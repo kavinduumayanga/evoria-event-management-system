@@ -26,6 +26,16 @@ app.get('/api/health', (req: Request, res: Response) => {
 // API Routes
 app.use('/api', routes);
 
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Evoria API is running',
+    health: '/api/health',
+    version: '1.0.0'
+  });
+});
+
 // 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({ status: 'error', message: 'Endpoint not found' });
