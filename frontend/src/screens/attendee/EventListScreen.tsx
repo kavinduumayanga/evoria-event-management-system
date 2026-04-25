@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Event } from '../../types';
 import { ScreenContainer, EventCard, LoadingState, EmptyState, ErrorState } from '../../components';
@@ -37,9 +38,11 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  useEffect(() => {
-    fetchEvents();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);

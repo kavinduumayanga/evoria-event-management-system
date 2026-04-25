@@ -4,20 +4,30 @@ Evoria is a mobile-based event booking and management system prototype.
 
 ## Project Structure
 This repository contains two main directories:
-- `backend/`: Node.js Express API using JSON files for storage
+- `backend/`: Node.js Express API using MongoDB for storage
 - `frontend/`: React Native Expo mobile application
 
 ## Tech Stack
-- **Backend:** Node.js, Express, TypeScript, bcryptjs, jsonwebtoken, zod
+- **Backend:** Node.js, Express, TypeScript, MongoDB, Mongoose, bcryptjs, jsonwebtoken, zod
 - **Frontend:** React Native, Expo, TypeScript, Zustand, React Navigation
 - **Design:** Dark neon UI with custom glassmorphism components
 
 ## Note
-This is a prototype. It currently uses JSON files for storage (`backend/data/*.json`) so that it can be tested easily without a database setup. The repository layer is abstracted so that MongoDB can be seamlessly integrated in the future. The backend is structured to be easily deployable to Azure App Service later.
+This project has been migrated to use MongoDB via Mongoose. The JSON file storage has been fully deprecated.
 
 ## Setup Instructions
 
-### 1. Backend Setup
+### 1. MongoDB Setup
+You must have a MongoDB instance running.
+- **Local Install (macOS):**
+  ```bash
+  brew tap mongodb/brew
+  brew install mongodb-community
+  brew services start mongodb-community
+  ```
+- Alternatively, you can use MongoDB Atlas and set your `MONGO_URI` in the `.env` file.
+
+### 2. Backend Setup
 1. Open a terminal and navigate to the backend folder:
    ```bash
    cd backend
@@ -27,15 +37,20 @@ This is a prototype. It currently uses JSON files for storage (`backend/data/*.j
    npm install
    ```
 3. Set up environment variables:
-   Copy `.env.example` to `.env`. Ensure your `JWT_SECRET` is set.
-4. Start the backend server:
+   Copy `.env.example` to `.env`. Ensure your `MONGO_URI` and `JWT_SECRET` are correctly configured.
+4. Seed the Database:
+   Populate your local MongoDB with test data (Users, Events, Venues, Tickets, Sessions):
+   ```bash
+   npm run seed
+   ```
+5. Start the backend server:
    ```bash
    npm run dev
    ```
    *The server will run on http://localhost:5000*
    *You can verify it's working by visiting http://localhost:5000/api/health*
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 1. Open a new terminal and navigate to the frontend folder:
    ```bash
    cd frontend
@@ -52,16 +67,76 @@ This is a prototype. It currently uses JSON files for storage (`backend/data/*.j
    npx expo start
    ```
 
-### 3. Running on iPhone 11 Pro Max
+### 4. Running on iPhone 11 Pro Max
 1. Download the **Expo Go** app from the App Store on your iPhone.
 2. Make sure your iPhone and computer are on the **same Wi-Fi network**.
 3. Scan the QR code displayed in the Expo terminal using your iPhone's camera.
 4. Tap the prompt to open the project in Expo Go.
+
+## Test Credentials
+
+After running `npm run seed`, you can use the following accounts:
+
+- **Host Admin:**
+  - Email: `hostadmin@evoria.com`
+  - Password: `Admin123!`
+
+- **Attendee:**
+  - Email: `attendee@evoria.com`
+  - Password: `Attendee123!`
+
+## API Smoke Testing / Postman Examples
+
+You can test the API using standard curl commands or Postman. For example, to login and get a token:
+
+```bash
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "hostadmin@evoria.com", "password": "Admin123!"}'
+```
+
+To fetch all events:
+```bash
+curl -X GET http://localhost:5000/api/events
+```
+
+To fetch venues:
+```bash
+curl -X GET http://localhost:5000/api/venues
+```
 
 ## Roles
 There are two roles in the system:
 - **Host Admin:** Can create and manage events, venues, sessions, tickets, and view bookings.
 - **Attendee:** Can browse public events, view details, and book tickets.
 
-You can register two separate accounts to test the full flow.
-# evoria-event-management-system
+## Azure Deployment Instructions
+
+### Backend (Azure App Service)
+The backend is fully compatible with Azure App Service (Linux Node.js runtime).
+
+1. **Create an Azure Web App** with the Node.js runtime.
+2. **Environment Variables**: Add the following Application Settings:
+   - `NODE_ENV=production`
+   - `MONGO_URI=<Your MongoDB Atlas connection string>`
+   - `JWT_SECRET=<Your strong secret>`
+   - `JWT_EXPIRES_IN=7d`
+   - `FRONTEND_URL=<Your Azure Static Web App URL>` (Optional, limits CORS)
+3. **Startup Command**: Azure will automatically detect the `package.json` and run:
+   - `npm install`
+   - `npm run build`
+   - `npm start`
+4. **Health Check**: Once deployed, verify functionality at `https://YOUR_BACKEND.azurewebsites.net/api/health`.
+
+### Frontend (Azure Static Web Apps)
+The Expo React Native app can be exported statically for the web and hosted on Azure Static Web Apps.
+
+1. **Create an Azure Static Web App**.
+2. **Configure Build Settings**:
+   - App location: `frontend`
+   - Api location: Leave blank
+   - Output location: `dist`
+   - Build command: `npm run web:build`
+3. **Environment Variables**: Add the following in the Azure Static Web Apps configuration:
+   - `EXPO_PUBLIC_API_BASE_URL=https://YOUR_BACKEND.azurewebsites.net/api`
+4. **Deployment**: Pushing to your GitHub branch will trigger the GitHub Actions workflow, compiling the Expo web build directly to Azure.

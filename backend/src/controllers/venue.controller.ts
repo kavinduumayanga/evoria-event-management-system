@@ -1,11 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { JsonRepository } from '../repositories/JsonRepository';
+import { VenueModel } from '../models/Venue';
 import { Venue } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
-
-const venueRepo = new JsonRepository<Venue>('venues.json');
 
 const venueSchema = z.object({
   name: z.string().min(2),
@@ -20,16 +17,9 @@ export const createVenue = async (req: Request, res: Response, next: NextFunctio
   try {
     const validatedData = venueSchema.parse(req.body);
 
-    const newVenue: Venue = {
-      id: uuidv4(),
-      ...validatedData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const newVenueDoc = await VenueModel.create(validatedData);
 
-    await venueRepo.create(newVenue);
-
-    res.status(201).json({ status: 'success', data: { venue: newVenue } });
+    res.status(201).json({ status: 'success', data: { venue: newVenueDoc.toJSON() } });
   } catch (error: any) {
     if (error instanceof z.ZodError) { const zodErr = error as z.ZodError<any>; return next(new AppError(zodErr.issues.map((e: any) => e.message).join(', '), 400)); }
     next(error);
@@ -38,8 +28,8 @@ export const createVenue = async (req: Request, res: Response, next: NextFunctio
 
 export const getVenues = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const venues = await venueRepo.findAll();
-    res.status(200).json({ status: 'success', results: venues.length, data: { venues } });
+    const venues = await VenueModel.find();
+    res.status(200).json({ status: 'success', results: venues.length, data: { venues: venues.map(v => v.toJSON()) } });
   } catch (error) {
     next(error);
   }
@@ -47,9 +37,9 @@ export const getVenues = async (req: Request, res: Response, next: NextFunction)
 
 export const getVenue = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const venue = await venueRepo.findById(req.params.id as string);
+    const venue = await VenueModel.findById(req.params.id as string);
     if (!venue) return next(new AppError('Venue not found', 404));
-    res.status(200).json({ status: 'success', data: { venue } });
+    res.status(200).json({ status: 'success', data: { venue: venue.toJSON() } });
   } catch (error) {
     next(error);
   }
@@ -57,11 +47,11 @@ export const getVenue = async (req: Request, res: Response, next: NextFunction) 
 
 export const updateVenue = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const venue = await venueRepo.findById(req.params.id as string);
+    const venue = await VenueModel.findById(req.params.id as string);
     if (!venue) return next(new AppError('Venue not found', 404));
 
-    const updatedVenue = await venueRepo.update((req.params.id as string), req.body);
-    res.status(200).json({ status: 'success', data: { venue: updatedVenue } });
+    const updatedVenue = await VenueModel.findByIdAndUpdate(req.params.id as string, req.body, { new: true });
+    res.status(200).json({ status: 'success', data: { venue: updatedVenue!.toJSON() } });
   } catch (error) {
     next(error);
   }
@@ -69,10 +59,10 @@ export const updateVenue = async (req: Request, res: Response, next: NextFunctio
 
 export const deleteVenue = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const venue = await venueRepo.findById(req.params.id as string);
+    const venue = await VenueModel.findById(req.params.id as string);
     if (!venue) return next(new AppError('Venue not found', 404));
 
-    await venueRepo.delete(req.params.id as string);
+    await VenueModel.findByIdAndDelete(req.params.id as string);
     res.status(204).json({ status: 'success', data: null });
   } catch (error) {
     next(error);

@@ -1,13 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
-import { JsonRepository } from '../repositories/JsonRepository';
+import { UserModel } from '../models/User';
 import { User, Role } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
-
-const userRepo = new JsonRepository<User>('users.json');
 
 const signToken = (id: string, role: Role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
@@ -28,38 +25,33 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     const validatedData = registerSchema.parse(req.body);
     const normalizedEmail = validatedData.email.trim().toLowerCase();
 
-    const existingUser = await userRepo.findOne((u) => u.email.toLowerCase() === normalizedEmail);
+    const existingUser = await UserModel.findOne({ email: normalizedEmail });
     if (existingUser) {
       return next(new AppError('Email already in use', 400));
     }
 
     const hashedPassword = await bcrypt.hash(validatedData.password, 12);
 
-    const newUser: User = {
-      id: uuidv4(),
+    const newUserDoc = await UserModel.create({
       name: validatedData.name,
       email: normalizedEmail,
       password: hashedPassword,
-      role: validatedData.role as Role,
+      role: validatedData.role,
       phone: validatedData.phone,
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    });
 
-    await userRepo.create(newUser);
-
+    const newUser = newUserDoc.toJSON() as any;
     const token = signToken(newUser.id, newUser.role);
 
     // Remove password from output
-    const userWithoutPassword = { ...newUser };
-    delete userWithoutPassword.password;
+    delete newUser.password;
 
     res.status(201).json({
       status: 'success',
       token,
       data: {
-        user: userWithoutPassword,
+        user: newUser,
       },
     });
   } catch (error: any) {
@@ -83,13 +75,15 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     console.log('[AUTH][LOGIN] Attempt:', { email: normalizedEmail });
 
-    const user = await userRepo.findOne((u) => u.email.toLowerCase() === normalizedEmail);
-    console.log('[AUTH][LOGIN] User found:', Boolean(user));
+    const userDoc = await UserModel.findOne({ email: normalizedEmail });
+    console.log('[AUTH][LOGIN] User found:', Boolean(userDoc));
 
-    if (!user || !user.password) {
+    if (!userDoc || !userDoc.password) {
       console.log('[AUTH][LOGIN] Rejected: missing user or password hash');
       return next(new AppError('Incorrect email or password', 401));
     }
+
+    const user = userDoc.toJSON() as any;
 
     const isBcryptHash = /^\$2[aby]\$\d{2}\$/.test(user.password);
     const isPasswordCorrect = isBcryptHash
@@ -104,15 +98,14 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     const token = signToken(user.id, user.role);
 
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password;
+    delete user.password;
 
     res.status(200).json({
       status: 'success',
       token,
-      user: userWithoutPassword,
+      user: user,
       data: {
-        user: userWithoutPassword,
+        user: user,
       },
     });
   } catch (error: any) {
@@ -129,16 +122,16 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
     const userId = req.user?.id;
     if (!userId) return next(new AppError('User not found', 404));
 
-    const user = await userRepo.findById(userId);
-    if (!user) return next(new AppError('User not found', 404));
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc) return next(new AppError('User not found', 404));
 
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password;
+    const user = userDoc.toJSON() as any;
+    delete user.password;
 
     res.status(200).json({
       status: 'success',
       data: {
-        user: userWithoutPassword,
+        user: user,
       },
     });
   } catch (error) {

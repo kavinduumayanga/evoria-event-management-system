@@ -94,7 +94,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
             <View style={styles.quantityContainer}>
               <Button title="-" onPress={() => setQuantity(Math.max(1, quantity - 1))} size="small" variant="outline" />
               <Text style={styles.quantity}>{quantity}</Text>
-              <Button title="+" onPress={() => setQuantity(Math.min(selectedTicket.maxPerUser, quantity + 1))} size="small" variant="outline" />
+              <Button title="+" onPress={() => setQuantity(Math.min(selectedTicket.maxPerUser, selectedTicket.quantity - selectedTicket.soldCount, quantity + 1))} size="small" variant="outline" />
             </View>
             <View style={styles.totalContainer}>
               <Text style={styles.totalLabel}>Total:</Text>

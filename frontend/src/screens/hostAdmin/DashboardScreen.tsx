@@ -6,7 +6,7 @@ import { CalendarDays, Users, MapPin, Layers } from 'lucide-react-native';
 import { EventService, BookingService, VenueService, SessionService, UserService } from '../../api/services';
 import { Event } from '../../types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
@@ -55,9 +55,11 @@ export const DashboardScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -68,8 +70,13 @@ export const DashboardScreen = () => {
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchData} /></ScreenContainer>;
 
   return (
-    <ScreenContainer scrollable style={styles.container}>
-      <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+    <ScreenContainer
+      scrollable
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+      }
+    >
       
       <View style={styles.header}>
         <Text style={styles.greeting}>Welcome back,</Text>
@@ -112,14 +119,21 @@ export const DashboardScreen = () => {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Events</Text>
-        <Text style={styles.seeAll} onPress={() => navigation.navigate('ManageEvents')}>See All</Text>
+        <Text style={styles.seeAll} onPress={() => navigation.navigate('EventsStack', { screen: 'ManageEvents' })}>See All</Text>
       </View>
 
       {recentEvents.length === 0 ? (
         <EmptyState title="No Events Yet" message="Create your first event to get started" />
       ) : (
         recentEvents.map(event => (
-          <EventCard key={event.id} event={event} />
+          <EventCard 
+            key={event.id} 
+            event={event} 
+            onPress={() => navigation.navigate('EventsStack', { 
+              screen: 'EventForm', 
+              params: { eventId: event.id } 
+            })} 
+          />
         ))
       )}
     </ScreenContainer>

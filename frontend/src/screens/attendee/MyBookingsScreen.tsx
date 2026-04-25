@@ -4,6 +4,7 @@ import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState } fr
 import { theme } from '../../constants/theme';
 import { BookingService } from '../../api/services';
 import { Booking } from '../../types';
+import { useFocusEffect } from '@react-navigation/native';
 
 export const MyBookingsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -25,9 +26,11 @@ export const MyBookingsScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchBookings();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchBookings();
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
