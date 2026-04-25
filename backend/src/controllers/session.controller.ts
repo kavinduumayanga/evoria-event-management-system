@@ -1,12 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { JsonRepository } from '../repositories/JsonRepository';
+import { SessionModel } from '../models/Session';
+import { EventModel } from '../models/Event';
 import { Session, Event } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
-
-const sessionRepo = new JsonRepository<Session>('sessions.json');
-const eventRepo = new JsonRepository<Event>('events.json');
 
 const sessionSchema = z.object({
   eventId: z.string(),
@@ -25,23 +22,16 @@ export const createSession = async (req: Request, res: Response, next: NextFunct
   try {
     const validatedData = sessionSchema.parse(req.body);
 
-    const event = await eventRepo.findById(validatedData.eventId);
+    const event = await EventModel.findById(validatedData.eventId);
     if (!event) return next(new AppError('Event not found', 404));
 
     if (event.hostAdminId !== req.user!.id) {
       return next(new AppError('Not authorized to add sessions to this event', 403));
     }
 
-    const newSession: Session = {
-      id: uuidv4(),
-      ...validatedData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const newSessionDoc = await SessionModel.create(validatedData);
 
-    await sessionRepo.create(newSession);
-
-    res.status(201).json({ status: 'success', data: { session: newSession } });
+    res.status(201).json({ status: 'success', data: { session: newSessionDoc.toJSON() } });
   } catch (error: any) {
     if (error instanceof z.ZodError) { const zodErr = error as z.ZodError<any>; return next(new AppError(zodErr.issues.map((e: any) => e.message).join(', '), 400)); }
     next(error);
@@ -50,8 +40,8 @@ export const createSession = async (req: Request, res: Response, next: NextFunct
 
 export const getSessions = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const sessions = await sessionRepo.findAll();
-    res.status(200).json({ status: 'success', results: sessions.length, data: { sessions } });
+    const sessions = await SessionModel.find();
+    res.status(200).json({ status: 'success', results: sessions.length, data: { sessions: sessions.map(s => s.toJSON()) } });
   } catch (error) {
     next(error);
   }
@@ -59,9 +49,9 @@ export const getSessions = async (req: Request, res: Response, next: NextFunctio
 
 export const getSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const session = await sessionRepo.findById(req.params.id as string);
+    const session = await SessionModel.findById(req.params.id as string);
     if (!session) return next(new AppError('Session not found', 404));
-    res.status(200).json({ status: 'success', data: { session } });
+    res.status(200).json({ status: 'success', data: { session: session.toJSON() } });
   } catch (error) {
     next(error);
   }
@@ -69,8 +59,8 @@ export const getSession = async (req: Request, res: Response, next: NextFunction
 
 export const getEventSessions = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const sessions = await sessionRepo.find((s) => s.eventId === req.params.eventId);
-    res.status(200).json({ status: 'success', results: sessions.length, data: { sessions } });
+    const sessions = await SessionModel.find({ eventId: req.params.eventId });
+    res.status(200).json({ status: 'success', results: sessions.length, data: { sessions: sessions.map(s => s.toJSON()) } });
   } catch (error) {
     next(error);
   }
@@ -78,16 +68,16 @@ export const getEventSessions = async (req: Request, res: Response, next: NextFu
 
 export const updateSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const session = await sessionRepo.findById(req.params.id as string);
+    const session = await SessionModel.findById(req.params.id as string);
     if (!session) return next(new AppError('Session not found', 404));
 
-    const event = await eventRepo.findById(session.eventId);
+    const event = await EventModel.findById(session.eventId);
     if (event?.hostAdminId !== req.user!.id) {
       return next(new AppError('Not authorized to update this session', 403));
     }
 
-    const updatedSession = await sessionRepo.update((req.params.id as string), req.body);
-    res.status(200).json({ status: 'success', data: { session: updatedSession } });
+    const updatedSession = await SessionModel.findByIdAndUpdate(req.params.id as string, req.body, { new: true });
+    res.status(200).json({ status: 'success', data: { session: updatedSession!.toJSON() } });
   } catch (error) {
     next(error);
   }
@@ -95,15 +85,15 @@ export const updateSession = async (req: Request, res: Response, next: NextFunct
 
 export const deleteSession = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const session = await sessionRepo.findById(req.params.id as string);
+    const session = await SessionModel.findById(req.params.id as string);
     if (!session) return next(new AppError('Session not found', 404));
 
-    const event = await eventRepo.findById(session.eventId);
+    const event = await EventModel.findById(session.eventId);
     if (event?.hostAdminId !== req.user!.id) {
       return next(new AppError('Not authorized to delete this session', 403));
     }
 
-    await sessionRepo.delete(req.params.id as string);
+    await SessionModel.findByIdAndDelete(req.params.id as string);
     res.status(204).json({ status: 'success', data: null });
   } catch (error) {
     next(error);

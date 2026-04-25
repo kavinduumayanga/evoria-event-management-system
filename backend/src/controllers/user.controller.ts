@@ -1,16 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import { JsonRepository } from '../repositories/JsonRepository';
+import { UserModel } from '../models/User';
 import { User } from '../types';
 import { AppError } from '../utils/appError';
 
-const userRepo = new JsonRepository<User>('users.json');
-
 export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const users = await userRepo.findAll();
-    const safeUsers = users.map(user => {
-      const { password, ...safeUser } = user;
-      return safeUser;
+    const userDocs = await UserModel.find();
+    const safeUsers = userDocs.map(doc => {
+      const user = doc.toJSON() as any;
+      delete user.password;
+      return user;
     });
     res.status(200).json({ status: 'success', results: safeUsers.length, data: { users: safeUsers } });
   } catch (error) {
@@ -20,10 +19,10 @@ export const getUsers = async (req: Request, res: Response, next: NextFunction) 
 
 export const getUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await userRepo.findById(req.params.id as string);
-    if (!user) return next(new AppError('User not found', 404));
+    const userDoc = await UserModel.findById(req.params.id as string);
+    if (!userDoc) return next(new AppError('User not found', 404));
 
-    const safeUser = { ...user };
+    const safeUser = userDoc.toJSON() as any;
     delete safeUser.password;
 
     res.status(200).json({ status: 'success', data: { user: safeUser } });
@@ -42,10 +41,10 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
     const updates = { ...req.body };
     delete updates.password;
 
-    const updatedUser = await userRepo.update((req.params.id as string), updates);
-    if (!updatedUser) return next(new AppError('User not found', 404));
+    const updatedUserDoc = await UserModel.findByIdAndUpdate(req.params.id as string, updates, { new: true });
+    if (!updatedUserDoc) return next(new AppError('User not found', 404));
 
-    const safeUser = { ...updatedUser };
+    const safeUser = updatedUserDoc.toJSON() as any;
     delete safeUser.password;
 
     res.status(200).json({ status: 'success', data: { user: safeUser } });
@@ -60,8 +59,8 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
       return next(new AppError('Not authorized to delete this user', 403));
     }
 
-    const success = await userRepo.delete(req.params.id as string);
-    if (!success) return next(new AppError('User not found', 404));
+    const deletedUserDoc = await UserModel.findByIdAndDelete(req.params.id as string);
+    if (!deletedUserDoc) return next(new AppError('User not found', 404));
 
     res.status(204).json({ status: 'success', data: null });
   } catch (error) {
