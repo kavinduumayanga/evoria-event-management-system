@@ -70,8 +70,13 @@ export const DashboardScreen = () => {
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchData} /></ScreenContainer>;
 
   return (
-    <ScreenContainer scrollable style={styles.container}>
-      <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+    <ScreenContainer
+      scrollable
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+      }
+    >
       
       <View style={styles.header}>
         <Text style={styles.greeting}>Welcome back,</Text>
@@ -114,7 +119,7 @@ export const DashboardScreen = () => {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Events</Text>
-        <Text style={styles.seeAll} onPress={() => navigation.navigate('ManageEvents')}>See All</Text>
+        <Text style={styles.seeAll} onPress={() => navigation.navigate('EventsStack', { screen: 'ManageEvents' })}>See All</Text>
       </View>
 
       {recentEvents.length === 0 ? (

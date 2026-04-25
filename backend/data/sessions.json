@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "id": "accd37be-4dd4-4d9c-a715-f5ff184c747b",
+    "eventId": "d2b1e7c8-e161-4f3e-8533-40b17b5244aa",
+    "title": "Keynote",
+    "sessionDate": "2026-12-01",
+    "startTime": "09:00",
+    "endTime": "10:00",
+    "status": "scheduled",
+    "createdAt": "2026-04-25T18:15:13.944Z",
+    "updatedAt": "2026-04-25T18:15:13.944Z"
+  }
+]

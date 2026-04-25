@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "id": "a96304a6-28c8-4276-878e-2e80f374d6d8",
+    "name": "Test Hall",
+    "address": "123 St",
+    "city": "Colombo",
+    "capacity": 200,
+    "type": "physical",
+    "createdAt": "2026-04-25T18:15:13.884Z",
+    "updatedAt": "2026-04-25T18:15:13.884Z"
+  }
+]

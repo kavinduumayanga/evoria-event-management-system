@@ -70,7 +70,7 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
           <Button 
             title="Back to Home" 
             variant="outline"
-            onPress={() => navigation.navigate('EventList')} 
+            onPress={() => navigation.navigate('HomeStack', { screen: 'EventList' })} 
             style={{ marginTop: 10 }}
           />
         </View>

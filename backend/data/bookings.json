@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "d790472e-ee1b-4547-b0c8-659b121b48e4",
+    "userId": "22222222-2222-4222-8222-222222222222",
+    "eventId": "d2b1e7c8-e161-4f3e-8533-40b17b5244aa",
+    "ticketTypeId": "0711b021-4adf-4f93-89f7-56d53612c4b8",
+    "quantity": 2,
+    "totalAmount": 50,
+    "bookingStatus": "cancelled",
+    "bookingDate": "2026-04-25T18:15:13.960Z",
+    "createdAt": "2026-04-25T18:15:13.960Z",
+    "updatedAt": "2026-04-25T18:15:14.005Z"
+  }
+]
