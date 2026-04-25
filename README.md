@@ -64,3 +64,4 @@ There are two roles in the system:
 - **Attendee:** Can browse public events, view details, and book tickets.
 
 You can register two separate accounts to test the full flow.
+# evoria-event-management-system
