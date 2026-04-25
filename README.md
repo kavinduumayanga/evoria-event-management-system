@@ -110,4 +110,33 @@ There are two roles in the system:
 - **Host Admin:** Can create and manage events, venues, sessions, tickets, and view bookings.
 - **Attendee:** Can browse public events, view details, and book tickets.
 
-# evoria-event-management-system
+## Azure Deployment Instructions
+
+### Backend (Azure App Service)
+The backend is fully compatible with Azure App Service (Linux Node.js runtime).
+
+1. **Create an Azure Web App** with the Node.js runtime.
+2. **Environment Variables**: Add the following Application Settings:
+   - `NODE_ENV=production`
+   - `MONGO_URI=<Your MongoDB Atlas connection string>`
+   - `JWT_SECRET=<Your strong secret>`
+   - `JWT_EXPIRES_IN=7d`
+   - `FRONTEND_URL=<Your Azure Static Web App URL>` (Optional, limits CORS)
+3. **Startup Command**: Azure will automatically detect the `package.json` and run:
+   - `npm install`
+   - `npm run build`
+   - `npm start`
+4. **Health Check**: Once deployed, verify functionality at `https://YOUR_BACKEND.azurewebsites.net/api/health`.
+
+### Frontend (Azure Static Web Apps)
+The Expo React Native app can be exported statically for the web and hosted on Azure Static Web Apps.
+
+1. **Create an Azure Static Web App**.
+2. **Configure Build Settings**:
+   - App location: `frontend`
+   - Api location: Leave blank
+   - Output location: `dist`
+   - Build command: `npm run web:build`
+3. **Environment Variables**: Add the following in the Azure Static Web Apps configuration:
+   - `EXPO_PUBLIC_API_BASE_URL=https://YOUR_BACKEND.azurewebsites.net/api`
+4. **Deployment**: Pushing to your GitHub branch will trigger the GitHub Actions workflow, compiling the Expo web build directly to Azure.
