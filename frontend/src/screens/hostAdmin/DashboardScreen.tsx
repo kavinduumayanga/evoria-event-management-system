@@ -6,7 +6,7 @@ import { CalendarDays, Users, MapPin, Layers } from 'lucide-react-native';
 import { EventService, BookingService, VenueService, SessionService, UserService } from '../../api/services';
 import { Event } from '../../types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
@@ -55,9 +55,11 @@ export const DashboardScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -119,7 +121,14 @@ export const DashboardScreen = () => {
         <EmptyState title="No Events Yet" message="Create your first event to get started" />
       ) : (
         recentEvents.map(event => (
-          <EventCard key={event.id} event={event} />
+          <EventCard 
+            key={event.id} 
+            event={event} 
+            onPress={() => navigation.navigate('EventsStack', { 
+              screen: 'EventForm', 
+              params: { eventId: event.id } 
+            })} 
+          />
         ))
       )}
     </ScreenContainer>

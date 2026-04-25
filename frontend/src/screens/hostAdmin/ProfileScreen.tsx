@@ -6,6 +6,7 @@ import { User, Mail, Shield, LogOut } from 'lucide-react-native';
 import { UserService } from '../../api/services';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useAuthStore } from '../../store/auth.store';
 
 export const ProfileScreen = () => {
   const navigation = useNavigation();
@@ -37,13 +38,8 @@ export const ProfileScreen = () => {
         text: 'Logout', 
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.removeItem('auth_token');
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Auth' }],
-            })
-          );
+          await useAuthStore.getState().logout();
+          // Navigation reset is not needed if root navigator listens to store
         }
       }
     ]);
