@@ -29,6 +29,7 @@ interface AuthState {
 
 const AUTH_TOKEN_KEY = 'auth_token';
 const AUTH_USER_KEY = 'user';
+const SHOULD_DEBUG_AUTH = __DEV__;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -75,7 +76,7 @@ export const initAuth = async () => {
   const store = useAuthStore.getState();
 
   initAuthPromise = (async () => {
-    if (__DEV__) {
+    if (SHOULD_DEBUG_AUTH) {
       console.log('[auth] initAuth started');
     }
     try {
@@ -85,6 +86,13 @@ export const initAuth = async () => {
       const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
       const storedUserStr = await AsyncStorage.getItem(AUTH_USER_KEY);
       const storedUser = storedUserStr ? (JSON.parse(storedUserStr) as User) : null;
+
+      if (SHOULD_DEBUG_AUTH) {
+        console.log('[auth] token load completed', {
+          hasToken: Boolean(token),
+          hasStoredUser: Boolean(storedUser),
+        });
+      }
 
       if (!token) {
         useAuthStore.setState({ user: null, token: null, isLoading: false, isAuthLoading: false });
@@ -124,7 +132,7 @@ export const initAuth = async () => {
     } finally {
       hasInitializedAuth = true;
       initAuthPromise = null;
-      if (__DEV__) {
+      if (SHOULD_DEBUG_AUTH) {
         console.log('[auth] initAuth completed');
       }
     }
@@ -132,3 +140,31 @@ export const initAuth = async () => {
 
   return initAuthPromise;
 };
+
+if (SHOULD_DEBUG_AUTH) {
+  const debugFlagKey = '__EVORIA_AUTH_DEBUG_SUBSCRIBED__';
+  const globalScope = globalThis as Record<string, unknown>;
+
+  if (!globalScope[debugFlagKey]) {
+    globalScope[debugFlagKey] = true;
+
+    let prev = useAuthStore.getState();
+    useAuthStore.subscribe((next) => {
+      const changed =
+        prev.user !== next.user ||
+        prev.token !== next.token ||
+        prev.isLoading !== next.isLoading ||
+        prev.isAuthLoading !== next.isAuthLoading;
+
+      if (changed) {
+        console.log('[auth] state change', {
+          hasUser: Boolean(next.user),
+          hasToken: Boolean(next.token),
+          isLoading: next.isLoading,
+          isAuthLoading: next.isAuthLoading,
+        });
+        prev = next;
+      }
+    });
+  }
+}

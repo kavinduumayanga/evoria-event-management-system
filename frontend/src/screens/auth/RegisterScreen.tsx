@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -34,18 +32,6 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [role, setRole] = useState<Role>('attendee');
   const [isLoading, setIsLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
-
-  useEffect(() => {
-    if (__DEV__) {
-      console.log('[RegisterScreen] mounted');
-    }
-
-    return () => {
-      if (__DEV__) {
-        console.log('[RegisterScreen] unmounted');
-      }
-    };
-  }, []);
 
   const handleRegister = async () => {
     const normalizedName = name.trim();
@@ -95,79 +81,78 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <KeyboardAvoidingView
-            style={styles.keyboardContainer}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <KeyboardAvoidingView
+          style={styles.keyboardContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
           >
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text style={styles.title}>Create Account</Text>
-              <Text style={styles.subtitle}>Join Evoria to start your journey</Text>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Join Evoria to start your journey</Text>
 
-              <GlassCard style={styles.card}>
-                <View style={styles.roleContainer}>
-                  <Text style={styles.roleLabel}>I am a:</Text>
-                  <View style={styles.roleButtons}>
-                    <TouchableOpacity
-                      style={[styles.roleButton, role === 'attendee' && styles.roleButtonActive]}
-                      onPress={() => setRole('attendee')}
-                    >
-                      <Text style={[styles.roleText, role === 'attendee' && styles.roleTextActive]}>Attendee</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.roleButton, role === 'host_admin' && styles.roleButtonActive]}
-                      onPress={() => setRole('host_admin')}
-                    >
-                      <Text style={[styles.roleText, role === 'host_admin' && styles.roleTextActive]}>Host Admin</Text>
-                    </TouchableOpacity>
-                  </View>
+            <GlassCard style={styles.card}>
+              <View style={styles.roleContainer}>
+                <Text style={styles.roleLabel}>I am a:</Text>
+                <View style={styles.roleButtons}>
+                  <TouchableOpacity
+                    style={[styles.roleButton, role === 'attendee' && styles.roleButtonActive]}
+                    onPress={() => setRole('attendee')}
+                  >
+                    <Text style={[styles.roleText, role === 'attendee' && styles.roleTextActive]}>Attendee</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.roleButton, role === 'host_admin' && styles.roleButtonActive]}
+                    onPress={() => setRole('host_admin')}
+                  >
+                    <Text style={[styles.roleText, role === 'host_admin' && styles.roleTextActive]}>Host Admin</Text>
+                  </TouchableOpacity>
                 </View>
-
-                <Input
-                  label="Full Name"
-                  placeholder="Enter your full name"
-                  value={name}
-                  onChangeText={setName}
-                />
-
-                <Input
-                  label="Email Address"
-                  placeholder="Enter your email"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={setEmail}
-                />
-
-                <Input
-                  label="Password"
-                  placeholder="Create a password"
-                  isPassword
-                  value={password}
-                  onChangeText={setPassword}
-                />
-
-                <Button
-                  title="Sign Up"
-                  onPress={handleRegister}
-                  isLoading={isLoading}
-                  style={styles.button}
-                />
-              </GlassCard>
-
-              <View style={styles.footer}>
-                <Text style={styles.footerText}>Already have an account? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                  <Text style={styles.footerLink}>Sign In</Text>
-                </TouchableOpacity>
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
+
+              <Input
+                label="Full Name"
+                placeholder="Enter your full name"
+                value={name}
+                onChangeText={setName}
+              />
+
+              <Input
+                label="Email Address"
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+              />
+
+              <Input
+                label="Password"
+                placeholder="Create a password"
+                isPassword
+                value={password}
+                onChangeText={setPassword}
+              />
+
+              <Button
+                title="Sign Up"
+                onPress={handleRegister}
+                isLoading={isLoading}
+                style={styles.button}
+              />
+            </GlassCard>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <Text style={styles.footerLink}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </GradientBackground>
   );
