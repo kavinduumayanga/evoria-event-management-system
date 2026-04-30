@@ -5,9 +5,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
 import { GradientBackground, Button, Input, GlassCard } from '../../components';
 import { theme } from '../../constants/theme';
-import apiClient from '../../api/client';
+import { AuthService } from '../../api/services';
 import { useAuthStore, Role } from '../../store/auth.store';
 import { ArrowLeft } from 'lucide-react-native';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
@@ -24,25 +25,39 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const login = useAuthStore((state) => state.login);
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedName || !normalizedEmail || !password) {
+      Alert.alert('Validation', 'Please fill in all required fields.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      Alert.alert('Validation', 'Please enter a valid email address.');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Validation', 'Password must be at least 6 characters long.');
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await apiClient.post('/auth/register', { 
-        name, 
-        email, 
+      const response = await AuthService.register({
+        name: normalizedName,
+        email: normalizedEmail,
         password,
-        role
+        role,
       });
       
-      const { token, data } = response.data;
+      const { token, data } = response;
       await login(data.user, token);
       
     } catch (error: any) {
-      Alert.alert('Registration Failed', error.response?.data?.message || 'An error occurred');
+      Alert.alert('Registration Failed', getApiErrorMessage(error, 'Unable to create account. Please try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +98,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                   style={[styles.roleButton, role === 'host_admin' && styles.roleButtonActive]}
                   onPress={() => setRole('host_admin')}
                 >
-                  <Text style={[styles.roleText, role === 'host_admin' && styles.roleTextActive]}>Host / Admin</Text>
+                  <Text style={[styles.roleText, role === 'host_admin' && styles.roleTextActive]}>Host Admin</Text>
                 </TouchableOpacity>
               </View>
             </View>

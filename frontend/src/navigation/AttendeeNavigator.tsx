@@ -4,8 +4,8 @@ import { AttendeeTabParamList } from '../types/navigation';
 import { theme } from '../constants/theme';
 import { Home, Ticket, User } from 'lucide-react-native';
 import { AttendeeHomeStack } from './AttendeeHomeStack';
+import { AttendeeProfileStack } from './AttendeeProfileStack';
 import { MyBookingsScreen } from '../screens/attendee/MyBookingsScreen';
-import { ProfileScreen } from '../screens/attendee/ProfileScreen';
 
 const Tab = createBottomTabNavigator<AttendeeTabParamList>();
 
@@ -40,7 +40,7 @@ export const AttendeeNavigator = () => {
       />
       <Tab.Screen 
         name="Profile" 
-        component={ProfileScreen} 
+        component={AttendeeProfileStack}
         options={{ 
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => <User color={color} size={size} /> 

@@ -5,12 +5,14 @@ export type AuthStackParamList = {
   Welcome: undefined;
   Login: undefined;
   Register: undefined;
+  ForgotPassword: undefined;
+  ResetPassword: { email?: string } | undefined;
 };
 
 export type AttendeeTabParamList = {
   HomeStack: NavigatorScreenParams<AttendeeHomeStackParamList>;
   MyBookings: undefined;
-  Profile: undefined;
+  Profile: NavigatorScreenParams<AttendeeProfileStackParamList>;
 };
 
 export type AttendeeHomeStackParamList = {
@@ -25,7 +27,7 @@ export type HostAdminTabParamList = {
   EventsStack: NavigatorScreenParams<HostAdminEventStackParamList>;
   VenuesStack: NavigatorScreenParams<HostAdminVenueStackParamList>;
   ManageBookings: undefined;
-  Profile: undefined;
+  Profile: NavigatorScreenParams<HostAdminProfileStackParamList>;
 };
 
 export type HostAdminEventStackParamList = {
@@ -40,6 +42,18 @@ export type HostAdminEventStackParamList = {
 export type HostAdminVenueStackParamList = {
   ManageVenues: undefined;
   VenueForm: { venueId?: string };
+};
+
+export type AttendeeProfileStackParamList = {
+  ProfileHome: undefined;
+  EditProfile: undefined;
+  ChangePassword: undefined;
+};
+
+export type HostAdminProfileStackParamList = {
+  ProfileHome: undefined;
+  EditProfile: undefined;
+  ChangePassword: undefined;
 };
 
 export type RootStackParamList = {

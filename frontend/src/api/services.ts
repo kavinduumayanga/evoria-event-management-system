@@ -1,5 +1,62 @@
 import apiClient from './client';
 import { Event, Booking, Venue, Session, TicketType } from '../types';
+import { Role } from '../store/auth.store';
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+  phone?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  newPassword: string;
+}
+
+export interface UpdateProfilePayload {
+  name?: string;
+  phone?: string;
+  profileImage?: string;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export const AuthService = {
+  register: async (payload: RegisterPayload) => {
+    const response = await apiClient.post('/auth/register', payload);
+    return response.data;
+  },
+  login: async (payload: LoginPayload) => {
+    const response = await apiClient.post('/auth/login', payload);
+    return response.data;
+  },
+  forgotPassword: async (payload: ForgotPasswordPayload) => {
+    const response = await apiClient.post('/auth/forgot-password', payload);
+    return response.data;
+  },
+  resetPassword: async (payload: ResetPasswordPayload) => {
+    const response = await apiClient.post('/auth/reset-password', payload);
+    return response.data;
+  },
+  googleLogin: async () => {
+    const response = await apiClient.post('/auth/google');
+    return response.data;
+  },
+};
 
 export const EventService = {
   getEvents: async () => {
@@ -123,6 +180,18 @@ export const SessionService = {
 export const UserService = {
   getMe: async () => {
     const response = await apiClient.get('/auth/me');
+    return response.data;
+  },
+  updateProfile: async (payload: UpdateProfilePayload) => {
+    const response = await apiClient.put('/users/profile', payload);
+    return response.data;
+  },
+  changePassword: async (payload: ChangePasswordPayload) => {
+    const response = await apiClient.put('/users/password', payload);
+    return response.data;
+  },
+  deactivateAccount: async () => {
+    const response = await apiClient.patch('/users/deactivate');
     return response.data;
   },
 };

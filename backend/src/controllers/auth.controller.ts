@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { UserModel } from '../models/User';
-import { User, Role } from '../types';
+import { Role } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
+
+const MIN_PASSWORD_LENGTH = 6;
+const RESET_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
 
 const signToken = (id: string, role: Role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
@@ -12,22 +16,58 @@ const signToken = (id: string, role: Role) => {
   });
 };
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const toSafeUser = (userDoc: any) => {
+  const user = userDoc?.toJSON ? userDoc.toJSON() : { ...userDoc };
+  delete user.password;
+  delete user.resetPasswordToken;
+  delete user.resetPasswordExpires;
+  return user;
+};
+
 const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(6),
-  role: z.enum(['host_admin', 'attendee']),
-  phone: z.string().optional(),
+  name: z.string().trim().min(1, 'Name is required'),
+  email: z.string().email('Please provide a valid email address'),
+  password: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`),
+  role: z.enum(['host_admin', 'attendee']).default('attendee'),
+  phone: z.string().trim().max(30, 'Phone number is too long').optional(),
 });
+
+const loginSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1, 'Reset token is required'),
+  newPassword: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`),
+});
+
+const handleValidationError = (error: unknown, next: NextFunction) => {
+  if (error instanceof z.ZodError) {
+    return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
+  }
+
+  if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: number }).code === 11000) {
+    return next(new AppError('Email already in use', 409));
+  }
+
+  return next(error);
+};
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = registerSchema.parse(req.body);
-    const normalizedEmail = validatedData.email.trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(validatedData.email);
 
     const existingUser = await UserModel.findOne({ email: normalizedEmail });
     if (existingUser) {
-      return next(new AppError('Email already in use', 400));
+      return next(new AppError('Email already in use', 409));
     }
 
     const hashedPassword = await bcrypt.hash(validatedData.password, 12);
@@ -41,100 +81,163 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       isActive: true,
     });
 
-    const newUser = newUserDoc.toJSON() as any;
-    const token = signToken(newUser.id, newUser.role);
-
-    // Remove password from output
-    delete newUser.password;
+    const safeUser = toSafeUser(newUserDoc);
+    const token = signToken(safeUser.id, safeUser.role);
 
     res.status(201).json({
       status: 'success',
       token,
       data: {
-        user: newUser,
+        user: safeUser,
       },
     });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      const zodErr = error as z.ZodError<any>;
-      return next(new AppError(zodErr.issues.map((e: any) => e.message).join(', '), 400));
-    }
-    next(error);
+  } catch (error) {
+    handleValidationError(error, next);
   }
 };
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
-});
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = loginSchema.parse(req.body);
-    const normalizedEmail = validatedData.email.trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(validatedData.email);
 
-    console.log('[AUTH][LOGIN] Attempt:', { email: normalizedEmail });
-
-    const userDoc = await UserModel.findOne({ email: normalizedEmail });
-    console.log('[AUTH][LOGIN] User found:', Boolean(userDoc));
+    const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+password +isActive');
 
     if (!userDoc || !userDoc.password) {
-      console.log('[AUTH][LOGIN] Rejected: missing user or password hash');
-      return next(new AppError('Incorrect email or password', 401));
+      return next(new AppError('Invalid email or password', 401));
     }
 
-    const user = userDoc.toJSON() as any;
+    if (!userDoc.isActive) {
+      return next(new AppError('This account is deactivated.', 401));
+    }
 
-    const isBcryptHash = /^\$2[aby]\$\d{2}\$/.test(user.password);
-    const isPasswordCorrect = isBcryptHash
-      ? await bcrypt.compare(validatedData.password, user.password)
-      : validatedData.password === user.password;
-
-    console.log('[AUTH][LOGIN] Password match:', isPasswordCorrect, `(mode: ${isBcryptHash ? 'bcrypt' : 'plain'})`);
-
+    const isPasswordCorrect = await bcrypt.compare(validatedData.password, userDoc.password);
     if (!isPasswordCorrect) {
-      return next(new AppError('Incorrect email or password', 401));
+      return next(new AppError('Invalid email or password', 401));
     }
 
-    const token = signToken(user.id, user.role);
-
-    delete user.password;
+    const safeUser = toSafeUser(userDoc);
+    const token = signToken(safeUser.id, safeUser.role);
 
     res.status(200).json({
       status: 'success',
       token,
-      user: user,
+      user: safeUser,
       data: {
-        user: user,
+        user: safeUser,
       },
     });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      const zodErr = error as z.ZodError<any>;
-      return next(new AppError(zodErr.issues.map((e: any) => e.message).join(', '), 400));
-    }
-    next(error);
+  } catch (error) {
+    handleValidationError(error, next);
   }
 };
 
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.id;
-    if (!userId) return next(new AppError('User not found', 404));
+    if (!userId) {
+      return next(new AppError('Unauthorized access. Please log in.', 401));
+    }
 
-    const userDoc = await UserModel.findById(userId);
-    if (!userDoc) return next(new AppError('User not found', 404));
+    const userDoc = await UserModel.findById(userId).select('+isActive');
+    if (!userDoc) {
+      return next(new AppError('User not found', 404));
+    }
 
-    const user = userDoc.toJSON() as any;
-    delete user.password;
+    if (!userDoc.isActive) {
+      return next(new AppError('This account is deactivated.', 401));
+    }
+
+    const safeUser = toSafeUser(userDoc);
 
     res.status(200).json({
       status: 'success',
       data: {
-        user: user,
+        user: safeUser,
       },
     });
   } catch (error) {
     next(error);
   }
+};
+
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validatedData = forgotPasswordSchema.parse(req.body);
+    const normalizedEmail = normalizeEmail(validatedData.email);
+
+    const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+resetPasswordToken +resetPasswordExpires +isActive');
+
+    let resetToken: string | undefined;
+
+    if (userDoc && userDoc.isActive) {
+      resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      userDoc.resetPasswordToken = hashedToken;
+      userDoc.resetPasswordExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
+      await userDoc.save();
+    }
+
+    const responsePayload: Record<string, unknown> = {
+      status: 'success',
+      message: 'If an account with that email exists, a password reset token was generated.',
+    };
+
+    if (process.env.NODE_ENV !== 'production' && resetToken) {
+      responsePayload.data = { resetToken };
+    }
+
+    res.status(200).json(responsePayload);
+  } catch (error) {
+    handleValidationError(error, next);
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validatedData = resetPasswordSchema.parse(req.body);
+
+    const hashedToken = crypto.createHash('sha256').update(validatedData.token).digest('hex');
+
+    const userDoc = await UserModel.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+password +resetPasswordToken +resetPasswordExpires +isActive');
+
+    if (!userDoc) {
+      return next(new AppError('Invalid or expired reset token', 400));
+    }
+
+    if (!userDoc.isActive) {
+      return next(new AppError('This account is deactivated.', 400));
+    }
+
+    userDoc.password = await bcrypt.hash(validatedData.newPassword, 12);
+    userDoc.resetPasswordToken = undefined;
+    userDoc.resetPasswordExpires = undefined;
+
+    await userDoc.save();
+
+    const safeUser = toSafeUser(userDoc);
+    const token = signToken(safeUser.id, safeUser.role);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Password reset successful.',
+      token,
+      data: {
+        user: safeUser,
+      },
+    });
+  } catch (error) {
+    handleValidationError(error, next);
+  }
+};
+
+export const googleAuthPlaceholder = async (req: Request, res: Response) => {
+  res.status(501).json({
+    status: 'fail',
+    message: 'Google authentication is planned for a future version.',
+  });
 };

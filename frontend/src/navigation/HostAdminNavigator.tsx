@@ -7,8 +7,8 @@ import { LayoutDashboard, CalendarDays, Users, User, MapPin } from 'lucide-react
 import { DashboardScreen } from '../screens/hostAdmin/DashboardScreen';
 import { HostAdminEventStack } from './HostAdminEventStack';
 import { HostAdminVenueStack } from './HostAdminVenueStack';
+import { HostAdminProfileStack } from './HostAdminProfileStack';
 import { ManageBookingsScreen } from '../screens/hostAdmin/ManageBookingsScreen';
-import { ProfileScreen } from '../screens/hostAdmin/ProfileScreen';
 
 const Tab = createBottomTabNavigator<HostAdminTabParamList>();
 
@@ -58,7 +58,7 @@ export const HostAdminNavigator = () => {
       />
       <Tab.Screen 
         name="Profile" 
-        component={ProfileScreen} 
+        component={HostAdminProfileStack}
         options={{ 
           tabBarIcon: ({ color, size }) => <User color={color} size={size} /> 
         }} 
