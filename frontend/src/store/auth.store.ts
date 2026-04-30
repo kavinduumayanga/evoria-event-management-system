@@ -19,9 +19,11 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  isAuthLoading: boolean;
   login: (user: User, token: string) => Promise<void>;
   logout: () => Promise<void>;
   setLoading: (isLoading: boolean) => void;
+  setAuthLoading: (isAuthLoading: boolean) => void;
   updateUser: (user: Partial<User>) => Promise<void>;
 }
 
@@ -32,17 +34,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isLoading: true,
+  isAuthLoading: true,
   login: async (user, token) => {
     await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
     await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-    set({ user, token, isLoading: false });
+    set({ user, token, isLoading: false, isAuthLoading: false });
   },
   logout: async () => {
     await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
     await AsyncStorage.removeItem(AUTH_USER_KEY);
-    set({ user: null, token: null, isLoading: false });
+    set({ user: null, token: null, isLoading: false, isAuthLoading: false });
   },
   setLoading: (isLoading) => set({ isLoading }),
+  setAuthLoading: (isAuthLoading) => set({ isAuthLoading }),
   updateUser: async (updatedUser) => {
     const currentUser = get().user;
     if (!currentUser) {
@@ -55,51 +59,76 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
+let initAuthPromise: Promise<void> | null = null;
+let hasInitializedAuth = false;
+
 // Initialize auth state
 export const initAuth = async () => {
+  if (hasInitializedAuth) {
+    return;
+  }
+
+  if (initAuthPromise) {
+    return initAuthPromise;
+  }
+
   const store = useAuthStore.getState();
 
-  try {
-    store.setLoading(true);
-
-    const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-    const storedUserStr = await AsyncStorage.getItem(AUTH_USER_KEY);
-    const storedUser = storedUserStr ? (JSON.parse(storedUserStr) as User) : null;
-
-    if (!token) {
-      useAuthStore.setState({ user: null, token: null, isLoading: false });
-      return;
+  initAuthPromise = (async () => {
+    if (__DEV__) {
+      console.log('[auth] initAuth started');
     }
-
     try {
-      const response = await axios.get(`${API_URL}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      store.setAuthLoading(true);
+      store.setLoading(true);
 
-      const apiUser = response.data?.data?.user as User | undefined;
-      if (!apiUser) {
-        throw new Error('Invalid user response from /auth/me');
-      }
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      const storedUserStr = await AsyncStorage.getItem(AUTH_USER_KEY);
+      const storedUser = storedUserStr ? (JSON.parse(storedUserStr) as User) : null;
 
-      await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(apiUser));
-      useAuthStore.setState({ user: apiUser, token, isLoading: false });
-    } catch (error: any) {
-      const isUnauthorized = error?.response?.status === 401;
-
-      if (isUnauthorized || !storedUser) {
-        await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
-        await AsyncStorage.removeItem(AUTH_USER_KEY);
-        useAuthStore.setState({ user: null, token: null, isLoading: false });
+      if (!token) {
+        useAuthStore.setState({ user: null, token: null, isLoading: false, isAuthLoading: false });
         return;
       }
 
-      // Fallback to cached user if server validation fails due transient issues.
-      useAuthStore.setState({ user: storedUser, token, isLoading: false });
+      try {
+        const response = await axios.get(`${API_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const apiUser = response.data?.data?.user as User | undefined;
+        if (!apiUser) {
+          throw new Error('Invalid user response from /auth/me');
+        }
+
+        await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(apiUser));
+        useAuthStore.setState({ user: apiUser, token, isLoading: false, isAuthLoading: false });
+      } catch (error: any) {
+        const isUnauthorized = error?.response?.status === 401;
+
+        if (isUnauthorized || !storedUser) {
+          await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+          await AsyncStorage.removeItem(AUTH_USER_KEY);
+          useAuthStore.setState({ user: null, token: null, isLoading: false, isAuthLoading: false });
+          return;
+        }
+
+        // Fallback to cached user if server validation fails due transient issues.
+        useAuthStore.setState({ user: storedUser, token, isLoading: false, isAuthLoading: false });
+      }
+    } catch (error: any) {
+      console.error('Failed to initialize auth state', error);
+      useAuthStore.setState({ user: null, token: null, isLoading: false, isAuthLoading: false });
+    } finally {
+      hasInitializedAuth = true;
+      initAuthPromise = null;
+      if (__DEV__) {
+        console.log('[auth] initAuth completed');
+      }
     }
-  } catch (error) {
-    console.error('Failed to initialize auth state', error);
-    useAuthStore.setState({ user: null, token: null, isLoading: false });
-  }
+  })();
+
+  return initAuthPromise;
 };
