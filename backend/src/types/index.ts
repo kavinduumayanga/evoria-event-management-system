@@ -14,6 +14,8 @@ export interface User {
   phone?: string;
   profileImage?: string;
   isActive: boolean;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: string;
   createdAt: string;
   updatedAt: string;
 }

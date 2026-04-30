@@ -5,9 +5,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
 import { GradientBackground, Button, Input, GlassCard } from '../../components';
 import { theme } from '../../constants/theme';
-import apiClient from '../../api/client';
+import { AuthService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { ArrowLeft } from 'lucide-react-native';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -22,19 +23,27 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const login = useAuthStore((state) => state.login);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
+      Alert.alert('Validation', 'Please fill in all fields.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      Alert.alert('Validation', 'Please enter a valid email address.');
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await apiClient.post('/auth/login', {
-        email: email.trim().toLowerCase(),
+      const response = await AuthService.login({
+        email: normalizedEmail,
         password,
       });
 
-      const { token, user, data } = response.data;
+      const { token, user, data } = response;
       const resolvedUser = user || data?.user;
 
       if (!token || !resolvedUser) {
@@ -46,24 +55,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       // Navigation will be handled by RootNavigator automatically 
       // based on the updated auth state.
     } catch (error: any) {
-      console.error('[AUTH][LOGIN] Request failed:', {
-        message: error?.message,
-        status: error?.response?.status,
-        data: error?.response?.data,
-        request: {
-          baseURL: error?.config?.baseURL,
-          url: error?.config?.url,
-          method: error?.config?.method,
-        },
-      });
-
-      const backendMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.error?.message ||
-        error?.message ||
-        'An error occurred';
-
-      Alert.alert('Login Failed', backendMessage);
+      Alert.alert('Login Failed', getApiErrorMessage(error, 'Unable to sign in. Please try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +100,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 onChangeText={setPassword}
               />
               
-              <TouchableOpacity style={styles.forgotPassword}>
+              <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
 

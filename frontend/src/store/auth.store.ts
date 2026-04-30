@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { API_URL } from '../constants/api';
 
 export type Role = 'host_admin' | 'attendee';
 
@@ -10,6 +12,7 @@ export interface User {
   role: Role;
   phone?: string;
   profileImage?: string;
+  isActive?: boolean;
 }
 
 interface AuthState {
@@ -19,46 +22,84 @@ interface AuthState {
   login: (user: User, token: string) => Promise<void>;
   logout: () => Promise<void>;
   setLoading: (isLoading: boolean) => void;
-  updateUser: (user: Partial<User>) => void;
+  updateUser: (user: Partial<User>) => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+const AUTH_TOKEN_KEY = 'auth_token';
+const AUTH_USER_KEY = 'user';
+
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isLoading: true,
   login: async (user, token) => {
-    await AsyncStorage.setItem('auth_token', token);
-    await AsyncStorage.setItem('user', JSON.stringify(user));
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+    await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
     set({ user, token, isLoading: false });
   },
   logout: async () => {
-    await AsyncStorage.removeItem('auth_token');
-    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+    await AsyncStorage.removeItem(AUTH_USER_KEY);
     set({ user: null, token: null, isLoading: false });
   },
   setLoading: (isLoading) => set({ isLoading }),
-  updateUser: (updatedUser) => set((state) => ({ 
-    user: state.user ? { ...state.user, ...updatedUser } : null 
-  })),
+  updateUser: async (updatedUser) => {
+    const currentUser = get().user;
+    if (!currentUser) {
+      return;
+    }
+
+    const nextUser = { ...currentUser, ...updatedUser };
+    await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+    set({ user: nextUser });
+  },
 }));
 
 // Initialize auth state
 export const initAuth = async () => {
   const store = useAuthStore.getState();
+
   try {
     store.setLoading(true);
-    const token = await AsyncStorage.getItem('auth_token');
-    const userStr = await AsyncStorage.getItem('user');
-    
-    if (token && userStr) {
-      const user = JSON.parse(userStr);
-      // Validate token structure if needed, or rely on API interceptors
-      useAuthStore.setState({ user, token, isLoading: false });
-    } else {
-      store.setLoading(false);
+
+    const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+    const storedUserStr = await AsyncStorage.getItem(AUTH_USER_KEY);
+    const storedUser = storedUserStr ? (JSON.parse(storedUserStr) as User) : null;
+
+    if (!token) {
+      useAuthStore.setState({ user: null, token: null, isLoading: false });
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const apiUser = response.data?.data?.user as User | undefined;
+      if (!apiUser) {
+        throw new Error('Invalid user response from /auth/me');
+      }
+
+      await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(apiUser));
+      useAuthStore.setState({ user: apiUser, token, isLoading: false });
+    } catch (error: any) {
+      const isUnauthorized = error?.response?.status === 401;
+
+      if (isUnauthorized || !storedUser) {
+        await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+        await AsyncStorage.removeItem(AUTH_USER_KEY);
+        useAuthStore.setState({ user: null, token: null, isLoading: false });
+        return;
+      }
+
+      // Fallback to cached user if server validation fails due transient issues.
+      useAuthStore.setState({ user: storedUser, token, isLoading: false });
     }
   } catch (error) {
     console.error('Failed to initialize auth state', error);
-    store.setLoading(false);
+    useAuthStore.setState({ user: null, token: null, isLoading: false });
   }
 };

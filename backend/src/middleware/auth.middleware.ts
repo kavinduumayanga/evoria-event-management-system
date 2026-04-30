@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from '../utils/appError';
 import { Role } from '../types';
+import { UserModel } from '../models/User';
 
 declare global {
   namespace Express {
@@ -14,22 +15,38 @@ declare global {
   }
 }
 
-export const protect = (req: Request, res: Response, next: NextFunction) => {
+export const protect = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    let token;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
+    const authHeader = req.headers.authorization;
+    let token: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
     }
 
     if (!token) {
-      return next(new AppError('You are not logged in! Please log in to get access.', 401));
+      return next(new AppError('Unauthorized access. Please log in.', 401));
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string; role: Role };
-    req.user = decoded;
+
+    const currentUser = await UserModel.findById(decoded.id).select('+isActive');
+    if (!currentUser) {
+      return next(new AppError('Unauthorized access. User no longer exists.', 401));
+    }
+
+    if (!currentUser.isActive) {
+      return next(new AppError('This account is deactivated. Please contact support.', 401));
+    }
+
+    req.user = {
+      id: currentUser.id,
+      role: currentUser.role as Role,
+    };
+
     next();
   } catch (error) {
-    next(new AppError('Invalid or expired token', 401));
+    next(new AppError('Invalid or expired token.', 401));
   }
 };
 
