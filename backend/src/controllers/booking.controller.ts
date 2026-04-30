@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { BookingModel } from '../models/Booking';
 import { TicketTypeModel } from '../models/TicketType';
+import { EventModel } from '../models/Event';
 import { Booking, TicketType } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
@@ -15,11 +16,26 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
   try {
     const validatedData = bookingSchema.parse(req.body);
 
+    const event = await EventModel.findById(validatedData.eventId);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (event.status !== 'published') {
+      return next(new AppError('Cannot book an event that is not published', 400));
+    }
+
+    if (event.visibility === 'private') {
+      return next(new AppError('Private events cannot be booked', 403));
+    }
+
     const ticket = await TicketTypeModel.findById(validatedData.ticketTypeId);
     if (!ticket) return next(new AppError('Ticket not found', 404));
     
     if (ticket.eventId !== validatedData.eventId) {
        return next(new AppError('Ticket does not belong to this event', 400));
+    }
+
+    if (!ticket.isActive) {
+      return next(new AppError('Ticket is not active', 400));
     }
 
     if (ticket.quantity < ticket.soldCount + validatedData.quantity) {

@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Settings } from 'lucide-react-native';
-import { EventService, UserService } from '../../../api/services';
+import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban } from 'lucide-react-native';
+import { EventService } from '../../../api/services';
 import { Event } from '../../../types';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -24,10 +24,8 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
   const fetchEvents = async () => {
     try {
       setError(null);
-      const userRes = await UserService.getMe();
       const eventsRes = await EventService.getEvents();
-      const myEvents = eventsRes.data.events.filter((e: any) => e.hostAdminId === userRes.data.user.id);
-      setEvents(myEvents);
+      setEvents(eventsRes.data.events);
     } catch (err) {
       console.error(err);
       setError('Failed to load events');
@@ -63,6 +61,30 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
           }
         }
       }
+    ]);
+  };
+
+  const handleStatusUpdate = (event: Event, nextStatus: 'published' | 'cancelled') => {
+    const actionLabel = nextStatus === 'published' ? 'Publish' : 'Cancel';
+    const confirmationText = nextStatus === 'published'
+      ? 'Publish this event now?'
+      : 'Cancel this event? Attendees will no longer be able to book it.';
+
+    Alert.alert(`${actionLabel} Event`, confirmationText, [
+      { text: 'No', style: 'cancel' },
+      {
+        text: actionLabel,
+        style: nextStatus === 'cancelled' ? 'destructive' : 'default',
+        onPress: async () => {
+          try {
+            const response = await EventService.updateEventStatus(event.id, nextStatus);
+            const updatedEvent: Event = response.data.event;
+            setEvents((previous) => previous.map((item) => (item.id === event.id ? updatedEvent : item)));
+          } catch (error: any) {
+            Alert.alert('Error', error.response?.data?.message || `Failed to ${nextStatus} event`);
+          }
+        },
+      },
     ]);
   };
 
@@ -104,6 +126,18 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
                     <Edit2 size={16} color={theme.colors.textMuted} />
                     <Text style={[styles.actionText, { color: theme.colors.textMuted }]}>Edit</Text>
                   </TouchableOpacity>
+                  {item.status === 'draft' && (
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleStatusUpdate(item, 'published')}>
+                      <Megaphone size={16} color={theme.colors.success} />
+                      <Text style={[styles.actionText, { color: theme.colors.success }]}>Publish</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status === 'published' && (
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleStatusUpdate(item, 'cancelled')}>
+                      <Ban size={16} color={theme.colors.warning} />
+                      <Text style={[styles.actionText, { color: theme.colors.warning }]}>Cancel</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item.id)}>
                     <Trash2 size={16} color={theme.colors.error} />
                     <Text style={[styles.actionText, { color: theme.colors.error }]}>Delete</Text>

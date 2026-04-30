@@ -1,6 +1,7 @@
 export type Role = 'host_admin' | 'attendee';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
-export type EventVisibility = 'public' | 'private';
+export type EventVisibility = 'public' | 'private' | 'unlisted';
+export type EventType = 'online' | 'physical' | 'hybrid';
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
 export type VenueType = 'physical' | 'online' | 'hybrid';
 export type SessionStatus = 'scheduled' | 'cancelled' | 'completed';
@@ -13,7 +14,8 @@ export interface Event {
   startTime: string;
   endTime: string;
   hostAdminId: string;
-  venueId: string;
+  venueId?: string | null;
+  type: EventType;
   coverImage?: string;
   capacity: number;
   status: EventStatus;
