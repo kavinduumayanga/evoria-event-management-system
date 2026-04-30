@@ -13,12 +13,11 @@ import { protect, restrictTo } from '../middleware/auth.middleware';
 const router = Router();
 
 router.get('/', getEvents);
+router.get('/host/:hostAdminId', protect, restrictTo('host_admin'), getHostEvents);
 router.get('/:id', getEvent);
 
 // Protected routes
 router.use(protect);
-
-router.get('/host/:hostAdminId', getHostEvents);
 
 // Host Admin only
 router.use(restrictTo('host_admin'));

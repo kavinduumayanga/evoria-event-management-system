@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image, StyleProp, ViewStyle } from 'react-nativ
 import { NeonCard } from './NeonCard';
 import { Event } from '../types';
 import { theme } from '../constants/theme';
-import { Calendar, MapPin, Users, Clock } from 'lucide-react-native';
+import { Calendar, Users, Clock } from 'lucide-react-native';
 
 interface EventCardProps {
   event: Event;
@@ -13,6 +13,9 @@ interface EventCardProps {
 }
 
 export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, actions }) => {
+  const isCancelled = event.status === 'cancelled';
+  const isPublished = event.status === 'published';
+
   const getStatusColor = () => {
     switch (event.status) {
       case 'published': return theme.colors.success;
@@ -23,7 +26,15 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, act
   };
 
   return (
-    <NeonCard style={[styles.container, style]} onPress={onPress}>
+    <NeonCard
+      style={[
+        styles.container,
+        isPublished && styles.publishedContainer,
+        isCancelled && styles.cancelledContainer,
+        style,
+      ]}
+      onPress={onPress}
+    >
       {event.coverImage ? (
         <Image source={{ uri: event.coverImage }} style={styles.image} />
       ) : (
@@ -37,6 +48,15 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, act
           <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor() + '20', borderColor: getStatusColor() }]}>
             <Text style={[styles.statusText, { color: getStatusColor() }]}>{event.status.toUpperCase()}</Text>
+          </View>
+        </View>
+
+        <View style={styles.badgeRow}>
+          <View style={styles.metaBadge}>
+            <Text style={styles.metaBadgeText}>{(event.type || 'physical').toUpperCase()}</Text>
+          </View>
+          <View style={styles.metaBadge}>
+            <Text style={styles.metaBadgeText}>{event.visibility.toUpperCase()}</Text>
           </View>
         </View>
 
@@ -69,6 +89,13 @@ const styles = StyleSheet.create({
   container: {
     padding: 0,
     marginBottom: theme.spacing.m,
+  },
+  publishedContainer: {
+    borderColor: `${theme.colors.success}66`,
+    borderWidth: 1,
+  },
+  cancelledContainer: {
+    opacity: 0.6,
   },
   image: {
     width: '100%',
@@ -112,6 +139,23 @@ const styles = StyleSheet.create({
   },
   detailsContainer: {
     marginTop: theme.spacing.xs,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    marginBottom: theme.spacing.s,
+    gap: theme.spacing.s,
+  },
+  metaBadge: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.s,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 2,
+  },
+  metaBadgeText: {
+    ...theme.typography.small,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
   },
   detailRow: {
     flexDirection: 'row',

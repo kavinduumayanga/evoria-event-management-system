@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -8,7 +8,7 @@ import { Event, Venue, Session, TicketType } from '../../types';
 import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { ArrowLeft, Calendar, MapPin, Clock, Users, Ticket as TicketIcon } from 'lucide-react-native';
+import { ArrowLeft, Calendar, MapPin, Clock, Wifi } from 'lucide-react-native';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -25,6 +25,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [tickets, setTickets] = useState<TicketType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEventDetails();
@@ -33,6 +34,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchEventDetails = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const [eventRes, sessionsRes, ticketsRes] = await Promise.all([
         apiClient.get(`/events/${eventId}`),
         apiClient.get(`/sessions/event/${eventId}`),
@@ -47,15 +49,26 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       if (eventData.venueId) {
         const venueRes = await apiClient.get(`/venues/${eventData.venueId}`);
         setVenue(venueRes.data.data.venue);
+      } else {
+        setVenue(null);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch event details', error);
+      setError(error.response?.data?.message || 'Failed to load event details');
     } finally {
       setIsLoading(false);
     }
   };
 
   if (isLoading) return <LoadingState />;
+
+  if (error) {
+    return (
+      <ScreenContainer>
+        <ErrorState message={error} onRetry={fetchEventDetails} />
+      </ScreenContainer>
+    );
+  }
 
   if (!event) {
     return (
@@ -96,10 +109,20 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Clock size={16} color={theme.colors.secondary} />
                 <Text style={styles.metaText}>{event.startTime} - {event.endTime}</Text>
               </View>
+              <View style={styles.metaRow}>
+                <Wifi size={16} color={theme.colors.primary} />
+                <Text style={styles.metaText}>Type: {event.type ? event.type.toUpperCase() : 'PHYSICAL'}</Text>
+              </View>
               {venue && (
                 <View style={styles.metaRow}>
                   <MapPin size={16} color={theme.colors.accent} />
                   <Text style={styles.metaText}>{venue.name}, {venue.city}</Text>
+                </View>
+              )}
+              {!venue && event.type === 'online' && (
+                <View style={styles.metaRow}>
+                  <MapPin size={16} color={theme.colors.accent} />
+                  <Text style={styles.metaText}>Online event (no physical venue)</Text>
                 </View>
               )}
             </View>
@@ -146,7 +169,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.footer}>
           <Button 
             title={isAvailable ? "Book Tickets" : "Sold Out"}
-            disabled={!isAvailable}
+            disabled={!isAvailable || event.status !== 'published'}
             onPress={() => navigation.navigate('TicketSelection', { eventId })}
             style={styles.bookButton}
           />
