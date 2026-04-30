@@ -11,13 +11,23 @@ import { theme } from '../constants/theme';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator = () => {
-  const { user, token, isLoading } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const isAuthLoading = useAuthStore((state) => state.isAuthLoading);
 
   useEffect(() => {
     initAuth();
   }, []);
 
-  if (isLoading) {
+  if (__DEV__) {
+    console.log('[RootNavigator] render', {
+      hasUser: Boolean(user),
+      hasToken: Boolean(token),
+      isAuthLoading,
+    });
+  }
+
+  if (isAuthLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
