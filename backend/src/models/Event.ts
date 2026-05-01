@@ -8,8 +8,11 @@ const eventSchema = new Schema({
   date: { type: String, required: true },
   startTime: { type: String, required: true },
   endTime: { type: String, required: true },
-  hostAdminId: { type: String, required: true, index: true },
+  ownerId: { type: String, required: true, index: true },
+  // Legacy field kept for backward compatibility with older records.
+  hostAdminId: { type: String, index: true },
   adminIds: { type: [String], default: [] },
+  publicSlug: { type: String, required: true, unique: true, trim: true, lowercase: true, index: true },
   venueId: { type: String, default: null },
   type: { type: String, enum: ['online', 'physical', 'hybrid'], required: true },
   category: { type: String, trim: true, default: '' },
@@ -55,6 +58,7 @@ const eventSchema = new Schema({
 eventSchema.index({ title: 'text', description: 'text' });
 eventSchema.index({ category: 1, city: 1, date: 1 });
 eventSchema.index({ tags: 1 });
+eventSchema.index({ ownerId: 1, date: 1 });
 eventSchema.index({ isFeatured: -1, date: 1, startTime: 1 });
 eventSchema.index({ bookingCount: -1, viewsCount: -1 });
 

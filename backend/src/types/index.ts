@@ -52,8 +52,10 @@ export interface Event {
   date: string;
   startTime: string;
   endTime: string;
-  hostAdminId: string;
+  ownerId: string;
+  hostAdminId?: string;
   adminIds?: string[];
+  publicSlug: string;
   venueId?: string | null;
   type: EventType;
   category: string;

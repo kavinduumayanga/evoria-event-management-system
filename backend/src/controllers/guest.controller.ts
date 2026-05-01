@@ -245,7 +245,7 @@ export const runBulkGuestAction = async (req: Request, res: Response, next: Next
     }
 
     const eventIds = [...new Set(registrations.map((registration) => registration.eventId))];
-    const events = await EventModel.find({ _id: { $in: eventIds } }).select('_id hostAdminId adminIds');
+    const events = await EventModel.find({ _id: { $in: eventIds } }).select('_id ownerId hostAdminId adminIds');
     const eventMap = new Map(events.map((event) => [event.id, event]));
 
     for (const registration of registrations) {

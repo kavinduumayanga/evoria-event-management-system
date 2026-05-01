@@ -39,8 +39,8 @@ export const mockCheckout = async (req: Request, res: Response, next: NextFuncti
       return next(new AppError('Event is not available for booking', 400));
     }
 
-    if (event.visibility === 'private') {
-      return next(new AppError('Event is private', 403));
+    if (event.visibility !== 'public') {
+      return next(new AppError('Only public events can be booked', 403));
     }
 
     const eventAtCapacity = await isEventAtCapacityForQuantity(event.id, validatedData.quantity);

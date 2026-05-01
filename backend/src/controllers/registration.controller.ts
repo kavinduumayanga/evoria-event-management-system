@@ -94,8 +94,8 @@ export const createRegistration = async (req: Request, res: Response, next: Next
       return next(new AppError('Cannot register for an event that is not published', 400));
     }
 
-    if (event.visibility === 'private') {
-      return next(new AppError('Private events are not open for attendee registrations', 403));
+    if (event.visibility !== 'public') {
+      return next(new AppError('Only public events are open for registrations', 403));
     }
 
     const ticket = await TicketTypeModel.findById(validatedData.ticketTypeId);

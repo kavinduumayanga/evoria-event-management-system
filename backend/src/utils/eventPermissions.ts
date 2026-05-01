@@ -1,4 +1,5 @@
 interface EventPermissionTarget {
+  ownerId?: string | null;
   hostAdminId?: string | null;
   adminIds?: string[] | null;
 }
@@ -23,6 +24,12 @@ export const isEventOwner = (userId: string, event: EventPermissionTarget | null
   const normalizedUserId = normalizeId(userId);
   if (!normalizedUserId) return false;
 
+  const ownerId = normalizeId(event.ownerId);
+  if (ownerId.length > 0) {
+    return ownerId === normalizedUserId;
+  }
+
+  // Legacy fallback for records created before ownerId was introduced.
   return normalizeId(event.hostAdminId) === normalizedUserId;
 };
 
@@ -39,5 +46,5 @@ export const canManageEvent = (userId: string, event: EventPermissionTarget | nu
 };
 
 export const manageableEventQuery = (userId: string) => ({
-  $or: [{ hostAdminId: userId }, { adminIds: userId }],
+  $or: [{ ownerId: userId }, { hostAdminId: userId }, { adminIds: userId }],
 });

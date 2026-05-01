@@ -113,6 +113,10 @@ export interface EventSearchParams {
   date?: string;
 }
 
+export interface AddEventAdminPayload {
+  email: string;
+}
+
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
@@ -186,6 +190,18 @@ export const EventService = {
   },
   updateEventStatus: async (id: string, status: string) => {
     const response = await apiClient.patch(`/events/${id}/status`, { status });
+    return response.data;
+  },
+  updateEventVisibility: async (id: string, visibility: 'public' | 'private' | 'unlisted') => {
+    const response = await apiClient.patch(`/events/${id}/visibility`, { visibility });
+    return response.data;
+  },
+  addEventAdmin: async (id: string, payload: AddEventAdminPayload) => {
+    const response = await apiClient.post(`/events/${id}/admins`, payload);
+    return response.data;
+  },
+  removeEventAdmin: async (id: string, userId: string) => {
+    const response = await apiClient.delete(`/events/${id}/admins/${userId}`);
     return response.data;
   },
   toggleFeature: async (id: string) => {
