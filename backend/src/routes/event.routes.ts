@@ -7,13 +7,15 @@ import {
   updateEvent,
   deleteEvent,
   updateEventStatus,
+  updateEventVisibility,
   searchEvents,
   getTrendingEvents,
   incrementEventView,
   getRecommendedEvents,
   getEventCalendar,
   toggleEventFeatured,
-  updateEventAdmins,
+  addEventAdmin,
+  removeEventAdmin,
 } from '../controllers/event.controller';
 import { protect } from '../middleware/auth.middleware';
 
@@ -34,7 +36,9 @@ router.post('/', createEvent);
 router.put('/:id', updateEvent);
 router.delete('/:id', deleteEvent);
 router.patch('/:id/status', updateEventStatus);
+router.patch('/:id/visibility', updateEventVisibility);
 router.patch('/:id/feature', toggleEventFeatured);
-router.patch('/:id/admins', updateEventAdmins);
+router.post('/:id/admins', addEventAdmin);
+router.delete('/:id/admins/:userId', removeEventAdmin);
 
 export default router;

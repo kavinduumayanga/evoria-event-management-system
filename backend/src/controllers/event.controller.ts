@@ -56,8 +56,12 @@ const statusUpdateSchema = z.object({
   status: z.enum(EVENT_STATUSES),
 }).strict();
 
-const eventAdminsSchema = z.object({
-  adminIds: z.array(z.string().trim().min(1, 'admin user id is required')).max(100, 'Maximum 100 admins allowed'),
+const visibilityUpdateSchema = z.object({
+  visibility: z.enum(EVENT_VISIBILITIES),
+}).strict();
+
+const addEventAdminSchema = z.object({
+  email: z.string().trim().email('Please provide a valid email address'),
 }).strict();
 
 interface EventInput {
@@ -137,6 +141,34 @@ const normalizeMeetingLink = (meetingLink: string | undefined): string | undefin
   if (meetingLink === undefined) return undefined;
   const trimmed = meetingLink.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const slugify = (value: string): string => {
+  const normalized = value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+
+  return normalized || 'event';
+};
+
+const generateUniquePublicSlug = async (title: string): Promise<string> => {
+  const baseSlug = slugify(title);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = attempt === 0
+      ? baseSlug
+      : `${baseSlug}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const existing = await EventModel.findOne({ publicSlug: candidate }).select('_id');
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return `${baseSlug}-${Date.now().toString(36)}`;
 };
 
 const approvedModerationFilter = () => ({
@@ -357,26 +389,21 @@ const ensureEventReadableByUser = (event: any, requester: { id: string } | null)
     throw new AppError('Event is not available', 403);
   }
 
-  if (event.visibility === 'private') {
-    throw new AppError('Event is private', 403);
+  if (event.visibility !== 'public') {
+    throw new AppError('Event is not public', 403);
   }
 };
 
-const normalizeAdminIds = (adminIds: string[], ownerId: string): string[] => {
-  const owner = ownerId.trim();
-  return Array.from(new Set(
-    adminIds
-      .map((adminId) => adminId.trim())
-      .filter((adminId) => adminId.length > 0 && adminId !== owner),
-  ));
-};
-
-const ensureAdminsExist = async (adminIds: string[]) => {
-  if (!adminIds.length) return;
-  const users = await UserModel.find({ _id: { $in: adminIds } }).select('_id');
-  if (users.length !== adminIds.length) {
-    throw new AppError('One or more event admin users were not found', 404);
+const resolveEventOwnerId = (event: any): string => {
+  if (typeof event.ownerId === 'string' && event.ownerId.trim().length > 0) {
+    return event.ownerId.trim();
   }
+
+  if (typeof event.hostAdminId === 'string' && event.hostAdminId.trim().length > 0) {
+    return event.hostAdminId.trim();
+  }
+
+  return '';
 };
 
 const parseTagsParam = (rawTags: string | string[] | undefined): string[] => {
@@ -620,12 +647,16 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
   try {
     const validatedData = createEventSchema.parse(req.body);
     const eventInput = toEventInputForCreate(validatedData);
+    const publicSlug = await generateUniquePublicSlug(eventInput.title);
 
     await validateEventData(eventInput);
 
     const newEventDoc = await EventModel.create({
+      ownerId: req.user!.id,
+      // Legacy mirror field for compatibility during migration.
       hostAdminId: req.user!.id,
       adminIds: [],
+      publicSlug,
       status: 'draft',
       moderationStatus: 'approved',
       isFlagged: false,
@@ -650,6 +681,7 @@ export const getEvents = async (req: Request, res: Response, next: NextFunction)
       ? {
           $or: [
             { status: 'published', visibility: 'public', ...approvedModerationFilter() },
+            { ownerId: requester.id },
             { hostAdminId: requester.id },
             { adminIds: requester.id },
           ],
@@ -792,6 +824,37 @@ export const updateEventStatus = async (req: Request, res: Response, next: NextF
   }
 };
 
+export const updateEventVisibility = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { visibility } = visibilityUpdateSchema.parse(req.body);
+
+    const event = await EventModel.findById(req.params.id as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (!canManageEvent(req.user!.id, event)) {
+      return next(new AppError('Not authorized to update this event visibility', 403));
+    }
+
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      { visibility },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: updatedEvent!.toJSON(),
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
+    }
+    next(error);
+  }
+};
+
 export const toggleEventFeatured = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const event = await EventModel.findById(req.params.id as string);
@@ -818,22 +881,86 @@ export const toggleEventFeatured = async (req: Request, res: Response, next: Nex
   }
 };
 
-export const updateEventAdmins = async (req: Request, res: Response, next: NextFunction) => {
+export const addEventAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const event = await EventModel.findById(req.params.id as string);
     if (!event) return next(new AppError('Event not found', 404));
 
     if (!isEventOwner(req.user!.id, event)) {
-      return next(new AppError('Only the event owner can update event admins', 403));
+      return next(new AppError('Only the event owner can add event admins', 403));
     }
 
-    const { adminIds } = eventAdminsSchema.parse(req.body);
-    const normalizedAdminIds = normalizeAdminIds(adminIds, req.user!.id);
-    await ensureAdminsExist(normalizedAdminIds);
+    const { email } = addEventAdminSchema.parse(req.body);
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await UserModel.findOne({ email: normalizedEmail }).select('_id email');
+    if (!user) {
+      return next(new AppError('User not found for the provided email', 404));
+    }
+
+    const ownerId = resolveEventOwnerId(event);
+    if (user.id === ownerId) {
+      return next(new AppError('Event owner is already a manager', 400));
+    }
+
+    const existingAdmins = Array.from(new Set((event.adminIds || []).map((id: string) => id.trim()).filter(Boolean)));
+    if (existingAdmins.includes(user.id)) {
+      return next(new AppError('User is already an event admin', 409));
+    }
+
+    const nextAdminIds = [...existingAdmins, user.id];
 
     const updatedEvent = await EventModel.findByIdAndUpdate(
       event.id,
-      { adminIds: normalizedAdminIds },
+      { adminIds: nextAdminIds },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: updatedEvent!.toJSON(),
+        admin: {
+          id: user.id,
+          email: user.email,
+        },
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
+    }
+    next(error);
+  }
+};
+
+export const removeEventAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.id as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (!isEventOwner(req.user!.id, event)) {
+      return next(new AppError('Only the event owner can remove event admins', 403));
+    }
+
+    const ownerId = resolveEventOwnerId(event);
+    const userId = String(req.params.userId || '').trim();
+    if (!userId) {
+      return next(new AppError('userId is required', 400));
+    }
+
+    if (userId === ownerId) {
+      return next(new AppError('Event owner cannot remove themselves', 400));
+    }
+
+    const existingAdmins = Array.from(new Set((event.adminIds || []).map((id: string) => id.trim()).filter(Boolean)));
+    if (!existingAdmins.includes(userId)) {
+      return next(new AppError('User is not an event admin', 404));
+    }
+
+    const nextAdminIds = existingAdmins.filter((id) => id !== userId);
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      { adminIds: nextAdminIds },
       { new: true },
     );
 
@@ -843,10 +970,7 @@ export const updateEventAdmins = async (req: Request, res: Response, next: NextF
         event: updatedEvent!.toJSON(),
       },
     });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
-    }
+  } catch (error) {
     next(error);
   }
 };

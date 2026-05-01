@@ -45,8 +45,8 @@ const ensureBookableEvent = async (eventId: string) => {
     throw new AppError('Cannot book an event that is not published', 400);
   }
 
-  if (event.visibility === 'private') {
-    throw new AppError('Private events cannot be booked', 403);
+  if (event.visibility !== 'public') {
+    throw new AppError('Only public events can be booked', 403);
   }
 
   return event;
