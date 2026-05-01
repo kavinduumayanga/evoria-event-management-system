@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, Button } from '../../components';
+import { GradientBackground, PrimaryButton, SecondaryButton } from '../../components';
 import { theme } from '../../constants/theme';
 
 type WelcomeScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Welcome'>;
@@ -13,14 +13,33 @@ interface Props {
 }
 
 export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
+  const logoAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(logoAnim, {
+      toValue: 1,
+      tension: 10,
+      friction: 4,
+      useNativeDriver: true,
+    }).start();
+  }, [logoAnim]);
+
   return (
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoPlaceholder}>
+            <Animated.View 
+              style={[
+                styles.logoPlaceholder,
+                {
+                  opacity: logoAnim,
+                  transform: [{ scale: logoAnim }]
+                }
+              ]}
+            >
               <Text style={styles.logoText}>EVORIA</Text>
-            </View>
+            </Animated.View>
           </View>
           
           <View style={styles.textContainer}>
@@ -31,14 +50,13 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <View style={styles.buttonContainer}>
-            <Button 
+            <PrimaryButton 
               title="Sign In" 
               onPress={() => navigation.navigate('Login')}
               style={styles.button}
             />
-            <Button 
+            <SecondaryButton 
               title="Create an Account" 
-              variant="outline"
               onPress={() => navigation.navigate('Register')}
               style={styles.button}
             />
@@ -66,20 +84,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoPlaceholder: {
-    width: width * 0.4,
-    height: width * 0.4,
+    width: width * 0.45,
+    height: width * 0.45,
     borderRadius: theme.borderRadius.round,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.neon,
+    ...theme.shadows.neonPurple,
   },
   logoText: {
     ...theme.typography.h2,
-    color: theme.colors.primaryLight,
-    letterSpacing: 4,
+    color: theme.colors.text,
+    letterSpacing: 6,
+    fontWeight: '800',
+    textShadowColor: theme.colors.primary,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
   textContainer: {
     flex: 1,

@@ -6,7 +6,7 @@ import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList, AttendeeTabParamList } from '../../types/navigation';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { GradientBackground, Button, GlassCard } from '../../components';
+import { GradientBackground, PrimaryButton, SecondaryButton, GlassCard } from '../../components';
 import { theme } from '../../constants/theme';
 import { CheckCircle } from 'lucide-react-native';
 import apiClient from '../../api/client';
@@ -89,7 +89,7 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
             </GlassCard>
           )}
 
-          <Button 
+          <PrimaryButton 
             title={isWaitlisted ? 'View My Waitlist' : 'View My Bookings'}
             onPress={() => (
               isWaitlisted
@@ -98,9 +98,8 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
             )}
             style={{ marginTop: 20 }}
           />
-          <Button 
+          <SecondaryButton 
             title="Back to Home" 
-            variant="outline"
             onPress={() => navigation.navigate('HomeStack', { screen: 'EventList' })} 
             style={{ marginTop: 10 }}
           />

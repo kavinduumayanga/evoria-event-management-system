@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft } from 'lucide-react-native';
-import { ScreenContainer, Input, Button, NeonCard } from '../../components';
+import { ArrowLeft, Lock } from 'lucide-react-native';
+import { ScreenContainer, FormInput, PrimaryButton, GlassCard, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
@@ -71,46 +71,59 @@ export const ChangePasswordScreen = () => {
   };
 
   return (
-    <ScreenContainer scrollable>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft color={theme.colors.text} size={22} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Change Password</Text>
-      </View>
+    <ScreenContainer scrollable={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.header}>
+          <IconButton 
+            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
+            onPress={() => navigation.goBack()} 
+            variant="solid" 
+          />
+          <Text style={styles.title}>Change Password</Text>
+        </View>
 
-      <NeonCard style={styles.card}>
-        <Input
-          label="Current Password"
-          placeholder="Enter current password"
-          isPassword
-          value={currentPassword}
-          onChangeText={setCurrentPassword}
-        />
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <GlassCard style={styles.card} variant="dark" animateEntrance>
+            <FormInput
+              label="Current Password"
+              placeholder="Enter current password"
+              isPassword
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+            />
 
-        <Input
-          label="New Password"
-          placeholder="Enter new password"
-          isPassword
-          value={newPassword}
-          onChangeText={setNewPassword}
-        />
+            <FormInput
+              label="New Password"
+              placeholder="Enter new password"
+              isPassword
+              value={newPassword}
+              onChangeText={setNewPassword}
+              leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+            />
 
-        <Input
-          label="Confirm New Password"
-          placeholder="Re-enter new password"
-          isPassword
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
+            <FormInput
+              label="Confirm New Password"
+              placeholder="Re-enter new password"
+              isPassword
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+            />
 
-        <Button
-          title="Update Password"
-          onPress={handleChangePassword}
-          isLoading={isLoading}
-          style={styles.updateButton}
-        />
-      </NeonCard>
+            <PrimaryButton
+              title="Update Password"
+              onPress={handleChangePassword}
+              isLoading={isLoading}
+              style={styles.updateButton}
+            />
+          </GlassCard>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 };
@@ -120,16 +133,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.m,
-    marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.xl,
   },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+  content: {
+    flexGrow: 1,
+    paddingBottom: theme.spacing.xxl,
   },
   title: {
     ...theme.typography.h2,

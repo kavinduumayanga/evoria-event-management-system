@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
-import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState } from '../../components';
+import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, SecondaryButton, GlassCard } from '../../components';
 import { theme } from '../../constants/theme';
 import { RegistrationService } from '../../api/services';
 import { Booking } from '../../types';
@@ -61,16 +61,14 @@ export const MyBookingsScreen = () => {
     <ScreenContainer style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Registrations</Text>
-        <TouchableOpacity
-          style={styles.waitlistNavButton}
+        <SecondaryButton
+          title="My Waitlist"
           onPress={() =>
             navigation.navigate('HomeStack', {
               screen: 'MyWaitlist',
             })
           }
-        >
-          <Text style={styles.waitlistNavText}>My Waitlist</Text>
-        </TouchableOpacity>
+        />
       </View>
 
       <FlatList
@@ -82,41 +80,37 @@ export const MyBookingsScreen = () => {
             actions={
               <View style={styles.actionsWrapper}>
                 {item.isWaitlisted ? (
-                  <View style={styles.waitingBanner}>
+                  <GlassCard style={styles.waitingBanner} variant="dark">
                     <Text style={styles.waitingBannerText}>
                       Waiting in queue{item.waitlistPosition ? ` (#${item.waitlistPosition})` : ''}
                     </Text>
-                  </View>
+                  </GlassCard>
                 ) : (
                   <View style={styles.rsvpActions}>
-                    <TouchableOpacity
-                      style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'going' && styles.rsvpButtonActive]}
+                    <SecondaryButton
+                      title="Going"
                       onPress={() => handleRsvpUpdate(item.id, 'going')}
-                    >
-                      <Text style={styles.rsvpButtonText}>Going</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'not_going' && styles.rsvpButtonActive]}
+                      style={{ flex: 1, ...(item.rsvpStatus === 'going' ? { backgroundColor: theme.colors.primary } : {}) }}
+                    />
+                    <SecondaryButton
+                      title="Not Going"
                       onPress={() => handleRsvpUpdate(item.id, 'not_going')}
-                    >
-                      <Text style={styles.rsvpButtonText}>Not Going</Text>
-                    </TouchableOpacity>
+                      style={{ flex: 1, ...(item.rsvpStatus === 'not_going' ? { backgroundColor: theme.colors.error } : {}) }}
+                    />
                   </View>
                 )}
 
                 {item.bookingStatus === 'confirmed' && !item.isWaitlisted && (
-                  <TouchableOpacity
-                    style={styles.qrBtn}
+                  <SecondaryButton
+                    title="View QR"
+                    icon={<QrCode size={16} color={theme.colors.text} />}
                     onPress={() =>
                       navigation.navigate('HomeStack', {
                         screen: 'MyTicketQR',
                         params: { bookingId: item.id },
                       })
                     }
-                  >
-                    <QrCode size={16} color={theme.colors.primaryLight} />
-                    <Text style={styles.qrBtnText}>View QR</Text>
-                  </TouchableOpacity>
+                  />
                 )}
               </View>
             }
@@ -162,62 +156,12 @@ const styles = StyleSheet.create({
     gap: theme.spacing.s,
     width: '100%',
   },
-  rsvpButton: {
-    flex: 1,
-    paddingVertical: theme.spacing.s,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.s,
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-  },
-  rsvpButtonActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: `${theme.colors.primary}20`,
-  },
-  rsvpButtonText: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
-    fontWeight: '600',
-  },
-  qrBtn: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.s,
-    paddingVertical: theme.spacing.s,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: theme.spacing.s,
-    backgroundColor: 'rgba(139, 92, 246, 0.12)',
-  },
-  qrBtnText: {
-    ...theme.typography.caption,
-    color: theme.colors.primaryLight,
-    fontWeight: '700',
-  },
-  waitlistNavButton: {
-    borderWidth: 1,
-    borderColor: theme.colors.warning,
-    borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 6,
-    backgroundColor: `${theme.colors.warning}1A`,
-  },
-  waitlistNavText: {
-    ...theme.typography.small,
-    color: theme.colors.warning,
-    fontWeight: '700',
-  },
   waitingBanner: {
     width: '100%',
-    borderWidth: 1,
-    borderColor: theme.colors.warning,
-    backgroundColor: `${theme.colors.warning}1A`,
-    borderRadius: theme.borderRadius.s,
     paddingVertical: theme.spacing.s,
     alignItems: 'center',
+    borderColor: theme.colors.warning,
+    borderWidth: 1,
   },
   waitingBannerText: {
     ...theme.typography.caption,

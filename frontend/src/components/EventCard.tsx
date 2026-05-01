@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, StyleProp, ViewStyle } from 'react-native';
-import { NeonCard } from './NeonCard';
+import { GlassCard } from './GlassCard';
+import { AnimatedPressable } from './AnimatedPressable';
+import { StatusBadge } from './StatusBadge';
 import { Event } from '../types';
 import { theme } from '../constants/theme';
 import { Calendar, Users, Clock } from 'lucide-react-native';
@@ -17,33 +19,34 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, act
   const isPublished = event.status === 'published';
   const moderationStatus = event.moderationStatus || 'approved';
 
-  const getStatusColor = () => {
+  const getStatus = (): any => {
     switch (event.status) {
-      case 'published': return theme.colors.success;
-      case 'draft': return theme.colors.warning;
-      case 'cancelled': return theme.colors.error;
-      default: return theme.colors.textMuted;
+      case 'published': return 'success';
+      case 'draft': return 'warning';
+      case 'cancelled': return 'error';
+      default: return 'neutral';
     }
   };
 
-  const getModerationColor = () => {
+  const getModerationStatus = (): any => {
     switch (moderationStatus) {
-      case 'approved': return theme.colors.success;
-      case 'pending': return theme.colors.warning;
-      case 'rejected': return theme.colors.error;
-      default: return theme.colors.textMuted;
+      case 'approved': return 'success';
+      case 'pending': return 'warning';
+      case 'rejected': return 'error';
+      default: return 'neutral';
     }
   };
 
-  return (
-    <NeonCard
+  const CardContent = (
+    <GlassCard
       style={[
         styles.container,
         isPublished && styles.publishedContainer,
         isCancelled && styles.cancelledContainer,
         style,
       ]}
-      onPress={onPress}
+      variant={event.isFeatured ? 'neonPurple' : 'dark'}
+      animateEntrance
     >
       {event.coverImage ? (
         <Image source={{ uri: event.coverImage }} style={styles.image} />
@@ -56,28 +59,16 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, act
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor() + '20', borderColor: getStatusColor() }]}>
-            <Text style={[styles.statusText, { color: getStatusColor() }]}>{event.status.toUpperCase()}</Text>
-          </View>
+          <StatusBadge status={getStatus()} label={event.status} />
         </View>
 
         <View style={styles.badgeRow}>
           {event.isFeatured && (
-            <View style={[styles.metaBadge, { borderColor: theme.colors.warning, backgroundColor: `${theme.colors.warning}20` }]}>
-              <Text style={[styles.metaBadgeText, { color: theme.colors.warning }]}>FEATURED</Text>
-            </View>
+            <StatusBadge status="warning" label="FEATURED" />
           )}
-          <View style={styles.metaBadge}>
-            <Text style={styles.metaBadgeText}>{(event.type || 'physical').toUpperCase()}</Text>
-          </View>
-          <View style={styles.metaBadge}>
-            <Text style={styles.metaBadgeText}>{event.visibility.toUpperCase()}</Text>
-          </View>
-          <View style={[styles.metaBadge, { borderColor: getModerationColor() }]}>
-            <Text style={[styles.metaBadgeText, { color: getModerationColor() }]}>
-              {moderationStatus.toUpperCase()}
-            </Text>
-          </View>
+          <StatusBadge status="neutral" label={event.type || 'physical'} />
+          <StatusBadge status="neutral" label={event.visibility} />
+          <StatusBadge status={getModerationStatus()} label={moderationStatus} />
         </View>
 
         <View style={styles.detailsContainer}>
@@ -101,8 +92,13 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, act
           </View>
         )}
       </View>
-    </NeonCard>
+    </GlassCard>
   );
+
+  if (onPress) {
+    return <AnimatedPressable onPress={onPress}>{CardContent}</AnimatedPressable>;
+  }
+  return CardContent;
 };
 
 const styles = StyleSheet.create({
@@ -192,7 +188,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.m,
     paddingTop: theme.spacing.m,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: theme.colors.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },

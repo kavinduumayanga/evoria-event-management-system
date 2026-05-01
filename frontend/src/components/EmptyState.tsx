@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { theme } from '../constants/theme';
 import { Inbox } from 'lucide-react-native';
+import { GlassCard } from './GlassCard';
 
 interface EmptyStateProps {
   title: string;
@@ -13,16 +14,18 @@ interface EmptyStateProps {
 export const EmptyState: React.FC<EmptyStateProps> = ({ 
   title, 
   message, 
-  icon = <Inbox size={48} color={theme.colors.textMuted} />, 
+  icon = <Inbox size={48} color={theme.colors.secondary} />, 
   style 
 }) => {
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.iconContainer}>
-        {icon}
-      </View>
-      <Text style={styles.title}>{title}</Text>
-      {message && <Text style={styles.message}>{message}</Text>}
+      <GlassCard style={styles.card} variant="dark" animateEntrance>
+        <View style={styles.iconContainer}>
+          {icon}
+        </View>
+        <Text style={styles.title}>{title}</Text>
+        {message && <Text style={styles.message}>{message}</Text>}
+      </GlassCard>
     </View>
   );
 };
@@ -34,9 +37,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.xl,
   },
+  card: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xxl,
+  },
   iconContainer: {
     marginBottom: theme.spacing.l,
-    opacity: 0.5,
+    opacity: 0.8,
   },
   title: {
     ...theme.typography.h2,

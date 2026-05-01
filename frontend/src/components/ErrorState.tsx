@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { theme } from '../constants/theme';
 import { AlertCircle, RefreshCw } from 'lucide-react-native';
+import { GlassCard } from './GlassCard';
+import { SecondaryButton } from './SecondaryButton';
 
 interface ErrorStateProps {
   message?: string;
@@ -16,15 +18,19 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
 }) => {
   return (
     <View style={[styles.container, style]}>
-      <AlertCircle size={48} color={theme.colors.error} style={styles.icon} />
-      <Text style={styles.message}>{message}</Text>
-      
-      {onRetry && (
-        <TouchableOpacity style={styles.retryButton} onPress={onRetry} activeOpacity={0.8}>
-          <RefreshCw size={16} color={theme.colors.text} style={styles.retryIcon} />
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      )}
+      <GlassCard style={styles.card} variant="dark" animateEntrance>
+        <AlertCircle size={48} color={theme.colors.error} style={styles.icon} />
+        <Text style={styles.message}>{message}</Text>
+        
+        {onRetry && (
+          <SecondaryButton 
+            title="Retry" 
+            onPress={onRetry} 
+            icon={<RefreshCw size={16} color={theme.colors.secondary} />}
+            style={styles.retryButton}
+          />
+        )}
+      </GlassCard>
     </View>
   );
 };
@@ -36,6 +42,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.xl,
   },
+  card: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xxl,
+    borderColor: 'rgba(239, 68, 68, 0.3)', // subtle error border
+  },
   icon: {
     marginBottom: theme.spacing.m,
   },
@@ -46,20 +58,6 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.l,
   },
   retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: theme.spacing.s,
-    paddingHorizontal: theme.spacing.l,
-    borderRadius: theme.borderRadius.round,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  retryIcon: {
-    marginRight: theme.spacing.s,
-  },
-  retryText: {
-    ...theme.typography.button,
-    color: theme.colors.text,
-  },
+    marginTop: theme.spacing.s,
+  }
 });

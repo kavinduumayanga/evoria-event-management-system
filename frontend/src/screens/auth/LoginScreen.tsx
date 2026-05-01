@@ -12,11 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, Button, Input, GlassCard } from '../../components';
+import { GradientBackground, PrimaryButton, FormInput, GlassCard, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
@@ -61,8 +61,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
       await login(resolvedUser, token);
       
-      // Navigation will be handled by RootNavigator automatically 
-      // based on the updated auth state.
     } catch (error: any) {
       Alert.alert('Login Failed', getApiErrorMessage(error, 'Unable to sign in. Please try again.'));
     } finally {
@@ -74,9 +72,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
-          </TouchableOpacity>
+          <IconButton 
+            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
+            onPress={() => navigation.goBack()} 
+            variant="solid" 
+          />
         </View>
 
         <KeyboardAvoidingView
@@ -91,17 +91,18 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>Sign in to access your account</Text>
 
-            <GlassCard style={styles.card}>
-              <Input
+            <GlassCard style={styles.card} variant="dark" animateEntrance>
+              <FormInput
                 label="Email Address"
                 placeholder="Enter your email"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
+                leftIcon={<Mail size={20} color={theme.colors.textMuted} />}
               />
 
-              <Input
+              <FormInput
                 label="Password"
                 placeholder="Enter your password"
                 isPassword
@@ -112,13 +113,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 returnKeyType="done"
                 value={password}
                 onChangeText={setPassword}
+                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
               />
 
               <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
 
-              <Button
+              <PrimaryButton
                 title="Sign In"
                 onPress={handleLogin}
                 isLoading={isLoading}
@@ -146,17 +148,10 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
+    alignItems: 'flex-start',
   },
   keyboardContainer: {
     flex: 1,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   content: {
     flexGrow: 1,
@@ -182,7 +177,7 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     ...theme.typography.caption,
-    color: theme.colors.primaryLight,
+    color: theme.colors.secondary,
   },
   button: {
     marginTop: theme.spacing.s,
@@ -198,7 +193,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     ...theme.typography.body,
-    color: theme.colors.primaryLight,
+    color: theme.colors.primary,
     fontWeight: 'bold',
   },
 });

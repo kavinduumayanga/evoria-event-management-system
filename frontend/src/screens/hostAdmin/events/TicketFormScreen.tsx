@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'rea
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState } from '../../../components';
+import { ScreenContainer, FormInput, PrimaryButton, SecondaryButton, LoadingState, GlassCard, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { TicketService } from '../../../api/services';
@@ -183,12 +183,12 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.form}>
-        <Input label="Ticket Name *" value={name} onChangeText={setName} placeholder="General Admission" />
-        <Input label="Description" value={description} onChangeText={setDescription} placeholder="Access to all areas" />
+        <FormInput label="Ticket Name *" value={name} onChangeText={setName} placeholder="General Admission" />
+        <FormInput label="Description" value={description} onChangeText={setDescription} placeholder="Access to all areas" />
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <Input
+            <FormInput
               label="Price *"
               value={price}
               onChangeText={setPrice}
@@ -198,102 +198,113 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
             />
           </View>
           <View style={styles.flexHalf}>
-            <Input label="Currency *" value={currency} onChangeText={setCurrency} placeholder="LKR" autoCapitalize="characters" />
+            <FormInput label="Currency *" value={currency} onChangeText={setCurrency} placeholder="LKR" autoCapitalize="characters" />
           </View>
         </View>
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <Input label="Quantity *" value={quantity} onChangeText={setQuantity} placeholder="100" keyboardType="numeric" />
+            <FormInput label="Quantity *" value={quantity} onChangeText={setQuantity} placeholder="100" keyboardType="numeric" />
           </View>
           <View style={styles.flexHalf}>
-            <Input label="Max per user *" value={maxPerUser} onChangeText={setMaxPerUser} placeholder="5" keyboardType="numeric" />
+            <FormInput label="Max per user *" value={maxPerUser} onChangeText={setMaxPerUser} placeholder="5" keyboardType="numeric" />
           </View>
         </View>
 
-        <Input label="Unlock Code (Optional)" value={unlockCode} onChangeText={setUnlockCode} placeholder="VIP2026" />
+        <FormInput label="Unlock Code (Optional)" value={unlockCode} onChangeText={setUnlockCode} placeholder="VIP2026" />
 
-        <Text style={styles.label}>Ticket Type</Text>
-        <View style={styles.selectorContainer}>
-          <TouchableOpacity style={[styles.chip, isFree && styles.chipSelected]} onPress={() => setIsFree(true)}>
-            <Text style={[styles.chipText, isFree && styles.chipTextSelected]}>FREE</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.chip, !isFree && styles.chipSelected]} onPress={() => setIsFree(false)}>
-            <Text style={[styles.chipText, !isFree && styles.chipTextSelected]}>PAID</Text>
-          </TouchableOpacity>
+        <View style={styles.segmentedControlSection}>
+          <Text style={styles.label}>Ticket Type</Text>
+          <GlassCard style={styles.segmentedControlContainer}>
+            <TouchableOpacity style={[styles.segmentButton, isFree && styles.segmentButtonSelected]} onPress={() => setIsFree(true)}>
+              <Text style={[styles.segmentButtonText, isFree && styles.segmentButtonTextSelected]}>FREE</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.segmentButton, !isFree && styles.segmentButtonSelected]} onPress={() => setIsFree(false)}>
+              <Text style={[styles.segmentButtonText, !isFree && styles.segmentButtonTextSelected]}>PAID</Text>
+            </TouchableOpacity>
+          </GlassCard>
         </View>
 
-        <Text style={styles.label}>Status</Text>
-        <View style={styles.selectorContainer}>
-          <TouchableOpacity style={[styles.chip, isActive && styles.chipSelected]} onPress={() => setIsActive(true)}>
-            <Text style={[styles.chipText, isActive && styles.chipTextSelected]}>ACTIVE</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.chip, !isActive && styles.chipSelected]} onPress={() => setIsActive(false)}>
-            <Text style={[styles.chipText, !isActive && styles.chipTextSelected]}>HIDDEN</Text>
-          </TouchableOpacity>
+        <View style={styles.segmentedControlSection}>
+          <Text style={styles.label}>Status</Text>
+          <GlassCard style={styles.segmentedControlContainer}>
+            <TouchableOpacity style={[styles.segmentButton, isActive && styles.segmentButtonSelected]} onPress={() => setIsActive(true)}>
+              <Text style={[styles.segmentButtonText, isActive && styles.segmentButtonTextSelected]}>ACTIVE</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.segmentButton, !isActive && styles.segmentButtonSelected]} onPress={() => setIsActive(false)}>
+              <Text style={[styles.segmentButtonText, !isActive && styles.segmentButtonTextSelected]}>HIDDEN</Text>
+            </TouchableOpacity>
+          </GlassCard>
         </View>
 
         <Text style={styles.sectionTitle}>Promo Codes</Text>
-        <Input
-          label="Promo Code"
-          value={promoCodeDraft}
-          onChangeText={setPromoCodeDraft}
-          placeholder="EARLYBIRD"
-          autoCapitalize="characters"
-        />
-        <View style={styles.selectorContainer}>
-          <TouchableOpacity
-            style={[styles.chip, promoTypeDraft === 'percentage' && styles.chipSelected]}
-            onPress={() => setPromoTypeDraft('percentage')}
-          >
-            <Text style={[styles.chipText, promoTypeDraft === 'percentage' && styles.chipTextSelected]}>PERCENTAGE</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.chip, promoTypeDraft === 'fixed' && styles.chipSelected]}
-            onPress={() => setPromoTypeDraft('fixed')}
-          >
-            <Text style={[styles.chipText, promoTypeDraft === 'fixed' && styles.chipTextSelected]}>FIXED</Text>
-          </TouchableOpacity>
-        </View>
-        <Input
-          label={promoTypeDraft === 'percentage' ? 'Value (%)' : 'Value'}
-          value={promoValueDraft}
-          onChangeText={setPromoValueDraft}
-          placeholder={promoTypeDraft === 'percentage' ? '10' : '500'}
-          keyboardType="numeric"
-        />
-        <View style={styles.selectorContainer}>
-          <TouchableOpacity style={[styles.chip, promoActiveDraft && styles.chipSelected]} onPress={() => setPromoActiveDraft(true)}>
-            <Text style={[styles.chipText, promoActiveDraft && styles.chipTextSelected]}>ACTIVE</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.chip, !promoActiveDraft && styles.chipSelected]} onPress={() => setPromoActiveDraft(false)}>
-            <Text style={[styles.chipText, !promoActiveDraft && styles.chipTextSelected]}>INACTIVE</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity style={styles.addButton} onPress={addPromoCode}>
-          <Plus size={16} color={theme.colors.text} />
-          <Text style={styles.addButtonText}>Add Promo</Text>
-        </TouchableOpacity>
+        <GlassCard style={styles.promoCard}>
+          <FormInput
+            label="Promo Code"
+            value={promoCodeDraft}
+            onChangeText={setPromoCodeDraft}
+            placeholder="EARLYBIRD"
+            autoCapitalize="characters"
+          />
+          <View style={styles.segmentedControlSection}>
+            <Text style={styles.label}>Discount Type</Text>
+            <GlassCard style={styles.segmentedControlContainer}>
+              <TouchableOpacity
+                style={[styles.segmentButton, promoTypeDraft === 'percentage' && styles.segmentButtonSelected]}
+                onPress={() => setPromoTypeDraft('percentage')}
+              >
+                <Text style={[styles.segmentButtonText, promoTypeDraft === 'percentage' && styles.segmentButtonTextSelected]}>PERCENTAGE</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.segmentButton, promoTypeDraft === 'fixed' && styles.segmentButtonSelected]}
+                onPress={() => setPromoTypeDraft('fixed')}
+              >
+                <Text style={[styles.segmentButtonText, promoTypeDraft === 'fixed' && styles.segmentButtonTextSelected]}>FIXED</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
+          <FormInput
+            label={promoTypeDraft === 'percentage' ? 'Value (%)' : 'Value'}
+            value={promoValueDraft}
+            onChangeText={setPromoValueDraft}
+            placeholder={promoTypeDraft === 'percentage' ? '10' : '500'}
+            keyboardType="numeric"
+          />
+          <View style={styles.segmentedControlSection}>
+            <Text style={styles.label}>Promo Status</Text>
+            <GlassCard style={styles.segmentedControlContainer}>
+              <TouchableOpacity style={[styles.segmentButton, promoActiveDraft && styles.segmentButtonSelected]} onPress={() => setPromoActiveDraft(true)}>
+                <Text style={[styles.segmentButtonText, promoActiveDraft && styles.segmentButtonTextSelected]}>ACTIVE</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.segmentButton, !promoActiveDraft && styles.segmentButtonSelected]} onPress={() => setPromoActiveDraft(false)}>
+                <Text style={[styles.segmentButtonText, !promoActiveDraft && styles.segmentButtonTextSelected]}>INACTIVE</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
+          <SecondaryButton title="Add Promo" onPress={addPromoCode} icon={<Plus size={16} color={theme.colors.text} />} />
+        </GlassCard>
 
         {promoCodes.length > 0 && (
           <ScrollView style={styles.promoList}>
             {promoCodes.map((promo) => (
-              <View key={promo.code} style={styles.promoItem}>
+              <GlassCard key={promo.code} style={styles.promoItem} variant={promo.isActive ? 'dark' : 'neonPurple'}>
                 <View style={styles.promoInfo}>
                   <Text style={styles.promoCode}>{promo.code}</Text>
                   <Text style={styles.promoMeta}>
                     {promo.discountType.toUpperCase()} • {promo.value} • {promo.isActive ? 'ACTIVE' : 'INACTIVE'}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => setPromoCodes((previous) => previous.filter((item) => item.code !== promo.code))}>
-                  <X size={16} color={theme.colors.error} />
-                </TouchableOpacity>
-              </View>
+                <IconButton
+                  icon={<X size={16} color={theme.colors.error} />}
+                  onPress={() => setPromoCodes((previous) => previous.filter((item) => item.code !== promo.code))}
+                  variant="outline"
+                />
+              </GlassCard>
             ))}
           </ScrollView>
         )}
 
-        <Button
+        <PrimaryButton
           title={isEditing ? 'Save Changes' : 'Create Ticket'}
           onPress={handleSave}
           isLoading={isSaving}
@@ -319,56 +330,54 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginTop: theme.spacing.s,
   },
-  selectorContainer: { flexDirection: 'row', marginBottom: theme.spacing.m, gap: theme.spacing.s, flexWrap: 'wrap' },
-  chip: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    borderRadius: theme.borderRadius.m,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  chipSelected: { borderColor: theme.colors.primary, backgroundColor: 'rgba(139, 92, 246, 0.1)' },
-  chipText: { ...theme.typography.caption, color: theme.colors.textMuted },
-  chipTextSelected: { color: theme.colors.primary, fontWeight: 'bold' },
   sectionTitle: {
-    ...theme.typography.h3,
+    ...theme.typography.h2,
     color: theme.colors.text,
-    marginTop: theme.spacing.s,
-    marginBottom: theme.spacing.s,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.m,
-    paddingVertical: theme.spacing.s,
+    marginTop: theme.spacing.l,
     marginBottom: theme.spacing.m,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
-  addButtonText: {
-    ...theme.typography.button,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.s,
+  segmentedControlSection: {
+    marginBottom: theme.spacing.m,
+  },
+  segmentedControlContainer: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: theme.borderRadius.m,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.s,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.s,
+  },
+  segmentButtonSelected: {
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+  },
+  segmentButtonText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+  },
+  segmentButtonTextSelected: {
+    color: theme.colors.primaryLight,
+  },
+  promoCard: {
+    padding: theme.spacing.m,
+    marginBottom: theme.spacing.m,
   },
   promoList: {
-    maxHeight: 180,
+    maxHeight: 220,
     marginBottom: theme.spacing.m,
   },
   promoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    padding: theme.spacing.s,
+    padding: theme.spacing.m,
     marginBottom: theme.spacing.s,
-    backgroundColor: theme.colors.surfaceLight,
   },
   promoInfo: { flex: 1, marginRight: theme.spacing.s },
   promoCode: { ...theme.typography.body, color: theme.colors.text, fontWeight: '700' },
-  promoMeta: { ...theme.typography.small, color: theme.colors.textMuted, marginTop: 2 },
+  promoMeta: { ...theme.typography.small, color: theme.colors.primaryLight, marginTop: 4 },
   saveButton: { marginTop: theme.spacing.xl, marginBottom: theme.spacing.xxl },
 });

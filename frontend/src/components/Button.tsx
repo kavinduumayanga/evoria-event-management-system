@@ -45,11 +45,11 @@ export const Button: React.FC<ButtonProps> = ({
   const getTextColor = () => {
     if (disabled) return theme.colors.textMuted;
     switch (variant) {
-      case 'primary':
+      case 'primary': return theme.colors.background; // Dark text on light bg for primary
       case 'secondary': return theme.colors.text;
       case 'outline': return theme.colors.primary;
       case 'ghost': return theme.colors.text;
-      default: return theme.colors.text;
+      default: return theme.colors.background;
     }
   };
 
@@ -77,7 +77,7 @@ export const Button: React.FC<ButtonProps> = ({
         getPadding(),
         getBorder(),
         style,
-        (variant === 'primary' || variant === 'secondary') && !disabled ? theme.shadows.neon : {},
+        (variant === 'primary' || variant === 'secondary') && !disabled ? theme.shadows.premium : {},
       ]}
       disabled={disabled || isLoading}
       activeOpacity={0.8}

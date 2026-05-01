@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
 import { ArrowLeft, Calendar as CalendarIcon, Clock, Link as LinkIcon, Mail, MapPin, Phone, Share2 } from 'lucide-react-native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { Button, ErrorState, GlassCard, Input, LoadingState, ScreenContainer } from '../../components';
+import { PrimaryButton, SecondaryButton, ErrorState, GlassCard, FormInput, LoadingState, ScreenContainer, IconButton } from '../../components';
 import { EventService, PublicEventDetails, RegistrationService } from '../../api/services';
 import { theme } from '../../constants/theme';
 import { useAuthStore } from '../../store/auth.store';
@@ -190,9 +190,11 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
     <ScreenContainer style={styles.screen}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={22} />
-          </TouchableOpacity>
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={24} />}
+            onPress={() => navigation.goBack()}
+            variant="solid"
+          />
         </View>
 
         <ScrollView
@@ -212,7 +214,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
             <Text style={styles.title}>{event.title}</Text>
             {event.topic ? <Text style={styles.topic}>Topic: {event.topic}</Text> : null}
 
-            <View style={styles.metaBlock}>
+            <GlassCard style={styles.metaBlock} variant="dark" animateEntrance>
               <View style={styles.metaRow}>
                 <CalendarIcon size={16} color={theme.colors.primaryLight} />
                 <Text style={styles.metaText}>{event.date}</Text>
@@ -229,23 +231,20 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
               <Text style={styles.metaLabel}>Type: {event.type.toUpperCase()}</Text>
               <Text style={styles.metaLabel}>Visibility: {event.visibility.toUpperCase()}</Text>
               {event.host ? <Text style={styles.metaLabel}>Host: {event.host.name}</Text> : null}
-            </View>
+            </GlassCard>
 
             <View style={styles.buttonGrid}>
-              <Button title="Share" icon={<Share2 size={16} color={theme.colors.text} />} onPress={handleShare} />
-              <Button title="Copy URL" variant="outline" icon={<LinkIcon size={16} color={theme.colors.primary} />} onPress={handleCopyLink} />
-              <Button
+              <SecondaryButton title="Share" onPress={handleShare} />
+              <SecondaryButton title="Copy URL" onPress={handleCopyLink} />
+              <SecondaryButton
                 title="Contact Host"
-                variant="outline"
-                icon={event.contactDetails?.phone || event.host?.phone ? <Phone size={16} color={theme.colors.primary} /> : <Mail size={16} color={theme.colors.primary} />}
                 onPress={handleContact}
               />
             </View>
 
             {event.isManageableByCurrentUser ? (
-              <Button
+              <SecondaryButton
                 title="Open Manage View"
-                variant="secondary"
                 onPress={() => navigation.navigate('EventDetails', { eventId: event.id, publicSlug: event.publicSlug })}
                 style={styles.manageButton}
               />
@@ -260,7 +259,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Agenda</Text>
                 {sessions.map((session) => (
-                  <GlassCard key={session.id} style={styles.sessionCard}>
+                  <GlassCard key={session.id} style={styles.sessionCard} variant="dark">
                     <Text style={styles.sessionTitle}>{session.title}</Text>
                     <Text style={styles.sessionMeta}>{session.sessionDate} • {session.startTime} - {session.endTime}</Text>
                     {session.speakerName ? <Text style={styles.sessionMeta}>Speaker: {session.speakerName}</Text> : null}
@@ -289,53 +288,55 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
             {!isTicketedEvent ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Event Registration</Text>
-                <Input label="Name *" value={name} onChangeText={setName} placeholder="Your full name" error={formErrors.name} />
-                <Input
-                  label="Email *"
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  error={formErrors.email}
-                />
-                <Input label="Mobile *" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" error={formErrors.mobile} />
-                <Input label="NIC *" value={nic} onChangeText={setNic} placeholder="200012345678" error={formErrors.nic} />
-
-                {registrationQuestions.map((question) => (
-                  <Input
-                    key={question.id}
-                    label={`${question.question}${question.required ? ' *' : ''}`}
-                    value={customAnswerMap[question.id] || ''}
-                    onChangeText={(value) => {
-                      setCustomAnswerMap((previous) => ({ ...previous, [question.id]: value }));
-                      setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
-                    }}
-                    placeholder={question.type === 'number' ? 'Enter a number' : 'Your answer'}
-                    keyboardType={question.type === 'number' ? 'numeric' : 'default'}
-                    error={formErrors[`q_${question.id}`]}
+                <GlassCard style={styles.registrationCard} variant="dark" animateEntrance>
+                  <FormInput label="Name *" value={name} onChangeText={setName} placeholder="Your full name" error={formErrors.name} />
+                  <FormInput
+                    label="Email *"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    error={formErrors.email}
                   />
-                ))}
+                  <FormInput label="Mobile *" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" error={formErrors.mobile} />
+                  <FormInput label="NIC *" value={nic} onChangeText={setNic} placeholder="200012345678" error={formErrors.nic} />
 
-                {registrationStatus ? (
-                  <GlassCard style={styles.statusCard}>
-                    <Text style={styles.statusTitle}>Registration Status</Text>
-                    <Text style={styles.statusText}>{registrationStatus.toUpperCase()}</Text>
-                  </GlassCard>
-                ) : null}
+                  {registrationQuestions.map((question) => (
+                    <FormInput
+                      key={question.id}
+                      label={`${question.question}${question.required ? ' *' : ''}`}
+                      value={customAnswerMap[question.id] || ''}
+                      onChangeText={(value) => {
+                        setCustomAnswerMap((previous) => ({ ...previous, [question.id]: value }));
+                        setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
+                      }}
+                      placeholder={question.type === 'number' ? 'Enter a number' : 'Your answer'}
+                      keyboardType={question.type === 'number' ? 'numeric' : 'default'}
+                      error={formErrors[`q_${question.id}`]}
+                    />
+                  ))}
 
-                <Button
-                  title="Submit Registration"
-                  onPress={handleSubmitRegistration}
-                  isLoading={isSubmittingRegistration}
-                />
+                  {registrationStatus ? (
+                    <GlassCard style={styles.statusCard}>
+                      <Text style={styles.statusTitle}>Registration Status</Text>
+                      <Text style={styles.statusText}>{registrationStatus.toUpperCase()}</Text>
+                    </GlassCard>
+                  ) : null}
+
+                  <PrimaryButton
+                    title="Submit Registration"
+                    onPress={handleSubmitRegistration}
+                    isLoading={isSubmittingRegistration}
+                  />
+                </GlassCard>
               </View>
             ) : null}
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button
+          <PrimaryButton
             title={
               isTicketedEvent
                 ? (isLoggedIn ? (isSoldOut ? 'Sold Out' : 'Book Tickets') : 'Login To Book Tickets')
@@ -410,6 +411,7 @@ const styles = StyleSheet.create({
   },
   metaBlock: {
     marginTop: theme.spacing.m,
+    padding: theme.spacing.l,
     gap: theme.spacing.s,
   },
   metaRow: {
@@ -427,10 +429,10 @@ const styles = StyleSheet.create({
   },
   buttonGrid: {
     marginTop: theme.spacing.m,
-    gap: theme.spacing.s,
+    gap: theme.spacing.m,
   },
   manageButton: {
-    marginTop: theme.spacing.s,
+    marginTop: theme.spacing.m,
   },
   section: {
     marginTop: theme.spacing.xl,
@@ -443,6 +445,10 @@ const styles = StyleSheet.create({
   sectionText: {
     ...theme.typography.body,
     color: theme.colors.textMuted,
+  },
+  registrationCard: {
+    padding: theme.spacing.m,
+    marginTop: theme.spacing.s,
   },
   sessionCard: {
     marginBottom: theme.spacing.s,

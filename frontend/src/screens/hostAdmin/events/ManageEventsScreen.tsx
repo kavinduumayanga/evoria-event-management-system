@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState } from '../../../components';
+import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, IconButton, SecondaryButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban, Users, Star, ListOrdered } from 'lucide-react-native';
 import { EventService } from '../../../api/services';
@@ -115,12 +115,11 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
     <ScreenContainer style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Manage Events</Text>
-        <TouchableOpacity 
-          style={styles.createButton}
+        <IconButton
+          icon={<Plus size={20} color={theme.colors.text} />}
           onPress={() => navigation.navigate('EventForm', {})}
-        >
-          <Plus size={20} color={theme.colors.text} />
-        </TouchableOpacity>
+          variant="solid"
+        />
       </View>
 
       {isLoading && !isRefreshing ? (
@@ -136,50 +135,66 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
               event={item} 
               onPress={() => navigation.navigate('EventForm', { eventId: item.id })}
               actions={
-                <>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageTickets', { eventId: item.id })}>
-                    <TicketIcon size={16} color={theme.colors.secondary} />
-                    <Text style={styles.actionText}>Tickets</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageSessions', { eventId: item.id })}>
-                    <CalendarIcon size={16} color={theme.colors.primaryLight} />
-                    <Text style={styles.actionText}>Agenda</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageRegistrations', { eventId: item.id })}>
-                    <Users size={16} color={theme.colors.accent} />
-                    <Text style={styles.actionText}>Guests</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageWaitlist', { eventId: item.id })}>
-                    <ListOrdered size={16} color={theme.colors.warning} />
-                    <Text style={styles.actionText}>Waitlist</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('EventForm', { eventId: item.id })}>
-                    <Edit2 size={16} color={theme.colors.textMuted} />
-                    <Text style={[styles.actionText, { color: theme.colors.textMuted }]}>Edit</Text>
-                  </TouchableOpacity>
+                <View style={styles.actionsGrid}>
+                  <SecondaryButton
+                    title="Tickets"
+                    icon={<TicketIcon size={14} color={theme.colors.text} />}
+                    onPress={() => navigation.navigate('ManageTickets', { eventId: item.id })}
+                    style={styles.actionButton}
+                  />
+                  <SecondaryButton
+                    title="Agenda"
+                    icon={<CalendarIcon size={14} color={theme.colors.text} />}
+                    onPress={() => navigation.navigate('ManageSessions', { eventId: item.id })}
+                    style={styles.actionButton}
+                  />
+                  <SecondaryButton
+                    title="Guests"
+                    icon={<Users size={14} color={theme.colors.text} />}
+                    onPress={() => navigation.navigate('ManageRegistrations', { eventId: item.id })}
+                    style={styles.actionButton}
+                  />
+                  <SecondaryButton
+                    title="Waitlist"
+                    icon={<ListOrdered size={14} color={theme.colors.text} />}
+                    onPress={() => navigation.navigate('ManageWaitlist', { eventId: item.id })}
+                    style={styles.actionButton}
+                  />
+                  <SecondaryButton
+                    title="Edit"
+                    icon={<Edit2 size={14} color={theme.colors.text} />}
+                    onPress={() => navigation.navigate('EventForm', { eventId: item.id })}
+                    style={styles.actionButton}
+                  />
                   {item.status === 'draft' && (
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleStatusUpdate(item, 'published')}>
-                      <Megaphone size={16} color={theme.colors.success} />
-                      <Text style={[styles.actionText, { color: theme.colors.success }]}>Publish</Text>
-                    </TouchableOpacity>
+                    <SecondaryButton
+                      title="Publish"
+                      icon={<Megaphone size={14} color={theme.colors.success} />}
+                      onPress={() => handleStatusUpdate(item, 'published')}
+                      style={styles.actionButton}
+                    />
                   )}
                   {item.status === 'published' && (
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleStatusUpdate(item, 'cancelled')}>
-                      <Ban size={16} color={theme.colors.warning} />
-                      <Text style={[styles.actionText, { color: theme.colors.warning }]}>Cancel</Text>
-                    </TouchableOpacity>
+                    <SecondaryButton
+                      title="Cancel"
+                      icon={<Ban size={14} color={theme.colors.warning} />}
+                      onPress={() => handleStatusUpdate(item, 'cancelled')}
+                      style={styles.actionButton}
+                    />
                   )}
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleFeatureToggle(item)}>
-                    <Star size={16} color={item.isFeatured ? theme.colors.warning : theme.colors.textMuted} />
-                    <Text style={[styles.actionText, { color: item.isFeatured ? theme.colors.warning : theme.colors.textMuted }]}>
-                      {item.isFeatured ? 'Unfeature' : 'Feature'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item.id)}>
-                    <Trash2 size={16} color={theme.colors.error} />
-                    <Text style={[styles.actionText, { color: theme.colors.error }]}>Delete</Text>
-                  </TouchableOpacity>
-                </>
+                  <SecondaryButton
+                    title={item.isFeatured ? 'Unfeature' : 'Feature'}
+                    icon={<Star size={14} color={item.isFeatured ? theme.colors.warning : theme.colors.textMuted} />}
+                    onPress={() => handleFeatureToggle(item)}
+                    style={styles.actionButton}
+                  />
+                  <SecondaryButton
+                    title="Delete"
+                    icon={<Trash2 size={14} color={theme.colors.error} />}
+                    onPress={() => handleDelete(item.id)}
+                    style={styles.actionButton}
+                  />
+                </View>
               }
             />
           )}
@@ -220,14 +235,13 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xxl,
     flexGrow: 1,
   },
-  actionBtn: {
+  actionsGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: theme.spacing.xs,
+    flexWrap: 'wrap',
+    gap: theme.spacing.s,
   },
-  actionText: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
-    marginLeft: 4,
+  actionButton: {
+    flexGrow: 1,
+    minWidth: '30%',
   },
 });

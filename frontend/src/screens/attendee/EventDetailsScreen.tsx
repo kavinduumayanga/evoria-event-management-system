@@ -8,7 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Calendar from 'expo-calendar';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Event, Venue, Session, TicketType } from '../../types';
-import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard, Input } from '../../components';
+import { GradientBackground, PrimaryButton, SecondaryButton, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard, FormInput, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { BookingService, EventService, PublicEventDetails, ReportService } from '../../api/services';
@@ -416,9 +416,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
-          </TouchableOpacity>
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={24} />}
+            onPress={() => navigation.goBack()}
+            variant="solid"
+          />
         </View>
 
         <ScrollView
@@ -438,7 +440,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.title}>{event.title}</Text>
             {event.category ? <Text style={styles.topicText}>Topic: {event.category}</Text> : null}
 
-            <View style={styles.metaContainer}>
+            <GlassCard style={styles.metaContainer} variant="dark" animateEntrance>
               <View style={styles.metaRow}>
                 <CalendarIcon size={16} color={theme.colors.primaryLight} />
                 <Text style={styles.metaText}>{event.date}</Text>
@@ -475,53 +477,48 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <MapPin size={16} color={theme.colors.accent} />
                 <Text style={styles.metaText}>{locationText}</Text>
               </View>
-            </View>
+            </GlassCard>
 
             <View style={styles.inlineActions}>
-              <Button title="Add to Calendar" variant="outline" onPress={handleCalendarAction} />
-              <Button title="Share" variant="outline" icon={<Share2 size={16} color={theme.colors.primary} />} onPress={handleShareEvent} />
-              <Button
+              <SecondaryButton title="Add to Calendar" onPress={handleCalendarAction} />
+              <SecondaryButton title="Share" onPress={handleShareEvent} />
+              <SecondaryButton
                 title="Contact Host"
-                variant="outline"
-                icon={publicData?.event.host?.phone ? <Phone size={16} color={theme.colors.primary} /> : <Mail size={16} color={theme.colors.primary} />}
                 onPress={handleContactHost}
               />
               {event.type === 'online' && event.meetingLink ? (
-                <Button
+                <SecondaryButton
                   title="Open Meeting Link"
                   onPress={handleOpenMeetingLink}
-                  icon={<Eye size={16} color={theme.colors.text} />}
                 />
               ) : null}
               {event.publicSlug ? (
-                <Button
+                <SecondaryButton
                   title="Open Public Page"
-                  variant="outline"
                   onPress={() => navigation.navigate('PublicEventDetails', { slug: event.publicSlug })}
                 />
               ) : null}
-              <Button
+              <SecondaryButton
                 title={showReportForm ? 'Hide Report Form' : 'Report Event'}
-                variant="outline"
                 onPress={() => setShowReportForm((previous) => !previous)}
               />
             </View>
 
             {canManageEvent ? (
-              <GlassCard style={styles.managePanel}>
+              <GlassCard style={styles.managePanel} variant="neonPurple" animateEntrance>
                 <Text style={styles.manageTitle}>Manager Actions</Text>
                 <View style={styles.manageActionGrid}>
-                  <Button title="Edit Event" variant="secondary" icon={<Pencil size={16} color={theme.colors.text} />} onPress={handleOpenEditEvent} />
-                  <Button title="Check-in Guests" variant="secondary" icon={<Users2 size={16} color={theme.colors.text} />} onPress={handleOpenCheckInGuests} />
-                  <Button title="Invite Guests" variant="secondary" icon={<Share2 size={16} color={theme.colors.text} />} onPress={handleInviteGuests} />
-                  <Button title="Guest List" variant="secondary" icon={<Users2 size={16} color={theme.colors.text} />} onPress={handleOpenGuestList} />
-                  <Button title="Manage Tickets" variant="secondary" icon={<Ticket size={16} color={theme.colors.text} />} onPress={handleOpenManageTickets} />
-                  <Button title="Copy Public URL" variant="outline" icon={<Copy size={16} color={theme.colors.primary} />} onPress={handleCopyEventUrl} />
+                  <SecondaryButton title="Edit Event" onPress={handleOpenEditEvent} />
+                  <SecondaryButton title="Check-in Guests" onPress={handleOpenCheckInGuests} />
+                  <SecondaryButton title="Invite Guests" onPress={handleInviteGuests} />
+                  <SecondaryButton title="Guest List" onPress={handleOpenGuestList} />
+                  <SecondaryButton title="Manage Tickets" onPress={handleOpenManageTickets} />
+                  <SecondaryButton title="Copy Public URL" onPress={handleCopyEventUrl} />
                 </View>
 
                 <View style={styles.manageSection}>
                   <Text style={styles.manageSectionTitle}>Add Event Admins</Text>
-                  <Input
+                  <FormInput
                     label="Admin Email"
                     value={eventAdminEmail}
                     onChangeText={setEventAdminEmail}
@@ -529,7 +526,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                     autoCapitalize="none"
                     keyboardType="email-address"
                   />
-                  <Button
+                  <PrimaryButton
                     title="Add Event Admin"
                     onPress={handleAddEventAdmin}
                     isLoading={isAddingEventAdmin}
@@ -539,25 +536,24 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={styles.manageSection}>
                   <Text style={styles.manageSectionTitle}>Visibility Settings</Text>
                   <View style={styles.visibilityButtons}>
-                    <Button title="Set Public" variant="outline" onPress={() => handleUpdateVisibility('public')} />
-                    <Button title="Set Unlisted" variant="outline" onPress={() => handleUpdateVisibility('unlisted')} />
-                    <Button title="Set Private" variant="outline" onPress={() => handleUpdateVisibility('private')} />
+                    <SecondaryButton title="Set Public" onPress={() => handleUpdateVisibility('public')} />
+                    <SecondaryButton title="Set Unlisted" onPress={() => handleUpdateVisibility('unlisted')} />
+                    <SecondaryButton title="Set Private" onPress={() => handleUpdateVisibility('private')} />
                   </View>
                 </View>
 
                 <View style={styles.manageSection}>
                   <Text style={styles.manageSectionTitle}>Send Blast Message</Text>
-                  <Input label="Blast Title" value={blastTitle} onChangeText={setBlastTitle} placeholder="Important event update" />
-                  <Input
+                  <FormInput label="Blast Title" value={blastTitle} onChangeText={setBlastTitle} placeholder="Important event update" />
+                  <FormInput
                     label="Blast Message"
                     value={blastMessage}
                     onChangeText={setBlastMessage}
                     placeholder="Write your message to all attendees"
                     multiline
                   />
-                  <Button
+                  <PrimaryButton
                     title="Send Blast Message"
-                    icon={<Send size={16} color={theme.colors.text} />}
                     onPress={handleSendBlastMessage}
                     isLoading={isSendingBlast}
                   />
@@ -566,20 +562,20 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             ) : null}
 
             {showReportForm && (
-              <View style={styles.reportBox}>
-                <Input
+              <GlassCard style={styles.reportBox} variant="dark">
+                <FormInput
                   label="Reason"
                   value={reportReason}
                   onChangeText={setReportReason}
                   placeholder="Tell us what is wrong with this event"
                   multiline
                 />
-                <Button
+                <PrimaryButton
                   title="Submit Report"
                   onPress={handleSubmitReport}
                   isLoading={isSubmittingReport}
                 />
-              </View>
+              </GlassCard>
             )}
 
             <View style={styles.section}>
@@ -591,7 +587,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Agenda</Text>
                 {sessions.map((session) => (
-                  <GlassCard key={session.id} style={styles.sessionCard}>
+                  <GlassCard key={session.id} style={styles.sessionCard} variant="dark">
                     <Text style={styles.sessionTitle}>{session.title}</Text>
                     <Text style={styles.sessionTime}>{session.startTime} - {session.endTime}</Text>
                     {session.speakerName && <Text style={styles.sessionSpeaker}>Speaker: {session.speakerName}</Text>}
@@ -645,7 +641,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           {isEventFull && (
             <Text style={styles.waitlistHint}>Event full - joining now adds you to waitlist.</Text>
           )}
-          <Button
+          <PrimaryButton
             title={isEventFull ? 'Join Waitlist' : (isFreeEvent ? 'Register' : (isAvailable ? 'Book Tickets' : 'Sold Out'))}
             disabled={!canRegister || event.status !== 'published' || (!isEventFull && !hasActionableInventory)}
             isLoading={isFreeEvent && isRegisteringFree}
@@ -710,6 +706,7 @@ const styles = StyleSheet.create({
   },
   metaContainer: {
     marginBottom: theme.spacing.xl,
+    padding: theme.spacing.l,
     gap: theme.spacing.s,
   },
   metaRow: {
@@ -732,9 +729,7 @@ const styles = StyleSheet.create({
   },
   managePanel: {
     marginBottom: theme.spacing.l,
-    padding: theme.spacing.m,
-    borderColor: `${theme.colors.primary}66`,
-    backgroundColor: 'rgba(67, 56, 202, 0.08)',
+    padding: theme.spacing.l,
   },
   manageTitle: {
     ...theme.typography.h2,

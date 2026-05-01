@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -12,9 +11,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, Button, Input, GlassCard } from '../../components';
+import { GradientBackground, PrimaryButton, FormInput, GlassCard, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Key, Lock } from 'lucide-react-native';
 import { AuthService } from '../../api/services';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -75,9 +74,11 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
-          </TouchableOpacity>
+          <IconButton 
+            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
+            onPress={() => navigation.goBack()} 
+            variant="solid" 
+          />
         </View>
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -91,32 +92,35 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
             {prefetchedEmail ? <Text style={styles.prefillText}>Email: {prefetchedEmail}</Text> : null}
 
-            <GlassCard style={styles.card}>
-              <Input
+            <GlassCard style={styles.card} variant="dark" animateEntrance>
+              <FormInput
                 label="Reset Token"
                 placeholder="Paste the reset token"
                 autoCapitalize="none"
                 value={token}
                 onChangeText={setToken}
+                leftIcon={<Key size={20} color={theme.colors.textMuted} />}
               />
 
-              <Input
+              <FormInput
                 label="New Password"
                 placeholder="Enter new password"
                 isPassword
                 value={newPassword}
                 onChangeText={setNewPassword}
+                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
               />
 
-              <Input
+              <FormInput
                 label="Confirm New Password"
                 placeholder="Re-enter new password"
                 isPassword
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
+                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
               />
 
-              <Button
+              <PrimaryButton
                 title="Reset Password"
                 onPress={handleResetPassword}
                 isLoading={isLoading}
@@ -137,14 +141,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   content: {
     flexGrow: 1,
