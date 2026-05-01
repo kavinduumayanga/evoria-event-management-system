@@ -6,6 +6,7 @@ import {
   getMyBookings,
   getEventBookings,
   cancelBooking,
+  refundBooking,
 } from '../controllers/booking.controller';
 import { protect, restrictTo } from '../middleware/auth.middleware';
 
@@ -20,6 +21,7 @@ router.post('/', createBooking);
 // Host admin only routes
 router.get('/', restrictTo('host_admin'), getBookings);
 router.get('/event/:eventId', restrictTo('host_admin'), getEventBookings);
+router.patch('/:id/refund', restrictTo('host_admin'), refundBooking);
 
 // Wildcard routes last
 router.get('/:id', getBooking);

@@ -3,8 +3,29 @@ export type EventStatus = 'draft' | 'published' | 'cancelled';
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type EventType = 'online' | 'physical' | 'hybrid';
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
+export type RsvpStatus = 'going' | 'not_going';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export type CheckInStatus = 'not_checked_in' | 'checked_in';
+export type RegistrationType = 'free' | 'paid';
+export type PromoDiscountType = 'percentage' | 'fixed';
 export type VenueType = 'physical' | 'online' | 'hybrid';
 export type SessionStatus = 'scheduled' | 'cancelled' | 'completed';
+export type CustomQuestionType = 'text' | 'number' | 'choice';
+export type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
+export type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
+export type NotificationStatus = 'sent' | 'scheduled' | 'failed';
+
+export interface EventCustomQuestion {
+  id: string;
+  question: string;
+  type: CustomQuestionType;
+  required?: boolean;
+}
+
+export interface RegistrationAnswer {
+  questionId: string;
+  answer: string;
+}
 
 export interface User {
   id: string;
@@ -35,6 +56,8 @@ export interface Event {
   capacity: number;
   status: EventStatus;
   visibility: EventVisibility;
+  requiresApproval?: boolean;
+  customQuestions?: EventCustomQuestion[];
   createdAt: string;
   updatedAt: string;
 }
@@ -45,12 +68,23 @@ export interface TicketType {
   name: string;
   description?: string;
   price: number;
+  currency: string;
+  isFree: boolean;
   quantity: number;
   soldCount: number;
   maxPerUser: number;
   isActive: boolean;
+  promoCodes: PromoCode[];
+  unlockCode?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PromoCode {
+  code: string;
+  discountType: PromoDiscountType;
+  value: number;
+  isActive: boolean;
 }
 
 export interface Booking {
@@ -62,6 +96,33 @@ export interface Booking {
   totalAmount: number;
   bookingStatus: BookingStatus;
   bookingDate: string;
+  rsvpStatus: RsvpStatus;
+  approvalStatus: ApprovalStatus;
+  checkInStatus: CheckInStatus;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
+  checkInMethod?: 'qr' | 'manual' | null;
+  qrCodeValue?: string;
+  attendanceNote?: string;
+  customAnswers: RegistrationAnswer[];
+  registrationType: RegistrationType;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  eventId?: string | null;
+  title: string;
+  message: string;
+  type: NotificationType;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  isRead: boolean;
+  scheduledAt?: string | null;
+  sentAt?: string | null;
+  createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }

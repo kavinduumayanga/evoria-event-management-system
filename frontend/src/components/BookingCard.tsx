@@ -13,11 +13,24 @@ interface BookingCardProps {
 }
 
 export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, style, actions }) => {
+  const approvalStatus = booking.approvalStatus || 'approved';
+  const rsvpStatus = booking.rsvpStatus || 'going';
+  const registrationType = booking.registrationType || (booking.totalAmount > 0 ? 'paid' : 'free');
+
   const getStatusColor = () => {
     switch (booking.bookingStatus) {
       case 'confirmed': return theme.colors.success;
       case 'pending': return theme.colors.warning;
       case 'cancelled': return theme.colors.error;
+      default: return theme.colors.textMuted;
+    }
+  };
+
+  const getApprovalColor = () => {
+    switch (approvalStatus) {
+      case 'approved': return theme.colors.success;
+      case 'pending': return theme.colors.warning;
+      case 'rejected': return theme.colors.error;
       default: return theme.colors.textMuted;
     }
   };
@@ -40,8 +53,22 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
           <Text style={styles.detailText}>Booked: {new Date(booking.bookingDate).toLocaleDateString()}</Text>
         </View>
         <View style={styles.detailRow}>
+          <Text style={styles.label}>Approval:</Text>
+          <View style={[styles.smallBadge, { borderColor: getApprovalColor(), backgroundColor: `${getApprovalColor()}20` }]}>
+            <Text style={[styles.smallBadgeText, { color: getApprovalColor() }]}>{approvalStatus.toUpperCase()}</Text>
+          </View>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.label}>RSVP:</Text>
+          <Text style={styles.value}>{rsvpStatus.replace('_', ' ').toUpperCase()}</Text>
+        </View>
+        <View style={styles.detailRow}>
           <Text style={styles.label}>Quantity:</Text>
           <Text style={styles.value}>{booking.quantity}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.label}>Type:</Text>
+          <Text style={styles.value}>{registrationType.toUpperCase()}</Text>
         </View>
         <View style={styles.detailRow}>
           <DollarSign size={14} color={theme.colors.success} />
@@ -112,6 +139,16 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.text,
     marginLeft: theme.spacing.s,
+  },
+  smallBadge: {
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.s,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 2,
+  },
+  smallBadgeText: {
+    ...theme.typography.small,
+    fontWeight: '700',
   },
   actionsContainer: {
     marginTop: theme.spacing.m,

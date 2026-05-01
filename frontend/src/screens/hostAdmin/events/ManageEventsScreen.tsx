@@ -4,7 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban, Users } from 'lucide-react-native';
 import { EventService } from '../../../api/services';
 import { Event } from '../../../types';
 import { useFocusEffect } from '@react-navigation/native';
@@ -121,6 +121,10 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
                   <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageSessions', { eventId: item.id })}>
                     <CalendarIcon size={16} color={theme.colors.primaryLight} />
                     <Text style={styles.actionText}>Agenda</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageRegistrations', { eventId: item.id })}>
+                    <Users size={16} color={theme.colors.accent} />
+                    <Text style={styles.actionText}>Guests</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('EventForm', { eventId: item.id })}>
                     <Edit2 size={16} color={theme.colors.textMuted} />

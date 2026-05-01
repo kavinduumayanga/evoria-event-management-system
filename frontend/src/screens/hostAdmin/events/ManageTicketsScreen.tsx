@@ -97,9 +97,19 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
               <View style={styles.ticketTitleRow}>
                 <TicketIcon size={18} color={theme.colors.secondary} />
                 <Text style={styles.ticketName}>{item.name}</Text>
+                <View style={[styles.ticketBadge, { backgroundColor: item.isFree ? `${theme.colors.success}20` : `${theme.colors.secondary}20` }]}>
+                  <Text style={[styles.ticketBadgeText, { color: item.isFree ? theme.colors.success : theme.colors.secondary }]}>
+                    {item.isFree ? 'FREE' : 'PAID'}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.ticketPrice}>${item.price.toFixed(2)}</Text>
-              <Text style={styles.ticketDetail}>Capacity: {item.quantity} • Sold: {item.soldCount}</Text>
+              <Text style={styles.ticketPrice}>
+                {item.isFree ? 'Free' : `${item.currency || 'LKR'} ${item.price.toFixed(2)}`}
+              </Text>
+              <Text style={styles.ticketDetail}>
+                Capacity: {item.quantity} • Sold: {item.soldCount} • Remaining: {Math.max(0, item.quantity - item.soldCount)}
+              </Text>
+              <Text style={styles.ticketDetail}>Max per user: {item.maxPerUser}</Text>
             </View>
             <View style={styles.actions}>
               <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('TicketForm', { eventId, ticketId: item.id })}>
@@ -134,6 +144,16 @@ const styles = StyleSheet.create({
   ticketInfo: { flex: 1 },
   ticketTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   ticketName: { ...theme.typography.h3, color: theme.colors.text, marginLeft: theme.spacing.xs },
+  ticketBadge: {
+    marginLeft: theme.spacing.s,
+    borderRadius: theme.borderRadius.s,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 2,
+  },
+  ticketBadgeText: {
+    ...theme.typography.small,
+    fontWeight: '700',
+  },
   ticketPrice: { ...theme.typography.body, color: theme.colors.primaryLight, marginBottom: 2, fontWeight: 'bold' },
   ticketDetail: { ...theme.typography.caption, color: theme.colors.textMuted },
   actions: { flexDirection: 'row' },
