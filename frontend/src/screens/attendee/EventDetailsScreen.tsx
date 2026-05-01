@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Image, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import * as Calendar from 'expo-calendar';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Event, Venue, Session, TicketType } from '../../types';
 import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { EventService, ReportService } from '../../api/services';
-import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Link as LinkIcon } from 'lucide-react-native';
+import { BookingService, EventService, PublicEventDetails, ReportService } from '../../api/services';
+import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Share2, Mail, Phone, UserRound, Users2, Pencil, Ticket, Eye, Copy, Send } from 'lucide-react-native';
+import { useAuthStore } from '../../store/auth.store';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -27,17 +29,25 @@ const parseEventDateTime = (dateValue: string, timeValue: string) => {
 };
 
 export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId } = route.params;
+  const { eventId, publicSlug } = route.params;
+  const currentUser = useAuthStore((state) => state.user);
   const [event, setEvent] = useState<Event | null>(null);
   const [venue, setVenue] = useState<Venue | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [tickets, setTickets] = useState<TicketType[]>([]);
+  const [publicData, setPublicData] = useState<PublicEventDetails | null>(null);
   const [recommendedEvents, setRecommendedEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [eventAdminEmail, setEventAdminEmail] = useState('');
+  const [isAddingEventAdmin, setIsAddingEventAdmin] = useState(false);
+  const [blastTitle, setBlastTitle] = useState('');
+  const [blastMessage, setBlastMessage] = useState('');
+  const [isSendingBlast, setIsSendingBlast] = useState(false);
+  const [isRegisteringFree, setIsRegisteringFree] = useState(false);
 
   useEffect(() => {
     fetchEventDetails();
@@ -58,6 +68,18 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       setEvent(eventData);
       setSessions(sessionsRes.data.data.sessions || []);
       setTickets(ticketsRes.data.data.tickets || []);
+      const resolvedSlug = publicSlug || eventData.publicSlug;
+      if (resolvedSlug) {
+        try {
+          const publicRes = await EventService.getPublicEventBySlug(resolvedSlug);
+          setPublicData(publicRes.data);
+        } catch (publicFetchError) {
+          // Keep details screen functional even if public endpoint access is restricted.
+          setPublicData(null);
+        }
+      } else {
+        setPublicData(null);
+      }
 
       if (eventData.venueId) {
         const venueRes = await apiClient.get(`/venues/${eventData.venueId}`);
@@ -134,6 +156,197 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     await Linking.openURL(event.meetingLink);
   };
 
+  const resolveShareUrl = () => {
+    const slug = publicData?.event.publicSlug || event?.publicSlug || publicSlug;
+    if (!slug) return '';
+
+    return publicData?.event.publicUrl || EventService.buildPublicEventUrl(slug);
+  };
+
+  const handleShareEvent = async () => {
+    if (!event) return;
+    const shareUrl = resolveShareUrl();
+    if (!shareUrl) {
+      Alert.alert('Share Unavailable', 'Public URL is not available for this event.');
+      return;
+    }
+
+    await Share.share({
+      title: event.title,
+      message: `Check out this event: ${shareUrl}`,
+      url: shareUrl,
+    });
+  };
+
+  const handleInviteGuests = async () => {
+    if (!event) return;
+    const shareUrl = resolveShareUrl();
+    if (!shareUrl) {
+      Alert.alert('Invite Unavailable', 'Public URL is not available for this event.');
+      return;
+    }
+
+    await Share.share({
+      title: `Invitation: ${event.title}`,
+      message: `You are invited to ${event.title}. Register here: ${shareUrl}`,
+      url: shareUrl,
+    });
+  };
+
+  const handleCopyEventUrl = async () => {
+    const shareUrl = resolveShareUrl();
+    if (!shareUrl) {
+      Alert.alert('Copy Unavailable', 'Public URL is not available for this event.');
+      return;
+    }
+
+    await Clipboard.setStringAsync(shareUrl);
+    Alert.alert('Copied', 'Public event URL copied to clipboard.');
+  };
+
+  const handleContactHost = async () => {
+    const host = publicData?.event.host;
+    const contact = publicData?.event.contactDetails;
+    if (!host && !contact) {
+      Alert.alert('Contact Unavailable', 'Host contact details are not available.');
+      return;
+    }
+
+    const phone = (contact?.phone || host?.phone || '').trim();
+    if (phone) {
+      const telUrl = `tel:${phone}`;
+      const canDial = await Linking.canOpenURL(telUrl);
+      if (canDial) {
+        await Linking.openURL(telUrl);
+        return;
+      }
+    }
+
+    const email = (contact?.email || host?.email || '').trim();
+    if (email) {
+      const mailUrl = `mailto:${email}`;
+      const canEmail = await Linking.canOpenURL(mailUrl);
+      if (canEmail) {
+        await Linking.openURL(mailUrl);
+        return;
+      }
+    }
+
+    Alert.alert('Contact Unavailable', 'Unable to open host contact options on this device.');
+  };
+
+  const handleOpenEditEvent = () => {
+    if (!event) return;
+    navigation.navigate('EventForm', { eventId: event.id });
+  };
+
+  const handleOpenGuestList = () => {
+    if (!event) return;
+    navigation.navigate('ManageRegistrations', { eventId: event.id });
+  };
+
+  const handleOpenCheckInGuests = () => {
+    if (!event) return;
+    navigation.navigate('ManageRegistrations', { eventId: event.id });
+  };
+
+  const handleOpenManageTickets = () => {
+    if (!event) return;
+    navigation.navigate('ManageTickets', { eventId: event.id });
+  };
+
+  const handleUpdateVisibility = async (visibility: 'public' | 'private' | 'unlisted') => {
+    if (!event) return;
+
+    try {
+      await EventService.updateEventVisibility(event.id, visibility);
+      Alert.alert('Updated', `Event visibility set to ${visibility}.`);
+      fetchEventDetails();
+    } catch (updateError: any) {
+      Alert.alert('Update Failed', updateError?.response?.data?.message || 'Unable to update event visibility.');
+    }
+  };
+
+  const handleAddEventAdmin = async () => {
+    if (!event) return;
+    const email = eventAdminEmail.trim();
+    if (!email) {
+      Alert.alert('Add Event Admin', 'Please enter an email address.');
+      return;
+    }
+
+    try {
+      setIsAddingEventAdmin(true);
+      await EventService.addEventAdmin(event.id, { email });
+      setEventAdminEmail('');
+      Alert.alert('Success', 'Event admin added successfully.');
+      fetchEventDetails();
+    } catch (addError: any) {
+      Alert.alert('Add Admin Failed', addError?.response?.data?.message || 'Unable to add event admin.');
+    } finally {
+      setIsAddingEventAdmin(false);
+    }
+  };
+
+  const handleSendBlastMessage = async () => {
+    if (!event) return;
+    if (!blastTitle.trim() || !blastMessage.trim()) {
+      Alert.alert('Missing Fields', 'Blast title and message are required.');
+      return;
+    }
+
+    try {
+      setIsSendingBlast(true);
+      const response = await EventService.blastMessage(event.id, {
+        subject: blastTitle.trim(),
+        message: blastMessage.trim(),
+      });
+      setBlastTitle('');
+      setBlastMessage('');
+      Alert.alert('Blast Sent', response?.message || 'Blast message sent to attendees.');
+    } catch (blastError: any) {
+      Alert.alert('Blast Failed', blastError?.response?.data?.message || 'Unable to send blast message.');
+    } finally {
+      setIsSendingBlast(false);
+    }
+  };
+
+  const handleRegisterFreeEvent = async () => {
+    if (!event) return;
+
+    try {
+      setIsRegisteringFree(true);
+      const response = await BookingService.createBooking({
+        eventId: event.id,
+        quantity: 1,
+      });
+
+      const booking = response?.data?.booking;
+      if (!booking?.id) {
+        Alert.alert('Registration Complete', 'Free event registration submitted.');
+        fetchEventDetails();
+        return;
+      }
+
+      if (booking.isWaitlisted) {
+        Alert.alert(
+          'Added to Waitlist',
+          booking.waitlistPosition
+            ? `Event is full. You were added at waitlist position #${booking.waitlistPosition}.`
+            : 'Event is full. You were added to the waitlist.',
+        );
+      } else {
+        Alert.alert('Registered', 'Free event registration confirmed.');
+      }
+
+      navigation.navigate('BookingConfirmation', { bookingId: booking.id });
+    } catch (registrationError: any) {
+      Alert.alert('Registration Failed', registrationError?.response?.data?.message || 'Unable to register for this event.');
+    } finally {
+      setIsRegisteringFree(false);
+    }
+  };
+
   const handleSubmitReport = async () => {
     if (!event) return;
     if (!reportReason.trim()) {
@@ -178,6 +391,18 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const isAvailable = tickets.some((ticket) => ticket.isActive && ticket.quantity > ticket.soldCount);
   const isEventFull = event.bookingCount >= event.capacity;
+  const canRegister = event.visibility === 'public';
+  const pricingMode = event.pricingMode || 'ticketed';
+  const isFreeEvent = pricingMode === 'free';
+  const hasActionableInventory = isFreeEvent || isAvailable;
+  const canManageEvent = Boolean(
+    publicData?.event.isManageableByCurrentUser
+    || (currentUser && (event.ownerId === currentUser.id || (event.adminIds || []).includes(currentUser.id)))
+  );
+  const hostName = publicData?.event.host?.name || 'Host';
+  const coverImage = publicData?.event.image || event.coverImage;
+  const locationText = publicData?.event.location.label
+    || (venue ? `${venue.name}, ${venue.city}` : event.city || (event.type === 'online' ? 'Online event' : 'Venue'));
 
   return (
     <GradientBackground>
@@ -189,12 +414,17 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.imagePlaceholder}>
-            <Text style={{ color: theme.colors.textMuted }}>Event Cover Image</Text>
-          </View>
+          {coverImage ? (
+            <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Text style={{ color: theme.colors.textMuted }}>Event Cover Image</Text>
+            </View>
+          )}
 
           <View style={styles.infoContainer}>
             <Text style={styles.title}>{event.title}</Text>
+            {event.category ? <Text style={styles.topicText}>Topic: {event.category}</Text> : null}
 
             <View style={styles.metaContainer}>
               <View style={styles.metaRow}>
@@ -209,6 +439,14 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Wifi size={16} color={theme.colors.primary} />
                 <Text style={styles.metaText}>Type: {event.type ? event.type.toUpperCase() : 'PHYSICAL'}</Text>
               </View>
+              <View style={styles.metaRow}>
+                <UserRound size={16} color={theme.colors.secondary} />
+                <Text style={styles.metaText}>Host: {hostName}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Capacity:</Text>
+                <Text style={styles.metaText}>{event.capacity}</Text>
+              </View>
               {event.category ? (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Category:</Text>
@@ -221,27 +459,33 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text style={styles.metaText}>{event.tags.join(', ')}</Text>
                 </View>
               ) : null}
-              {venue && (
-                <View style={styles.metaRow}>
-                  <MapPin size={16} color={theme.colors.accent} />
-                  <Text style={styles.metaText}>{venue.name}, {venue.city}</Text>
-                </View>
-              )}
-              {!venue && event.type === 'online' && (
-                <View style={styles.metaRow}>
-                  <MapPin size={16} color={theme.colors.accent} />
-                  <Text style={styles.metaText}>Online event (no physical venue)</Text>
-                </View>
-              )}
+              <View style={styles.metaRow}>
+                <MapPin size={16} color={theme.colors.accent} />
+                <Text style={styles.metaText}>{locationText}</Text>
+              </View>
             </View>
 
             <View style={styles.inlineActions}>
               <Button title="Add to Calendar" variant="outline" onPress={handleCalendarAction} />
+              <Button title="Share" variant="outline" icon={<Share2 size={16} color={theme.colors.primary} />} onPress={handleShareEvent} />
+              <Button
+                title="Contact Host"
+                variant="outline"
+                icon={publicData?.event.host?.phone ? <Phone size={16} color={theme.colors.primary} /> : <Mail size={16} color={theme.colors.primary} />}
+                onPress={handleContactHost}
+              />
               {event.type === 'online' && event.meetingLink ? (
                 <Button
                   title="Open Meeting Link"
                   onPress={handleOpenMeetingLink}
-                  icon={<LinkIcon size={16} color={theme.colors.text} />}
+                  icon={<Eye size={16} color={theme.colors.text} />}
+                />
+              ) : null}
+              {event.publicSlug ? (
+                <Button
+                  title="Open Public Page"
+                  variant="outline"
+                  onPress={() => navigation.navigate('PublicEventDetails', { slug: event.publicSlug })}
                 />
               ) : null}
               <Button
@@ -250,6 +494,64 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 onPress={() => setShowReportForm((previous) => !previous)}
               />
             </View>
+
+            {canManageEvent ? (
+              <GlassCard style={styles.managePanel}>
+                <Text style={styles.manageTitle}>Manager Actions</Text>
+                <View style={styles.manageActionGrid}>
+                  <Button title="Edit Event" variant="secondary" icon={<Pencil size={16} color={theme.colors.text} />} onPress={handleOpenEditEvent} />
+                  <Button title="Check-in Guests" variant="secondary" icon={<Users2 size={16} color={theme.colors.text} />} onPress={handleOpenCheckInGuests} />
+                  <Button title="Invite Guests" variant="secondary" icon={<Share2 size={16} color={theme.colors.text} />} onPress={handleInviteGuests} />
+                  <Button title="Guest List" variant="secondary" icon={<Users2 size={16} color={theme.colors.text} />} onPress={handleOpenGuestList} />
+                  <Button title="Manage Tickets" variant="secondary" icon={<Ticket size={16} color={theme.colors.text} />} onPress={handleOpenManageTickets} />
+                  <Button title="Copy Public URL" variant="outline" icon={<Copy size={16} color={theme.colors.primary} />} onPress={handleCopyEventUrl} />
+                </View>
+
+                <View style={styles.manageSection}>
+                  <Text style={styles.manageSectionTitle}>Add Event Admins</Text>
+                  <Input
+                    label="Admin Email"
+                    value={eventAdminEmail}
+                    onChangeText={setEventAdminEmail}
+                    placeholder="user@example.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <Button
+                    title="Add Event Admin"
+                    onPress={handleAddEventAdmin}
+                    isLoading={isAddingEventAdmin}
+                  />
+                </View>
+
+                <View style={styles.manageSection}>
+                  <Text style={styles.manageSectionTitle}>Visibility Settings</Text>
+                  <View style={styles.visibilityButtons}>
+                    <Button title="Set Public" variant="outline" onPress={() => handleUpdateVisibility('public')} />
+                    <Button title="Set Unlisted" variant="outline" onPress={() => handleUpdateVisibility('unlisted')} />
+                    <Button title="Set Private" variant="outline" onPress={() => handleUpdateVisibility('private')} />
+                  </View>
+                </View>
+
+                <View style={styles.manageSection}>
+                  <Text style={styles.manageSectionTitle}>Send Blast Message</Text>
+                  <Input label="Blast Title" value={blastTitle} onChangeText={setBlastTitle} placeholder="Important event update" />
+                  <Input
+                    label="Blast Message"
+                    value={blastMessage}
+                    onChangeText={setBlastMessage}
+                    placeholder="Write your message to all attendees"
+                    multiline
+                  />
+                  <Button
+                    title="Send Blast Message"
+                    icon={<Send size={16} color={theme.colors.text} />}
+                    onPress={handleSendBlastMessage}
+                    isLoading={isSendingBlast}
+                  />
+                </View>
+              </GlassCard>
+            ) : null}
 
             {showReportForm && (
               <View style={styles.reportBox}>
@@ -288,7 +590,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tickets</Text>
-              {tickets.length > 0 ? (
+              {isFreeEvent ? (
+                <Text style={styles.description}>This is a free event. Tap Register to reserve your spot.</Text>
+              ) : tickets.length > 0 ? (
                 tickets.map((ticket) => (
                   <GlassCard key={ticket.id} style={styles.ticketCard} variant="light">
                     <View style={styles.ticketInfo}>
@@ -314,7 +618,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   <EventCard
                     key={recommended.id}
                     event={recommended}
-                    onPress={() => navigation.push('EventDetails', { eventId: recommended.id })}
+                    onPress={() => navigation.push('EventDetails', { eventId: recommended.id, publicSlug: recommended.publicSlug })}
                   />
                 ))}
               </View>
@@ -323,13 +627,23 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         </ScrollView>
 
         <View style={styles.footer}>
+          {!canRegister && (
+            <Text style={styles.waitlistHint}>Registrations are available only for public events.</Text>
+          )}
           {isEventFull && (
             <Text style={styles.waitlistHint}>Event full - joining now adds you to waitlist.</Text>
           )}
           <Button
-            title={isEventFull ? 'Join Waitlist' : (isAvailable ? 'Book Tickets' : 'Sold Out')}
-            disabled={event.status !== 'published' || (!isEventFull && !isAvailable)}
-            onPress={() => navigation.navigate('TicketSelection', { eventId })}
+            title={isEventFull ? 'Join Waitlist' : (isFreeEvent ? 'Register' : (isAvailable ? 'Book Tickets' : 'Sold Out'))}
+            disabled={!canRegister || event.status !== 'published' || (!isEventFull && !hasActionableInventory)}
+            isLoading={isFreeEvent && isRegisteringFree}
+            onPress={() => {
+              if (isFreeEvent) {
+                handleRegisterFreeEvent();
+                return;
+              }
+              navigation.navigate('TicketSelection', { eventId });
+            }}
             style={styles.bookButton}
           />
         </View>
@@ -365,12 +679,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  coverImage: {
+    width: '100%',
+    height: 250,
+  },
   infoContainer: {
     padding: theme.spacing.xl,
   },
   title: {
     ...theme.typography.h1,
     color: theme.colors.text,
+    marginBottom: theme.spacing.m,
+  },
+  topicText: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.m,
   },
   metaContainer: {
@@ -393,6 +716,33 @@ const styles = StyleSheet.create({
   },
   inlineActions: {
     marginBottom: theme.spacing.m,
+    gap: theme.spacing.s,
+  },
+  managePanel: {
+    marginBottom: theme.spacing.l,
+    padding: theme.spacing.m,
+    borderColor: `${theme.colors.primary}66`,
+    backgroundColor: 'rgba(67, 56, 202, 0.08)',
+  },
+  manageTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.primaryLight,
+    marginBottom: theme.spacing.s,
+  },
+  manageActionGrid: {
+    gap: theme.spacing.s,
+  },
+  manageSection: {
+    marginTop: theme.spacing.m,
+  },
+  manageSectionTitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.s,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  visibilityButtons: {
     gap: theme.spacing.s,
   },
   reportBox: {

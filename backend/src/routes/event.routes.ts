@@ -7,14 +7,25 @@ import {
   updateEvent,
   deleteEvent,
   updateEventStatus,
+  updateEventVisibility,
   searchEvents,
   getTrendingEvents,
   incrementEventView,
   getRecommendedEvents,
   getEventCalendar,
   toggleEventFeatured,
+  addEventAdmin,
+  removeEventAdmin,
+  updateEventRegistrationFields,
 } from '../controllers/event.controller';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { getEventRegistrationsForManagers } from '../controllers/eventRegistration.controller';
+import { getEventGuests } from '../controllers/guest.controller';
+import {
+  blastEventMessage,
+  getEventCommunications,
+  inviteGuestToEvent,
+} from '../controllers/eventCommunication.controller';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -22,20 +33,26 @@ router.get('/', getEvents);
 router.get('/search', searchEvents);
 router.get('/trending', getTrendingEvents);
 router.get('/recommended', getRecommendedEvents);
-router.get('/host/:hostAdminId', protect, restrictTo('host_admin'), getHostEvents);
+router.get('/host/:hostAdminId', protect, getHostEvents);
+router.get('/:eventId/registrations', protect, getEventRegistrationsForManagers);
+router.get('/:eventId/guests', protect, getEventGuests);
 router.get('/:id/calendar', getEventCalendar);
 router.get('/:id', getEvent);
 
 // Protected routes
 router.use(protect);
 router.patch('/:id/view', incrementEventView);
-
-// Host Admin only
-router.use(restrictTo('host_admin'));
 router.post('/', createEvent);
 router.put('/:id', updateEvent);
 router.delete('/:id', deleteEvent);
 router.patch('/:id/status', updateEventStatus);
+router.patch('/:id/visibility', updateEventVisibility);
+router.patch('/:eventId/registration-fields', updateEventRegistrationFields);
+router.post('/:eventId/invite', inviteGuestToEvent);
+router.post('/:eventId/blast', blastEventMessage);
+router.get('/:eventId/communications', getEventCommunications);
 router.patch('/:id/feature', toggleEventFeatured);
+router.post('/:id/admins', addEventAdmin);
+router.delete('/:id/admins/:userId', removeEventAdmin);
 
 export default router;

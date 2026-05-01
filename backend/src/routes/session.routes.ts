@@ -7,7 +7,7 @@ import {
   updateSession,
   deleteSession,
 } from '../controllers/session.controller';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -16,7 +16,6 @@ router.get('/:id', getSession);
 router.get('/event/:eventId', getEventSessions);
 
 router.use(protect);
-router.use(restrictTo('host_admin'));
 
 router.post('/', createSession);
 router.put('/:id', updateSession);

@@ -94,7 +94,7 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
             onPress={() => (
               isWaitlisted
                 ? navigation.navigate('HomeStack', { screen: 'MyWaitlist' })
-                : navigation.navigate('MyBookings')
+                : navigation.navigate('MyRegistrations')
             )}
             style={{ marginTop: 20 }}
           />

@@ -12,6 +12,7 @@ import {
   getNextWaitlistPosition,
   isEventAtCapacityForQuantity,
 } from '../utils/waitlist.helper';
+import { canManageEvent } from '../utils/eventPermissions';
 
 const registrationSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
@@ -28,13 +29,13 @@ const rsvpSchema = z.object({
   rsvpStatus: z.enum(['going', 'not_going']),
 }).strict();
 
-const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) {
     throw new AppError('Event not found', 404);
   }
 
-  if (event.hostAdminId !== hostAdminId) {
+  if (!canManageEvent(userId, event)) {
     throw new AppError('Not authorized for this event registrations', 403);
   }
 
@@ -93,8 +94,8 @@ export const createRegistration = async (req: Request, res: Response, next: Next
       return next(new AppError('Cannot register for an event that is not published', 400));
     }
 
-    if (event.visibility === 'private') {
-      return next(new AppError('Private events are not open for attendee registrations', 403));
+    if (event.visibility !== 'public') {
+      return next(new AppError('Only public events are open for registrations', 403));
     }
 
     const ticket = await TicketTypeModel.findById(validatedData.ticketTypeId);
@@ -234,7 +235,7 @@ export const getMyRegistrations = async (req: Request, res: Response, next: Next
 
 export const getEventRegistrations = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await ensureHostOwnsEvent(req.params.eventId as string, req.user!.id);
+    await ensureCanManageEvent(req.params.eventId as string, req.user!.id);
 
     const registrations = await BookingModel.find({ eventId: req.params.eventId }).sort({ createdAt: -1 });
     res.status(200).json({
@@ -257,7 +258,7 @@ const updateApprovalStatus = async (
     const registration = await BookingModel.findById(req.params.id as string);
     if (!registration) return next(new AppError('Registration not found', 404));
 
-    await ensureHostOwnsEvent(registration.eventId, req.user!.id);
+    await ensureCanManageEvent(registration.eventId, req.user!.id);
 
     if (registration.approvalStatus === approvalStatus) {
       return next(new AppError(`Registration already ${approvalStatus}`, 400));

@@ -5,7 +5,6 @@ import { useAuthStore, initAuth } from '../store/auth.store';
 import { RootStackParamList } from '../types/navigation';
 import { AuthNavigator } from './AuthNavigator';
 import { AttendeeNavigator } from './AttendeeNavigator';
-import { HostAdminNavigator } from './HostAdminNavigator';
 import { theme } from '../constants/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -15,6 +14,7 @@ export const RootNavigator = () => {
   const token = useAuthStore((state) => state.token);
   const isAuthLoading = useAuthStore((state) => state.isAuthLoading);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [activeStack, setActiveStack] = useState<'Auth' | 'Attendee'>('Auth');
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
 
@@ -46,7 +46,14 @@ export const RootNavigator = () => {
     };
   }, []);
 
-  const activeStack = !token ? 'Auth' : user?.role === 'host_admin' ? 'HostAdmin' : 'Attendee';
+  useEffect(() => {
+    if (!token) {
+      setActiveStack('Auth');
+      return;
+    }
+
+    setActiveStack('Attendee');
+  }, [token, user?.id]);
 
   if (__DEV__) {
     console.log('[RootNavigator] render', {
@@ -69,10 +76,8 @@ export const RootNavigator = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {!token ? (
+      {activeStack === 'Auth' ? (
         <Stack.Screen name="Auth" component={AuthNavigator} />
-      ) : user?.role === 'host_admin' ? (
-        <Stack.Screen name="HostAdmin" component={HostAdminNavigator} />
       ) : (
         <Stack.Screen name="Attendee" component={AttendeeNavigator} />
       )}

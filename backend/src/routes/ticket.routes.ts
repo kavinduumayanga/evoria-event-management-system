@@ -8,7 +8,7 @@ import {
   deleteTicket,
   applyPromoCode,
 } from '../controllers/ticket.controller';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -18,7 +18,6 @@ router.get('/event/:eventId', getEventTickets);
 
 router.use(protect);
 router.post('/apply-promo', applyPromoCode);
-router.use(restrictTo('host_admin'));
 
 router.post('/', createTicket);
 router.put('/:id', updateTicket);

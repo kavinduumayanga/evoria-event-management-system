@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 import {
   getBookingQr,
   scanCheckIn,
@@ -11,11 +11,10 @@ const router = Router();
 
 router.use(protect);
 
-router.get('/qr/:bookingId', getBookingQr);
+router.get('/qr/:registrationId', getBookingQr);
 
-router.use(restrictTo('host_admin'));
 router.post('/scan', scanCheckIn);
-router.patch('/:bookingId/manual', manualCheckIn);
+router.patch('/:registrationId/manual', manualCheckIn);
 router.get('/event/:eventId', getEventAttendance);
 
 export default router;

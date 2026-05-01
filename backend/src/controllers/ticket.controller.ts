@@ -8,6 +8,7 @@ import {
   validateTicketAvailability,
   validateUnlockCode,
 } from '../utils/ticketPricing';
+import { canManageEvent } from '../utils/eventPermissions';
 
 const promoCodeSchema = z.object({
   code: z.string().trim().min(1, 'Promo code is required'),
@@ -99,8 +100,12 @@ export const createTicket = async (req: Request, res: Response, next: NextFuncti
     const event = await EventModel.findById(validatedData.eventId);
     if (!event) return next(new AppError('Event not found', 404));
 
-    if (event.hostAdminId !== req.user!.id) {
+    if (!canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to add tickets to this event', 403));
+    }
+
+    if ((event.pricingMode === 'free') && (!normalizedPayload.isFree || normalizedPayload.price > 0)) {
+      return next(new AppError('Free events can only have free ticket types (price must be 0)', 400));
     }
 
     const newTicketDoc = await TicketTypeModel.create({
@@ -148,7 +153,7 @@ export const updateTicket = async (req: Request, res: Response, next: NextFuncti
     if (!ticket) return next(new AppError('Ticket not found', 404));
 
     const event = await EventModel.findById(ticket.eventId);
-    if (event?.hostAdminId !== req.user!.id) {
+    if (!event || !canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to update this ticket', 403));
     }
 
@@ -184,6 +189,10 @@ export const updateTicket = async (req: Request, res: Response, next: NextFuncti
       return next(new AppError('Price must be at least 0', 400));
     }
 
+    if ((event.pricingMode === 'free') && (!mergedData.isFree || mergedData.price > 0)) {
+      return next(new AppError('Free events can only have free ticket types (price must be 0)', 400));
+    }
+
     if (mergedData.quantity <= 0) {
       return next(new AppError('Quantity must be greater than 0', 400));
     }
@@ -210,7 +219,7 @@ export const deleteTicket = async (req: Request, res: Response, next: NextFuncti
     if (!ticket) return next(new AppError('Ticket not found', 404));
 
     const event = await EventModel.findById(ticket.eventId);
-    if (event?.hostAdminId !== req.user!.id) {
+    if (!event || !canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to delete this ticket', 403));
     }
 

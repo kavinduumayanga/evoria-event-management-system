@@ -3,14 +3,17 @@ import { View, Text, StyleSheet, RefreshControl, ScrollView, TouchableOpacity } 
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowLeft, Users, CheckCircle2, UserCheck, Ticket, DollarSign, Percent } from 'lucide-react-native';
-import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { AnalyticsService } from '../../../api/services';
 import { ScreenContainer, LoadingState, ErrorState, StatCard } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { EventAnalytics } from '../../../types';
 
-type EventAnalyticsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'EventAnalytics'>;
-type EventAnalyticsRouteProp = RouteProp<HostAdminEventStackParamList, 'EventAnalytics'>;
+type EventAnalyticsStandaloneParamList = {
+  EventAnalytics: { eventId: string };
+};
+
+type EventAnalyticsNavigationProp = NativeStackNavigationProp<EventAnalyticsStandaloneParamList, 'EventAnalytics'>;
+type EventAnalyticsRouteProp = RouteProp<EventAnalyticsStandaloneParamList, 'EventAnalytics'>;
 
 interface Props {
   navigation: EventAnalyticsNavigationProp;

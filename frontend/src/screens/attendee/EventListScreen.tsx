@@ -146,7 +146,7 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
                     <EventCard
                       event={item}
                       style={styles.horizontalCard}
-                      onPress={() => navigation.navigate('EventDetails', { eventId: item.id })}
+                      onPress={() => navigation.navigate('EventDetails', { eventId: item.id, publicSlug: item.publicSlug })}
                     />
                   )}
                 />
@@ -165,7 +165,7 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
                     <EventCard
                       event={item}
                       style={styles.horizontalCard}
-                      onPress={() => navigation.navigate('EventDetails', { eventId: item.id })}
+                      onPress={() => navigation.navigate('EventDetails', { eventId: item.id, publicSlug: item.publicSlug })}
                     />
                   )}
                 />
@@ -178,7 +178,7 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
         renderItem={({ item }) => (
           <EventCard
             event={item}
-            onPress={() => navigation.navigate('EventDetails', { eventId: item.id })}
+            onPress={() => navigation.navigate('EventDetails', { eventId: item.id, publicSlug: item.publicSlug })}
           />
         )}
         ListEmptyComponent={<EmptyState title="No Events Found" message="Try changing your filters or check back later." />}

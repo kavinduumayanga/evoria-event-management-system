@@ -1,21 +1,24 @@
 import { Router } from 'express';
 import {
   exportEventGuestsCsv,
+  getGuestQr,
   getEventGuests,
   markGuestCheckIn,
   runBulkGuestAction,
-  updateGuestApprovalStatus,
+  updateGuestStatus,
 } from '../controllers/guest.controller';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
 router.use(protect);
-router.use(restrictTo('host_admin'));
 
+router.get('/:registrationId/qr', getGuestQr);
 router.get('/event/:eventId', getEventGuests);
 router.get('/export/:eventId', exportEventGuestsCsv);
-router.patch('/:id/status', updateGuestApprovalStatus);
+router.patch('/:registrationId/status', updateGuestStatus);
+// Backward-compatible status route.
+router.patch('/:id/status', updateGuestStatus);
 router.patch('/:id/checkin', markGuestCheckIn);
 router.post('/bulk-action', runBulkGuestAction);
 

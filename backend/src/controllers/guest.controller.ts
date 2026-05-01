@@ -1,50 +1,53 @@
+import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { BookingModel } from '../models/Booking';
+import { RegistrationModel } from '../models/Registration';
 import { EventModel } from '../models/Event';
-import { TicketTypeModel } from '../models/TicketType';
-import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
+import { canManageEvent } from '../utils/eventPermissions';
+import { sendRegistrationStatusCommunications } from '../utils/registrationCommunication.helper';
 
-const approvalStatusValues = ['pending', 'approved', 'rejected'] as const;
-const bookingStatusValues = ['pending', 'confirmed', 'cancelled'] as const;
-const checkInStatusValues = ['not_checked_in', 'checked_in'] as const;
+const guestStatusValues = ['pending', 'going', 'ongoing', 'checked_in', 'not_going', 'declined'] as const;
+const bulkActionValues = ['going', 'ongoing', 'not_going', 'declined', 'checkin'] as const;
 
 const updateGuestStatusSchema = z.object({
-  approvalStatus: z.enum(approvalStatusValues),
+  status: z.enum(guestStatusValues),
 }).strict();
 
 const bulkActionSchema = z.object({
-  action: z.enum(['approve', 'reject', 'checkin']),
+  action: z.enum(bulkActionValues),
   ids: z.array(z.string().trim().min(1)).min(1, 'ids must contain at least one registration id'),
 }).strict();
 
-interface GuestRecord {
-  id: string;
-  userId: string;
-  eventId: string;
-  ticketTypeId: string;
-  quantity: number;
-  totalAmount: number;
-  bookingStatus: string;
-  approvalStatus: string;
-  rsvpStatus: string;
-  checkInStatus: string;
-  createdAt: string;
-  updatedAt: string;
-  guestName: string;
-  guestEmail: string;
-  ticketName: string;
-}
-
-const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) {
+  if (!canManageEvent(userId, event)) {
     throw new AppError('Not authorized to manage guests for this event', 403);
   }
   return event;
 };
+
+const ensureCanManageRegistration = async (registrationId: string, userId: string) => {
+  const registration = await RegistrationModel.findById(registrationId);
+  if (!registration) throw new AppError('Guest registration not found', 404);
+  await ensureCanManageEvent(registration.eventId, userId);
+  return registration;
+};
+
+const generateUniqueQrCodeValue = async (): Promise<string> => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const token = `qr_${crypto.randomBytes(16).toString('hex')}`;
+    const exists = await RegistrationModel.exists({ qrCodeValue: token });
+    if (!exists) {
+      return token;
+    }
+  }
+
+  throw new AppError('Failed to generate a unique QR code token', 500);
+};
+
+const shouldHaveQr = (status: string) => status === 'going' || status === 'ongoing' || status === 'checked_in';
 
 const escapeCsvValue = (value: string | number) => {
   const stringValue = String(value ?? '');
@@ -54,22 +57,15 @@ const escapeCsvValue = (value: string | number) => {
   return stringValue;
 };
 
-const normalizeSearchRegex = (search: string) => new RegExp(search.trim(), 'i');
-
 const buildGuestQuery = (eventId: string, query: Request['query']) => {
   const mongoQuery: Record<string, any> = { eventId };
 
   const status = typeof query.status === 'string' ? query.status.trim() : '';
   if (status) {
-    if ((approvalStatusValues as readonly string[]).includes(status)) {
-      mongoQuery.approvalStatus = status;
-    } else if ((bookingStatusValues as readonly string[]).includes(status)) {
-      mongoQuery.bookingStatus = status;
-    } else if ((checkInStatusValues as readonly string[]).includes(status)) {
-      mongoQuery.checkInStatus = status;
-    } else {
+    if (!(guestStatusValues as readonly string[]).includes(status)) {
       throw new AppError('Invalid status filter', 400);
     }
+    mongoQuery.status = status;
   }
 
   const date = typeof query.date === 'string' ? query.date.trim() : '';
@@ -80,88 +76,53 @@ const buildGuestQuery = (eventId: string, query: Request['query']) => {
     }
     const nextDay = new Date(dayStart);
     nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    mongoQuery.createdAt = { $gte: dayStart, $lt: nextDay };
+    mongoQuery.registeredAt = { $gte: dayStart, $lt: nextDay };
+  }
+
+  const search = typeof query.search === 'string' ? query.search.trim() : '';
+  if (search) {
+    const regex = new RegExp(search, 'i');
+    mongoQuery.$or = [
+      { name: regex },
+      { email: regex },
+      { mobile: regex },
+      { nic: regex },
+    ];
   }
 
   return mongoQuery;
 };
 
-const resolveSearchUserIds = async (search: string) => {
-  const normalizedSearch = search.trim();
-  if (!normalizedSearch) return null;
-
-  const regex = normalizeSearchRegex(normalizedSearch);
-  const users = await UserModel.find({
-    role: 'attendee',
-    $or: [{ name: regex }, { email: regex }],
-  }).select('_id');
-
-  return users.map((user) => user.id);
-};
-
-const buildGuestRecords = async (
-  eventId: string,
-  query: Request['query'],
-): Promise<GuestRecord[]> => {
-  const mongoQuery = buildGuestQuery(eventId, query);
-
-  const search = typeof query.search === 'string' ? query.search : '';
-  const searchedUserIds = await resolveSearchUserIds(search);
-  if (searchedUserIds && searchedUserIds.length === 0) return [];
-  if (searchedUserIds) mongoQuery.userId = { $in: searchedUserIds };
-
-  const registrations = await BookingModel.find(mongoQuery).sort({ createdAt: -1 });
-  if (registrations.length === 0) return [];
-
-  const userIds = [...new Set(registrations.map((registration) => registration.userId))];
-  const ticketIds = [...new Set(registrations.map((registration) => registration.ticketTypeId))];
-
-  const [users, tickets] = await Promise.all([
-    UserModel.find({ _id: { $in: userIds } }).select('_id name email'),
-    TicketTypeModel.find({ _id: { $in: ticketIds } }).select('_id name'),
-  ]);
-
-  const userMap = new Map(users.map((user) => [user.id, user]));
-  const ticketMap = new Map(tickets.map((ticket) => [ticket.id, ticket]));
-
-  return registrations.map((registration) => {
-    const user = userMap.get(registration.userId);
-    const ticket = ticketMap.get(registration.ticketTypeId);
-
-    return {
-      id: registration.id,
-      userId: registration.userId,
-      eventId: registration.eventId,
-      ticketTypeId: registration.ticketTypeId,
-      quantity: registration.quantity,
-      totalAmount: registration.totalAmount,
-      bookingStatus: registration.bookingStatus,
-      approvalStatus: registration.approvalStatus,
-      rsvpStatus: registration.rsvpStatus,
-      checkInStatus: registration.checkInStatus,
-      createdAt: new Date(registration.createdAt).toISOString(),
-      updatedAt: new Date(registration.updatedAt).toISOString(),
-      guestName: user?.name || 'Unknown',
-      guestEmail: user?.email || 'Unknown',
-      ticketName: ticket?.name || 'Unknown Ticket',
-    };
-  });
-};
-
-const ensureHostOwnsBookingEvent = async (booking: any, hostAdminId: string) => {
-  const event = await EventModel.findById(booking.eventId);
-  if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) {
-    throw new AppError('Not authorized to manage this guest record', 403);
-  }
-  return event;
-};
+const toGuestRecord = (registration: any) => ({
+  id: registration.id,
+  registrationId: registration.id,
+  eventId: registration.eventId,
+  userId: registration.userId || null,
+  name: registration.name,
+  email: registration.email,
+  mobile: registration.mobile,
+  nic: registration.nic,
+  status: registration.status,
+  qrCodeValue: registration.qrCodeValue || null,
+  checkedInAt: registration.checkedInAt || null,
+  checkedInBy: registration.checkedInBy || null,
+  checkInMethod: registration.checkInMethod || null,
+  attendanceNote: registration.attendanceNote || null,
+  registeredAt: registration.registeredAt,
+  createdAt: registration.createdAt,
+  updatedAt: registration.updatedAt,
+});
 
 export const getEventGuests = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await ensureHostOwnsEvent(req.params.eventId as string, req.user!.id);
-    const guests = await buildGuestRecords(req.params.eventId as string, req.query);
+    const eventId = String(req.params.eventId || '').trim();
+    if (!eventId) return next(new AppError('eventId is required', 400));
 
+    await ensureCanManageEvent(eventId, req.user!.id);
+    const registrations = await RegistrationModel.find(buildGuestQuery(eventId, req.query))
+      .sort({ registeredAt: -1, createdAt: -1 });
+
+    const guests = registrations.map((registration) => toGuestRecord(registration));
     res.status(200).json({
       status: 'success',
       results: guests.length,
@@ -172,26 +133,59 @@ export const getEventGuests = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const updateGuestApprovalStatus = async (req: Request, res: Response, next: NextFunction) => {
+export const updateGuestStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { approvalStatus } = updateGuestStatusSchema.parse(req.body);
-    const registration = await BookingModel.findById(req.params.id as string);
-    if (!registration) return next(new AppError('Guest record not found', 404));
+    const { status } = updateGuestStatusSchema.parse(req.body);
+    const registrationId = String(req.params.registrationId || req.params.id || '').trim();
+    if (!registrationId) return next(new AppError('registrationId is required', 400));
 
-    await ensureHostOwnsBookingEvent(registration, req.user!.id);
-
-    const updatePayload: Record<string, unknown> = { approvalStatus };
-    if (approvalStatus === 'rejected') {
-      updatePayload.rsvpStatus = 'not_going';
+    const registration = await ensureCanManageRegistration(registrationId, req.user!.id);
+    if (registration.status === status) {
+      return next(new AppError(`Guest already ${status}`, 400));
     }
 
-    const updatedRegistration = await BookingModel.findByIdAndUpdate(
+    const updatePayload: Record<string, unknown> = { status };
+
+    if (shouldHaveQr(status) && !registration.qrCodeValue) {
+      updatePayload.qrCodeValue = await generateUniqueQrCodeValue();
+    }
+
+    if (!shouldHaveQr(status)) {
+      updatePayload.qrCodeValue = null;
+      updatePayload.checkedInAt = null;
+      updatePayload.checkedInBy = null;
+      updatePayload.checkInMethod = null;
+      updatePayload.attendanceNote = null;
+    }
+
+    if (status === 'checked_in') {
+      updatePayload.checkedInAt = new Date();
+      updatePayload.checkedInBy = req.user!.id;
+      updatePayload.checkInMethod = 'manual';
+    }
+
+    const updatedRegistration = await RegistrationModel.findByIdAndUpdate(
       registration.id,
       updatePayload,
       { new: true },
     );
+    if (!updatedRegistration) return next(new AppError('Guest registration not found after update', 404));
 
-    res.status(200).json({ status: 'success', data: { guest: updatedRegistration!.toJSON() } });
+    const event = await EventModel.findById(registration.eventId);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    await sendRegistrationStatusCommunications(
+      req,
+      event,
+      updatedRegistration,
+      status,
+      req.user!.id,
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: { guest: toGuestRecord(updatedRegistration) },
+    });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
@@ -200,36 +194,57 @@ export const updateGuestApprovalStatus = async (req: Request, res: Response, nex
   }
 };
 
+export const getGuestQr = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const registrationId = String(req.params.registrationId || req.params.id || '').trim();
+    if (!registrationId) return next(new AppError('registrationId is required', 400));
+
+    const registration = await ensureCanManageRegistration(registrationId, req.user!.id);
+    if (!shouldHaveQr(registration.status)) {
+      return next(new AppError('QR is available only for going/ongoing/checked-in guests', 400));
+    }
+
+    if (!registration.qrCodeValue) {
+      registration.qrCodeValue = await generateUniqueQrCodeValue();
+      await registration.save();
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        registrationId: registration.id,
+        qrCodeValue: registration.qrCodeValue,
+        qrData: registration.qrCodeValue,
+        guestStatus: registration.status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const markGuestCheckIn = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const registration = await BookingModel.findById(req.params.id as string);
-    if (!registration) return next(new AppError('Guest record not found', 404));
+    const registration = await ensureCanManageRegistration(String(req.params.id || '').trim(), req.user!.id);
 
-    await ensureHostOwnsBookingEvent(registration, req.user!.id);
-
-    if (registration.bookingStatus === 'cancelled') {
-      return next(new AppError('Cancelled bookings cannot be checked in', 400));
+    if (registration.status === 'declined' || registration.status === 'not_going') {
+      return next(new AppError('Declined/Not-going guests cannot be checked in', 400));
     }
 
-    if (registration.bookingStatus !== 'confirmed' || registration.isWaitlisted) {
-      return next(new AppError('Only confirmed non-waitlisted bookings can be checked in', 400));
+    if (registration.status === 'checked_in') {
+      return next(new AppError('Guest is already checked in', 409));
     }
 
-    if (registration.approvalStatus === 'rejected') {
-      return next(new AppError('Rejected guests cannot be checked in', 400));
+    if (!registration.qrCodeValue) {
+      registration.qrCodeValue = await generateUniqueQrCodeValue();
     }
+    registration.status = 'checked_in';
+    registration.checkedInAt = new Date();
+    registration.checkedInBy = req.user!.id;
+    registration.checkInMethod = 'manual';
+    await registration.save();
 
-    if (registration.checkInStatus === 'checked_in') {
-      return next(new AppError('Guest is already checked in', 400));
-    }
-
-    const updatedRegistration = await BookingModel.findByIdAndUpdate(
-      registration.id,
-      { checkInStatus: 'checked_in' },
-      { new: true },
-    );
-
-    res.status(200).json({ status: 'success', data: { guest: updatedRegistration!.toJSON() } });
+    res.status(200).json({ status: 'success', data: { guest: toGuestRecord(registration) } });
   } catch (error) {
     next(error);
   }
@@ -238,52 +253,60 @@ export const markGuestCheckIn = async (req: Request, res: Response, next: NextFu
 export const runBulkGuestAction = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { action, ids } = bulkActionSchema.parse(req.body);
-    const registrations = await BookingModel.find({ _id: { $in: ids } });
-
+    const registrations = await RegistrationModel.find({ _id: { $in: ids } });
     if (registrations.length !== ids.length) {
       return next(new AppError('One or more guest records not found', 404));
     }
 
     const eventIds = [...new Set(registrations.map((registration) => registration.eventId))];
-    const events = await EventModel.find({ _id: { $in: eventIds } }).select('_id hostAdminId');
+    const events = await EventModel.find({ _id: { $in: eventIds } }).select('_id ownerId hostAdminId adminIds');
     const eventMap = new Map(events.map((event) => [event.id, event]));
 
     for (const registration of registrations) {
       const event = eventMap.get(registration.eventId);
       if (!event) return next(new AppError('Event not found for one or more records', 404));
-      if (event.hostAdminId !== req.user!.id) {
+      if (!canManageEvent(req.user!.id, event)) {
         return next(new AppError('Not authorized to manage one or more guest records', 403));
       }
     }
 
-    let updatePayload: Record<string, unknown>;
-    let extraQuery: Record<string, unknown> = {};
+    let updated = 0;
+    for (const registration of registrations) {
+      if (action === 'checkin') {
+        if (registration.status === 'declined' || registration.status === 'not_going' || registration.status === 'checked_in') {
+          continue;
+        }
 
-    if (action === 'approve') {
-      updatePayload = { approvalStatus: 'approved' };
-    } else if (action === 'reject') {
-      updatePayload = { approvalStatus: 'rejected', rsvpStatus: 'not_going' };
-    } else {
-      updatePayload = { checkInStatus: 'checked_in' };
-      extraQuery = {
-        bookingStatus: 'confirmed',
-        isWaitlisted: false,
-        approvalStatus: { $ne: 'rejected' },
-      };
+        if (!registration.qrCodeValue) {
+          registration.qrCodeValue = await generateUniqueQrCodeValue();
+        }
+        registration.status = 'checked_in';
+        registration.checkedInAt = new Date();
+        registration.checkedInBy = req.user!.id;
+        registration.checkInMethod = 'manual';
+        await registration.save();
+        updated += 1;
+        continue;
+      }
+
+      registration.status = action;
+      if (!shouldHaveQr(action)) {
+        registration.qrCodeValue = null;
+        registration.checkedInAt = null;
+        registration.checkedInBy = null;
+        registration.checkInMethod = null;
+        registration.attendanceNote = null;
+      } else if (!registration.qrCodeValue) {
+        registration.qrCodeValue = await generateUniqueQrCodeValue();
+      }
+
+      await registration.save();
+      updated += 1;
     }
-
-    const updateResult = await BookingModel.updateMany(
-      { _id: { $in: ids }, ...extraQuery },
-      updatePayload,
-    );
 
     res.status(200).json({
       status: 'success',
-      data: {
-        action,
-        requested: ids.length,
-        updated: updateResult.modifiedCount,
-      },
+      data: { action, requested: ids.length, updated },
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -295,18 +318,22 @@ export const runBulkGuestAction = async (req: Request, res: Response, next: Next
 
 export const exportEventGuestsCsv = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const eventId = req.params.eventId as string;
-    await ensureHostOwnsEvent(eventId, req.user!.id);
-    const guests = await buildGuestRecords(eventId, req.query);
+    const eventId = String(req.params.eventId || '').trim();
+    if (!eventId) return next(new AppError('eventId is required', 400));
 
-    const header = ['name', 'email', 'ticket', 'status', 'rsvp', 'check-in'];
-    const rows = guests.map((guest) => [
-      escapeCsvValue(guest.guestName),
-      escapeCsvValue(guest.guestEmail),
-      escapeCsvValue(guest.ticketName),
-      escapeCsvValue(guest.approvalStatus),
-      escapeCsvValue(guest.rsvpStatus),
-      escapeCsvValue(guest.checkInStatus),
+    await ensureCanManageEvent(eventId, req.user!.id);
+    const registrations = await RegistrationModel.find(buildGuestQuery(eventId, req.query))
+      .sort({ registeredAt: -1, createdAt: -1 });
+
+    const header = ['name', 'email', 'mobile', 'nic', 'status', 'registered_at', 'checked_in_at'];
+    const rows = registrations.map((registration) => [
+      escapeCsvValue(registration.name),
+      escapeCsvValue(registration.email),
+      escapeCsvValue(registration.mobile),
+      escapeCsvValue(registration.nic),
+      escapeCsvValue(registration.status),
+      escapeCsvValue(new Date(registration.registeredAt).toISOString()),
+      escapeCsvValue(registration.checkedInAt ? new Date(registration.checkedInAt).toISOString() : ''),
     ].join(','));
 
     const csv = [header.join(','), ...rows].join('\n');
@@ -318,3 +345,6 @@ export const exportEventGuestsCsv = async (req: Request, res: Response, next: Ne
     next(error);
   }
 };
+
+// Backward-compatible alias.
+export const updateGuestApprovalStatus = updateGuestStatus;

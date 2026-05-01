@@ -1,48 +1,47 @@
-import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { BookingModel } from '../models/Booking';
+import { RegistrationModel } from '../models/Registration';
 import { EventModel } from '../models/Event';
 import { TicketTypeModel } from '../models/TicketType';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
 import { createNotificationRecord } from '../utils/notification.helper';
+import { canManageEvent } from '../utils/eventPermissions';
 
 const scanSchema = z.object({
-  qrCodeValue: z.string().min(1),
-});
+  qrCodeValue: z.string().trim().min(1, 'qrCodeValue is required'),
+}).strict();
 
 const manualCheckInSchema = z.object({
   attendanceNote: z.string().trim().max(500).optional(),
-});
+}).strict();
 
-const ensureEventOwnership = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) throw new AppError('Not authorized for this event', 403);
+  if (!canManageEvent(userId, event)) throw new AppError('Not authorized for this event', 403);
   return event;
 };
 
-const ensureQrTokenForBooking = async (bookingId: string) => {
-  const booking = await BookingModel.findById(bookingId);
-  if (!booking) return null;
+const shouldHaveRegistrationQr = (status: string) => (
+  status === 'going'
+  || status === 'ongoing'
+  || status === 'checked_in'
+);
 
-  if (booking.qrCodeValue) return booking;
-
-  for (let i = 0; i < 10; i++) {
-    const token = `qr_${crypto.randomBytes(16).toString('hex')}`;
-    const exists = await BookingModel.exists({ qrCodeValue: token });
-    if (!exists) {
-      booking.qrCodeValue = token;
-      await booking.save();
-      return booking;
-    }
+const validateRegistrationCheckInEligibility = (registration: any) => {
+  if (registration.status === 'declined' || registration.status === 'not_going') {
+    throw new AppError('Declined/Not-going guests cannot be checked in', 400);
   }
 
-  throw new AppError('Failed to generate QR token', 500);
+  if (registration.status === 'pending') {
+    throw new AppError('Guest must be marked going or ongoing before check-in', 400);
+  }
 };
 
-const validateCheckInEligibility = (booking: any) => {
+const validateBookingCheckInEligibility = (booking: any) => {
   if (booking.bookingStatus === 'cancelled') {
     throw new AppError('Cancelled bookings cannot be checked in', 400);
   }
@@ -54,19 +53,78 @@ const validateCheckInEligibility = (booking: any) => {
   }
 };
 
+const generateRegistrationQrCodeValue = async (): Promise<string> => {
+  for (let i = 0; i < 10; i += 1) {
+    const token = `qr_${crypto.randomBytes(16).toString('hex')}`;
+    const exists = await RegistrationModel.exists({ qrCodeValue: token });
+    if (!exists) return token;
+  }
+
+  throw new AppError('Failed to generate a unique QR code token', 500);
+};
+
+const generateBookingQrCodeValue = async (): Promise<string> => {
+  for (let i = 0; i < 10; i += 1) {
+    const token = `qr_${crypto.randomBytes(16).toString('hex')}`;
+    const exists = await BookingModel.exists({ qrCodeValue: token });
+    if (!exists) return token;
+  }
+
+  throw new AppError('Failed to generate a unique QR code token', 500);
+};
+
+const ensureQrTokenForBooking = async (bookingId: string) => {
+  const booking = await BookingModel.findById(bookingId);
+  if (!booking) return null;
+
+  if (booking.qrCodeValue) return booking;
+  booking.qrCodeValue = await generateBookingQrCodeValue();
+  await booking.save();
+  return booking;
+};
+
+const ensureQrTokenForRegistration = async (registrationId: string) => {
+  const registration = await RegistrationModel.findById(registrationId);
+  if (!registration) return null;
+
+  if (!shouldHaveRegistrationQr(registration.status)) {
+    throw new AppError('QR is available only for going/ongoing/checked-in guests', 400);
+  }
+
+  if (registration.qrCodeValue) return registration;
+  registration.qrCodeValue = await generateRegistrationQrCodeValue();
+  await registration.save();
+  return registration;
+};
+
 export const getBookingQr = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const bookingId = String(req.params.bookingId);
-    let booking = await ensureQrTokenForBooking(bookingId);
-    if (!booking) return next(new AppError('Booking not found', 404));
+    const registrationOrBookingId = String(req.params.bookingId || req.params.registrationId || '').trim();
+    if (!registrationOrBookingId) return next(new AppError('registrationId is required', 400));
 
-    if (req.user!.role === 'attendee' && booking.userId !== req.user!.id) {
-      return next(new AppError('Not authorized to view this QR code', 403));
+    const registration = await RegistrationModel.findById(registrationOrBookingId);
+    if (registration) {
+      await ensureCanManageEvent(registration.eventId, req.user!.id);
+      const refreshedRegistration = await ensureQrTokenForRegistration(registration.id);
+      if (!refreshedRegistration) return next(new AppError('Guest registration not found', 404));
+
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          registrationId: refreshedRegistration.id,
+          qrCodeValue: refreshedRegistration.qrCodeValue,
+          qrData: refreshedRegistration.qrCodeValue,
+          guestStatus: refreshedRegistration.status,
+        },
+      });
     }
 
-    if (req.user!.role === 'host_admin') {
-      await ensureEventOwnership(booking.eventId, req.user!.id);
-      booking = await ensureQrTokenForBooking(bookingId);
+    let booking = await ensureQrTokenForBooking(registrationOrBookingId);
+    if (!booking) return next(new AppError('Booking not found', 404));
+
+    if (booking.userId !== req.user!.id) {
+      await ensureCanManageEvent(booking.eventId, req.user!.id);
+      booking = await ensureQrTokenForBooking(registrationOrBookingId);
       if (!booking) return next(new AppError('Booking not found', 404));
     }
 
@@ -88,8 +146,57 @@ export const getBookingQr = async (req: Request, res: Response, next: NextFuncti
 export const scanCheckIn = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { qrCodeValue } = scanSchema.parse(req.body);
-    const booking = await BookingModel.findOne({ qrCodeValue });
 
+    const registration = await RegistrationModel.findOne({ qrCodeValue });
+    if (registration) {
+      await ensureCanManageEvent(registration.eventId, req.user!.id);
+      validateRegistrationCheckInEligibility(registration);
+
+      if (registration.status === 'checked_in') {
+        return res.status(409).json({
+          status: 'duplicate',
+          message: 'Guest already checked in',
+          data: {
+            registrationId: registration.id,
+            checkedInAt: registration.checkedInAt,
+          },
+        });
+      }
+
+      registration.status = 'checked_in';
+      registration.checkedInAt = new Date();
+      registration.checkedInBy = req.user!.id;
+      registration.checkInMethod = 'qr';
+      await registration.save();
+
+      if (registration.userId) {
+        await createNotificationRecord({
+          userId: registration.userId,
+          eventId: registration.eventId,
+          title: 'Check-in Successful',
+          message: `You have been checked in for ${registration.eventId}.`,
+          type: 'checkin',
+          channel: 'in_app',
+          status: 'sent',
+          sentAt: new Date(),
+          createdBy: req.user!.id,
+        });
+      }
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Check-in successful',
+        data: {
+          registrationId: registration.id,
+          checkInStatus: registration.status,
+          checkedInAt: registration.checkedInAt,
+          checkedInBy: registration.checkedInBy,
+          checkInMethod: registration.checkInMethod,
+        },
+      });
+    }
+
+    const booking = await BookingModel.findOne({ qrCodeValue });
     if (!booking) {
       return res.status(404).json({
         status: 'invalid',
@@ -97,8 +204,8 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    await ensureEventOwnership(booking.eventId, req.user!.id);
-    validateCheckInEligibility(booking);
+    await ensureCanManageEvent(booking.eventId, req.user!.id);
+    validateBookingCheckInEligibility(booking);
 
     if (booking.checkInStatus === 'checked_in') {
       return res.status(409).json({
@@ -151,13 +258,63 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
 
 export const manualCheckIn = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const bookingId = String(req.params.bookingId);
+    const registrationOrBookingId = String(req.params.bookingId || req.params.registrationId || '').trim();
+    if (!registrationOrBookingId) return next(new AppError('registrationId is required', 400));
+
     const { attendanceNote } = manualCheckInSchema.parse(req.body || {});
-    const booking = await BookingModel.findById(bookingId);
+
+    const registration = await RegistrationModel.findById(registrationOrBookingId);
+    if (registration) {
+      await ensureCanManageEvent(registration.eventId, req.user!.id);
+      validateRegistrationCheckInEligibility(registration);
+
+      if (registration.status === 'checked_in') {
+        return res.status(409).json({
+          status: 'duplicate',
+          message: 'Guest already checked in',
+          data: {
+            registrationId: registration.id,
+            checkedInAt: registration.checkedInAt,
+          },
+        });
+      }
+
+      if (!registration.qrCodeValue) {
+        registration.qrCodeValue = await generateRegistrationQrCodeValue();
+      }
+      registration.status = 'checked_in';
+      registration.checkedInAt = new Date();
+      registration.checkedInBy = req.user!.id;
+      registration.checkInMethod = 'manual';
+      registration.attendanceNote = attendanceNote || null;
+      await registration.save();
+
+      if (registration.userId) {
+        await createNotificationRecord({
+          userId: registration.userId,
+          eventId: registration.eventId,
+          title: 'Check-in Recorded',
+          message: `A manual check-in was recorded for event ${registration.eventId}.`,
+          type: 'checkin',
+          channel: 'in_app',
+          status: 'sent',
+          sentAt: new Date(),
+          createdBy: req.user!.id,
+        });
+      }
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Manual check-in successful',
+        data: { registration: registration.toJSON() },
+      });
+    }
+
+    const booking = await BookingModel.findById(registrationOrBookingId);
     if (!booking) return next(new AppError('Booking not found', 404));
 
-    await ensureEventOwnership(booking.eventId, req.user!.id);
-    validateCheckInEligibility(booking);
+    await ensureCanManageEvent(booking.eventId, req.user!.id);
+    validateBookingCheckInEligibility(booking);
 
     if (booking.checkInStatus === 'checked_in') {
       return res.status(409).json({
@@ -205,20 +362,45 @@ export const manualCheckIn = async (req: Request, res: Response, next: NextFunct
 
 export const getEventAttendance = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const eventId = String(req.params.eventId);
-    await ensureEventOwnership(eventId, req.user!.id);
+    const eventId = String(req.params.eventId || '').trim();
+    if (!eventId) return next(new AppError('eventId is required', 400));
+
+    await ensureCanManageEvent(eventId, req.user!.id);
+    const registrations = await RegistrationModel.find({ eventId }).sort({ registeredAt: -1, createdAt: -1 });
+    if (registrations.length > 0) {
+      const attendanceRecords = registrations.map((registration) => ({
+        registrationId: registration.id,
+        attendeeName: registration.name,
+        attendeeEmail: registration.email,
+        mobile: registration.mobile,
+        nic: registration.nic,
+        guestStatus: registration.status,
+        checkInStatus: registration.status === 'checked_in' ? 'checked_in' : 'not_checked_in',
+        checkedInAt: registration.checkedInAt || null,
+        checkedInBy: registration.checkedInBy || null,
+        checkInMethod: registration.checkInMethod || null,
+        attendanceNote: registration.attendanceNote || null,
+        qrCodeValue: registration.qrCodeValue || null,
+      }));
+
+      return res.status(200).json({
+        status: 'success',
+        results: attendanceRecords.length,
+        data: { attendance: attendanceRecords },
+      });
+    }
 
     const bookings = await BookingModel.find({ eventId }).sort({ createdAt: -1 });
-    const userIds = Array.from(new Set(bookings.map((b) => b.userId)));
-    const ticketIds = Array.from(new Set(bookings.map((b) => b.ticketTypeId)));
+    const userIds = Array.from(new Set(bookings.map((booking) => booking.userId)));
+    const ticketIds = Array.from(new Set(bookings.map((booking) => booking.ticketTypeId)));
 
     const [users, tickets] = await Promise.all([
       UserModel.find({ _id: { $in: userIds } }).select('name email'),
       TicketTypeModel.find({ _id: { $in: ticketIds } }).select('name'),
     ]);
 
-    const userMap = new Map(users.map((u) => [u.id, u]));
-    const ticketMap = new Map(tickets.map((t) => [t.id, t]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const ticketMap = new Map(tickets.map((ticket) => [ticket.id, ticket]));
 
     const attendanceRecords = bookings.map((booking) => {
       const user = userMap.get(booking.userId);
@@ -247,3 +429,4 @@ export const getEventAttendance = async (req: Request, res: Response, next: Next
     next(error);
   }
 };
+

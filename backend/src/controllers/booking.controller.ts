@@ -5,6 +5,7 @@ import { BookingModel } from '../models/Booking';
 import { TicketTypeModel } from '../models/TicketType';
 import { EventModel } from '../models/Event';
 import { AppError } from '../utils/appError';
+import { canManageEvent, manageableEventQuery } from '../utils/eventPermissions';
 import { createNotificationRecord } from '../utils/notification.helper';
 import {
   calculateTicketPrice,
@@ -21,8 +22,8 @@ import {
 
 const bookingSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
-  ticketTypeId: z.string().trim().min(1, 'ticketTypeId is required'),
-  quantity: z.number().int().positive('quantity must be greater than 0'),
+  ticketTypeId: z.string().trim().min(1, 'ticketTypeId is required').optional(),
+  quantity: z.number().int().positive('quantity must be greater than 0').default(1),
   promoCode: z.string().trim().optional(),
   unlockCode: z.string().trim().optional(),
   customAnswers: z.array(z.object({
@@ -44,8 +45,8 @@ const ensureBookableEvent = async (eventId: string) => {
     throw new AppError('Cannot book an event that is not published', 400);
   }
 
-  if (event.visibility === 'private') {
-    throw new AppError('Private events cannot be booked', 403);
+  if (event.visibility !== 'public') {
+    throw new AppError('Only public events can be booked', 403);
   }
 
   return event;
@@ -64,6 +65,41 @@ const ensureTicketForEvent = async (ticketTypeId: string, eventId: string) => {
   }
 
   return ticket;
+};
+
+const normalizePricingMode = (value: unknown): 'free' | 'ticketed' => {
+  return value === 'free' ? 'free' : 'ticketed';
+};
+
+const ensureFreeRegistrationTicket = async (event: any) => {
+  const freeTicket = await TicketTypeModel.findOne({
+    eventId: event.id,
+    isActive: true,
+    isFree: true,
+  }).sort({ createdAt: 1, soldCount: 1 });
+
+  if (freeTicket) {
+    const desiredQuantity = Math.max(freeTicket.quantity, Number(event.capacity || 1), freeTicket.soldCount || 0, 1);
+    if (desiredQuantity !== freeTicket.quantity) {
+      freeTicket.quantity = desiredQuantity;
+      await freeTicket.save();
+    }
+    return freeTicket;
+  }
+
+  return TicketTypeModel.create({
+    eventId: event.id,
+    name: 'Free Registration',
+    description: 'Auto-generated free registration ticket',
+    price: 0,
+    currency: 'LKR',
+    isFree: true,
+    quantity: Math.max(1, Number(event.capacity || 1)),
+    soldCount: 0,
+    maxPerUser: 1,
+    isActive: true,
+    promoCodes: [],
+  });
 };
 
 const validateMaxPerUser = async (userId: string, ticketTypeId: string, maxPerUser: number, requestedQuantity: number) => {
@@ -182,10 +218,10 @@ const createWaitlistBooking = async (
   return waitlistBooking;
 };
 
-const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) {
+  if (!canManageEvent(userId, event)) {
     throw new AppError('Not authorized for this event', 403);
   }
   return event;
@@ -202,7 +238,28 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
   try {
     const validatedData = bookingSchema.parse(req.body);
     const event = await ensureBookableEvent(validatedData.eventId);
-    const ticket = await ensureTicketForEvent(validatedData.ticketTypeId, validatedData.eventId);
+    const pricingMode = normalizePricingMode(event.pricingMode);
+    let ticket: any;
+
+    if (pricingMode === 'free') {
+      if (validatedData.promoCode || validatedData.unlockCode) {
+        return next(new AppError('Promo code and unlock code are not applicable for free events', 400));
+      }
+
+      if (validatedData.ticketTypeId) {
+        ticket = await ensureTicketForEvent(validatedData.ticketTypeId, validatedData.eventId);
+        if (!ticket.isFree || ticket.price > 0) {
+          return next(new AppError('Free events require a free registration ticket', 400));
+        }
+      } else {
+        ticket = await ensureFreeRegistrationTicket(event);
+      }
+    } else {
+      if (!validatedData.ticketTypeId) {
+        return next(new AppError('ticketTypeId is required for ticketed events', 400));
+      }
+      ticket = await ensureTicketForEvent(validatedData.ticketTypeId, validatedData.eventId);
+    }
 
     validateUnlockCode(ticket as any, validatedData.unlockCode);
     await validateMaxPerUser(req.user!.id, ticket.id, ticket.maxPerUser, validatedData.quantity);
@@ -223,7 +280,7 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
     const pricing = calculateTicketPrice(
       ticket as any,
       validatedData.quantity,
-      validatedData.promoCode,
+      pricingMode === 'free' ? undefined : validatedData.promoCode,
     );
 
     if (eventAtCapacity) {
@@ -306,7 +363,14 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
 
 export const getBookings = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const bookings = await BookingModel.find();
+    const manageableEvents = await EventModel.find(manageableEventQuery(req.user!.id)).select('_id');
+    const manageableEventIds = manageableEvents.map((event) => event.id);
+
+    if (!manageableEventIds.length) {
+      return res.status(200).json({ status: 'success', results: 0, data: { bookings: [] } });
+    }
+
+    const bookings = await BookingModel.find({ eventId: { $in: manageableEventIds } });
     res.status(200).json({ status: 'success', results: bookings.length, data: { bookings: bookings.map((booking) => booking.toJSON()) } });
   } catch (error) {
     next(error);
@@ -319,12 +383,8 @@ export const getBooking = async (req: Request, res: Response, next: NextFunction
     if (!booking) return next(new AppError('Booking not found', 404));
 
     if (booking.userId !== req.user!.id) {
-      if (req.user!.role !== 'host_admin') {
-        return next(new AppError('Not authorized to view this booking', 403));
-      }
-
       const event = await EventModel.findById(booking.eventId);
-      if (!event || event.hostAdminId !== req.user!.id) {
+      if (!event || !canManageEvent(req.user!.id, event)) {
         return next(new AppError('Not authorized to view this booking', 403));
       }
     }
@@ -347,7 +407,7 @@ export const getMyBookings = async (req: Request, res: Response, next: NextFunct
 export const getEventBookings = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const eventId = String(req.params.eventId);
-    await ensureHostOwnsEvent(eventId, req.user!.id);
+    await ensureCanManageEvent(eventId, req.user!.id);
     const bookings = await BookingModel.find({ eventId });
     res.status(200).json({ status: 'success', results: bookings.length, data: { bookings: bookings.map((booking) => booking.toJSON()) } });
   } catch (error) {
@@ -407,12 +467,8 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
     if (!booking) return next(new AppError('Booking not found', 404));
 
     if (booking.userId !== req.user!.id) {
-      if (req.user!.role !== 'host_admin') {
-        return next(new AppError('Not authorized to cancel this booking', 403));
-      }
-
       const event = await EventModel.findById(booking.eventId);
-      if (!event || event.hostAdminId !== req.user!.id) {
+      if (!event || !canManageEvent(req.user!.id, event)) {
         return next(new AppError('Not authorized to cancel this booking', 403));
       }
     }
@@ -444,6 +500,11 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
 
 export const refundBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const existingBooking = await BookingModel.findById(req.params.id as string);
+    if (!existingBooking) return next(new AppError('Booking not found', 404));
+
+    await ensureCanManageEvent(existingBooking.eventId, req.user!.id);
+
     const { booking, updatedBooking, promotedBooking } = await cancelAndRestoreInventory(req.params.id as string, req.user?.id);
 
     await createNotificationRecord({

@@ -8,7 +8,6 @@ import { TicketFormScreen } from '../screens/hostAdmin/events/TicketFormScreen';
 import { ManageSessionsScreen } from '../screens/hostAdmin/events/ManageSessionsScreen';
 import { SessionFormScreen } from '../screens/hostAdmin/events/SessionFormScreen';
 import { ManageRegistrationsScreen } from '../screens/hostAdmin/events/ManageRegistrationsScreen';
-import { EventAnalyticsScreen } from '../screens/hostAdmin/events/EventAnalyticsScreen';
 import { ManageWaitlistScreen } from '../screens/hostAdmin/events/ManageWaitlistScreen';
 
 const Stack = createNativeStackNavigator<HostAdminEventStackParamList>();
@@ -18,7 +17,6 @@ export const HostAdminEventStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ManageEvents" component={ManageEventsScreen} />
       <Stack.Screen name="EventForm" component={EventFormScreen} />
-      <Stack.Screen name="EventAnalytics" component={EventAnalyticsScreen} />
       <Stack.Screen name="ManageTickets" component={ManageTicketsScreen} />
       <Stack.Screen name="TicketForm" component={TicketFormScreen} />
       <Stack.Screen name="ManageRegistrations" component={ManageRegistrationsScreen} />

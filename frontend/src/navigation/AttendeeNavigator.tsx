@@ -2,11 +2,11 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AttendeeTabParamList } from '../types/navigation';
 import { theme } from '../constants/theme';
-import { Home, Ticket, User, Bell } from 'lucide-react-native';
+import { Home, Ticket, User, CalendarDays } from 'lucide-react-native';
 import { AttendeeHomeStack } from './AttendeeHomeStack';
 import { AttendeeProfileStack } from './AttendeeProfileStack';
 import { MyBookingsScreen } from '../screens/attendee/MyBookingsScreen';
-import { NotificationsScreen } from '../screens/common/NotificationsScreen';
+import { MyEventsScreen } from '../screens/attendee/MyEventsScreen';
 
 const Tab = createBottomTabNavigator<AttendeeTabParamList>();
 
@@ -27,25 +27,25 @@ export const AttendeeNavigator = () => {
         name="HomeStack" 
         component={AttendeeHomeStack} 
         options={{ 
-          tabBarLabel: 'Explore',
+          tabBarLabel: 'Discover',
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> 
         }} 
       />
       <Tab.Screen 
-        name="MyBookings" 
-        component={MyBookingsScreen} 
+        name="MyEvents" 
+        component={MyEventsScreen} 
         options={{ 
-          tabBarLabel: 'Tickets',
-          tabBarIcon: ({ color, size }) => <Ticket color={color} size={size} /> 
+          tabBarLabel: 'My Events',
+          tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} /> 
         }} 
       />
-      <Tab.Screen
-        name="Notifications"
-        component={NotificationsScreen}
-        options={{
-          tabBarLabel: 'Alerts',
-          tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
-        }}
+      <Tab.Screen 
+        name="MyRegistrations" 
+        component={MyBookingsScreen} 
+        options={{ 
+          tabBarLabel: 'My Registrations',
+          tabBarIcon: ({ color, size }) => <Ticket color={color} size={size} /> 
+        }} 
       />
       <Tab.Screen 
         name="Profile" 

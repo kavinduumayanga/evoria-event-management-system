@@ -1,8 +1,9 @@
-export type Role = 'host_admin' | 'attendee';
+export type Role = 'user' | 'host_admin' | 'attendee';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
 export type ModerationStatus = 'pending' | 'approved' | 'rejected';
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type EventType = 'online' | 'physical' | 'hybrid';
+export type EventPricingMode = 'free' | 'ticketed';
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
 export type RsvpStatus = 'going' | 'not_going';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -15,6 +16,9 @@ export type CustomQuestionType = 'text' | 'number' | 'choice';
 export type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
 export type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
 export type NotificationStatus = 'sent' | 'scheduled' | 'failed';
+export type EventRegistrationStatus = 'pending' | 'going' | 'ongoing' | 'checked_in' | 'not_going' | 'declined';
+export type EmailLogType = 'registration_pending' | 'registration_confirmed' | 'registration_declined' | 'invite' | 'blast' | 'system';
+export type EmailLogStatus = 'queued' | 'sent' | 'failed';
 
 export interface EventCustomQuestion {
   id: string;
@@ -52,9 +56,13 @@ export interface Event {
   date: string;
   startTime: string;
   endTime: string;
-  hostAdminId: string;
+  ownerId: string;
+  hostAdminId?: string;
+  adminIds?: string[];
+  publicSlug: string;
   venueId?: string | null;
   type: EventType;
+  pricingMode: EventPricingMode;
   category: string;
   city: string;
   tags: string[];
@@ -62,6 +70,15 @@ export interface Event {
   bookingCount: number;
   meetingLink?: string;
   coverImage?: string;
+  contactDetails?: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  branding?: {
+    primaryColor: string;
+    accentColor: string;
+  };
   capacity: number;
   isFlagged: boolean;
   isFeatured: boolean;
@@ -71,6 +88,9 @@ export interface Event {
   visibility: EventVisibility;
   requiresApproval?: boolean;
   customQuestions?: EventCustomQuestion[];
+  registrationFields?: {
+    customQuestions: EventCustomQuestion[];
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -143,6 +163,21 @@ export interface Notification {
   updatedAt: string;
 }
 
+export interface EmailLog {
+  id: string;
+  recipientEmail: string;
+  recipientUserId?: string | null;
+  eventId?: string | null;
+  subject: string;
+  message: string;
+  type: EmailLogType;
+  status: EmailLogStatus;
+  metadata?: Record<string, unknown> | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Report {
   id: string;
   reporterId: string;
@@ -180,6 +215,26 @@ export interface Session {
   hallOrRoom?: string;
   bannerImage?: string;
   status: SessionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Registration {
+  id: string;
+  eventId: string;
+  userId?: string | null;
+  name: string;
+  email: string;
+  mobile: string;
+  nic: string;
+  customAnswers: RegistrationAnswer[];
+  status: EventRegistrationStatus;
+  qrCodeValue?: string | null;
+  checkedInAt?: string | null;
+  checkedInBy?: string | null;
+  checkInMethod?: 'qr' | 'manual' | null;
+  attendanceNote?: string | null;
+  registeredAt: string;
   createdAt: string;
   updatedAt: string;
 }

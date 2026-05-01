@@ -1,12 +1,22 @@
 import apiClient from './client';
-import { Event, Booking, Venue, Session, TicketType, RegistrationAnswer, RsvpStatus } from '../types';
-import { Role } from '../store/auth.store';
+import {
+  Event,
+  Booking,
+  Venue,
+  Session,
+  TicketType,
+  RegistrationAnswer,
+  RsvpStatus,
+  EventRegistration,
+  EventRegistrationStatus,
+  EventCustomQuestion,
+} from '../types';
+import { API_URL } from '../constants/api';
 
 export interface RegisterPayload {
   name: string;
   email: string;
   password: string;
-  role: Role;
   phone?: string;
 }
 
@@ -43,6 +53,14 @@ export interface CreateRegistrationPayload {
   customAnswers?: RegistrationAnswer[];
 }
 
+export interface PublicEventRegistrationPayload {
+  name: string;
+  email: string;
+  mobile: string;
+  nic: string;
+  customAnswers?: RegistrationAnswer[];
+}
+
 export interface ApplyPromoPayload {
   ticketTypeId: string;
   quantity: number;
@@ -59,7 +77,7 @@ export interface MockCheckoutPayload {
 
 export interface CreateBookingPayload {
   eventId: string;
-  ticketTypeId: string;
+  ticketTypeId?: string;
   quantity: number;
   promoCode?: string;
   unlockCode?: string;
@@ -73,20 +91,22 @@ export interface CreateReportPayload {
 
 export interface GuestRecord {
   id: string;
-  userId: string;
+  registrationId: string;
   eventId: string;
-  ticketTypeId: string;
-  quantity: number;
-  totalAmount: number;
-  bookingStatus: 'pending' | 'confirmed' | 'cancelled';
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  rsvpStatus: 'going' | 'not_going';
-  checkInStatus: 'not_checked_in' | 'checked_in';
+  userId: string | null;
+  name: string;
+  email: string;
+  mobile: string;
+  nic: string;
+  status: EventRegistrationStatus;
+  qrCodeValue: string | null;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
+  checkInMethod: 'qr' | 'manual' | null;
+  attendanceNote: string | null;
+  registeredAt: string;
   createdAt: string;
   updatedAt: string;
-  guestName: string;
-  guestEmail: string;
-  ticketName: string;
 }
 
 export interface CreateNotificationPayload {
@@ -115,6 +135,149 @@ export interface EventSearchParams {
   date?: string;
 }
 
+export interface AddEventAdminPayload {
+  email: string;
+}
+
+export interface EventInvitePayload {
+  email: string;
+  message?: string;
+}
+
+export interface EventBroadcastPayload {
+  subject?: string;
+  title?: string;
+  message: string;
+}
+
+export interface EventCommunicationEntry {
+  id: string;
+  source: 'email_log' | 'in_app_notification';
+  channel: 'in_app' | 'email_mock' | 'sms_mock';
+  recipientUserId: string | null;
+  recipientEmail: string | null;
+  subject: string;
+  message: string;
+  type: string;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface PublicEventDetails {
+  event: {
+    id: string;
+    publicSlug: string;
+    publicUrl: string;
+    title: string;
+    topic: string;
+    image: string | null;
+    branding: {
+      primaryColor: string;
+      accentColor: string;
+    };
+    host: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string | null;
+      profileImage: string | null;
+    } | null;
+    contactDetails: {
+      name: string;
+      email: string;
+      phone: string;
+    };
+    date: string;
+    startTime: string;
+    endTime: string;
+    capacity: number;
+    bookingCount: number;
+    type: 'online' | 'physical' | 'hybrid';
+    pricingMode: 'free' | 'ticketed';
+    visibility: 'public' | 'private' | 'unlisted';
+    about: string;
+    description: string;
+    location: {
+      label: string;
+      city: string;
+      venue: {
+        id: string;
+        name: string;
+        address: string;
+        city: string;
+        type: 'physical' | 'online' | 'hybrid';
+        contactInfo: string;
+      } | null;
+      meetingLink: string;
+    };
+    isManageableByCurrentUser: boolean;
+  };
+  agenda: {
+    sessions: Array<{
+      id: string;
+      title: string;
+      description: string;
+      speakerName: string;
+      sessionDate: string;
+      startTime: string;
+      endTime: string;
+      hallOrRoom: string;
+      bannerImage: string;
+      status: 'scheduled' | 'cancelled' | 'completed';
+    }>;
+  };
+  tickets: Array<{
+    id: string;
+    name: string;
+    description: string;
+    isFree: boolean;
+    price: number;
+    currency: string;
+    remaining: number;
+    quantity: number;
+    soldCount: number;
+    maxPerUser: number;
+  }>;
+  freeRegistrationOptions: Array<{
+    id: string;
+    name: string;
+    description: string;
+    isFree: boolean;
+    price: number;
+    currency: string;
+    remaining: number;
+    quantity: number;
+    soldCount: number;
+    maxPerUser: number;
+  }>;
+  registrationFields: {
+    defaultFields: Array<{
+      key: 'name' | 'email' | 'mobile' | 'nic';
+      label: string;
+      required: boolean;
+    }>;
+    customQuestions: EventCustomQuestion[];
+  };
+  visibilityInfo: {
+    visibility: 'public' | 'private' | 'unlisted';
+    discoveryVisible: boolean;
+    accessibleByUrl: boolean;
+    privateAccess: boolean;
+  };
+}
+
+const inferImageMimeType = (uri: string): string => {
+  const extension = (uri.split('.').pop() || '').toLowerCase();
+  if (extension === 'png') return 'image/png';
+  if (extension === 'webp') return 'image/webp';
+  if (extension === 'heic') return 'image/heic';
+  if (extension === 'gif') return 'image/gif';
+  return 'image/jpeg';
+};
+
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
@@ -135,6 +298,28 @@ export const AuthService = {
   googleLogin: async () => {
     const response = await apiClient.post('/auth/google');
     return response.data;
+  },
+};
+
+export const UploadService = {
+  uploadEventImage: async (uri: string) => {
+    const formData = new FormData();
+    const extension = (uri.split('.').pop() || 'jpg').toLowerCase();
+    const safeExt = extension.replace(/[^a-z0-9]/g, '') || 'jpg';
+
+    formData.append('image', {
+      uri,
+      name: `event-image-${Date.now()}.${safeExt}`,
+      type: inferImageMimeType(uri),
+    } as any);
+
+    const response = await apiClient.post('/uploads/event-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data as { status: string; data: { url: string } };
   },
 };
 
@@ -170,6 +355,14 @@ export const EventService = {
     const response = await apiClient.get(`/events/${id}`);
     return response.data;
   },
+  getPublicEventBySlug: async (slug: string) => {
+    const response = await apiClient.get(`/public/events/${slug}`);
+    return response.data as { status: string; data: PublicEventDetails };
+  },
+  buildPublicEventUrl: (slug: string) => {
+    const trimmedBase = API_URL.replace(/\/+$/, '');
+    return `${trimmedBase}/public/events/${slug}`;
+  },
   getHostEvents: async (hostId: string) => {
     const response = await apiClient.get(`/events/host/${hostId}`);
     return response.data;
@@ -189,6 +382,59 @@ export const EventService = {
   updateEventStatus: async (id: string, status: string) => {
     const response = await apiClient.patch(`/events/${id}/status`, { status });
     return response.data;
+  },
+  updateEventVisibility: async (id: string, visibility: 'public' | 'private' | 'unlisted') => {
+    const response = await apiClient.patch(`/events/${id}/visibility`, { visibility });
+    return response.data;
+  },
+  updateRegistrationFields: async (eventId: string, customQuestions: EventCustomQuestion[]) => {
+    const response = await apiClient.patch(`/events/${eventId}/registration-fields`, { customQuestions });
+    return response.data;
+  },
+  addEventAdmin: async (id: string, payload: AddEventAdminPayload) => {
+    const response = await apiClient.post(`/events/${id}/admins`, payload);
+    return response.data;
+  },
+  removeEventAdmin: async (id: string, userId: string) => {
+    const response = await apiClient.delete(`/events/${id}/admins/${userId}`);
+    return response.data;
+  },
+  inviteGuest: async (eventId: string, payload: EventInvitePayload) => {
+    const response = await apiClient.post(`/events/${eventId}/invite`, payload);
+    return response.data as {
+      status: string;
+      message: string;
+      data: {
+        invite: Record<string, unknown>;
+        publicUrl: string;
+      };
+    };
+  },
+  blastMessage: async (eventId: string, payload: EventBroadcastPayload) => {
+    const response = await apiClient.post(`/events/${eventId}/blast`, payload);
+    return response.data as {
+      status: string;
+      message: string;
+      results: number;
+      data: {
+        publicUrl: string;
+        recipients: number;
+        inAppRecipients: number;
+        emailLogs: Array<Record<string, unknown>>;
+      };
+    };
+  },
+  getEventCommunications: async (eventId: string, limit = 100) => {
+    const response = await apiClient.get(`/events/${eventId}/communications`, {
+      params: { limit },
+    });
+    return response.data as {
+      status: string;
+      results: number;
+      data: {
+        communications: EventCommunicationEntry[];
+      };
+    };
   },
   toggleFeature: async (id: string) => {
     const response = await apiClient.patch(`/events/${id}/feature`);
@@ -262,6 +508,10 @@ export const PaymentService = {
 };
 
 export const RegistrationService = {
+  submitPublicRegistration: async (slug: string, payload: PublicEventRegistrationPayload) => {
+    const response = await apiClient.post(`/public/events/${slug}/register`, payload);
+    return response.data as { status: string; data: { registration: EventRegistration } };
+  },
   createRegistration: async (payload: CreateRegistrationPayload) => {
     const response = await apiClient.post('/registrations', payload);
     return response.data;
@@ -270,9 +520,17 @@ export const RegistrationService = {
     const response = await apiClient.get('/registrations/my');
     return response.data;
   },
+  getEventRegistrationsV2: async (eventId: string) => {
+    const response = await apiClient.get(`/events/${eventId}/registrations`);
+    return response.data as { status: string; results: number; data: { registrations: EventRegistration[] } };
+  },
   getEventRegistrations: async (eventId: string) => {
     const response = await apiClient.get(`/registrations/event/${eventId}`);
     return response.data;
+  },
+  updateRegistrationStatus: async (registrationId: string, status: EventRegistrationStatus) => {
+    const response = await apiClient.patch(`/registrations/${registrationId}/status`, { status });
+    return response.data as { status: string; data: { registration: EventRegistration } };
   },
   updateRsvp: async (registrationId: string, rsvpStatus: RsvpStatus) => {
     const response = await apiClient.patch(`/registrations/${registrationId}/rsvp`, { rsvpStatus });
@@ -290,18 +548,22 @@ export const RegistrationService = {
 
 export const GuestService = {
   getEventGuests: async (eventId: string, params?: { status?: string; search?: string; date?: string }) => {
-    const response = await apiClient.get(`/guests/event/${eventId}`, { params });
+    const response = await apiClient.get(`/events/${eventId}/guests`, { params });
     return response.data;
   },
-  updateGuestStatus: async (id: string, approvalStatus: 'pending' | 'approved' | 'rejected') => {
-    const response = await apiClient.patch(`/guests/${id}/status`, { approvalStatus });
+  updateGuestStatus: async (registrationId: string, status: EventRegistrationStatus) => {
+    const response = await apiClient.patch(`/guests/${registrationId}/status`, { status });
+    return response.data;
+  },
+  getGuestQr: async (registrationId: string) => {
+    const response = await apiClient.get(`/guests/${registrationId}/qr`);
     return response.data;
   },
   checkInGuest: async (id: string) => {
     const response = await apiClient.patch(`/guests/${id}/checkin`);
     return response.data;
   },
-  bulkAction: async (payload: { action: 'approve' | 'reject' | 'checkin'; ids: string[] }) => {
+  bulkAction: async (payload: { action: 'going' | 'ongoing' | 'not_going' | 'declined' | 'checkin'; ids: string[] }) => {
     const response = await apiClient.post('/guests/bulk-action', payload);
     return response.data;
   },
@@ -315,6 +577,10 @@ export const GuestService = {
 };
 
 export const CheckInService = {
+  getRegistrationQr: async (registrationId: string) => {
+    const response = await apiClient.get(`/checkins/qr/${registrationId}`);
+    return response.data;
+  },
   getBookingQr: async (bookingId: string) => {
     const response = await apiClient.get(`/checkins/qr/${bookingId}`);
     return response.data;
@@ -323,8 +589,8 @@ export const CheckInService = {
     const response = await apiClient.post('/checkins/scan', { qrCodeValue });
     return response.data;
   },
-  manualCheckIn: async (bookingId: string, attendanceNote?: string) => {
-    const response = await apiClient.patch(`/checkins/${bookingId}/manual`, {
+  manualCheckIn: async (registrationId: string, attendanceNote?: string) => {
+    const response = await apiClient.patch(`/checkins/${registrationId}/manual`, {
       attendanceNote,
     });
     return response.data;

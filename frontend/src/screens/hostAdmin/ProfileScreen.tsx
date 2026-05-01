@@ -109,7 +109,7 @@ export const ProfileScreen = () => {
 
         <View style={styles.roleBadge}>
           <Shield size={12} color={theme.colors.secondary} style={{ marginRight: 4 }} />
-          <Text style={styles.roleText}>{(user?.role || 'host_admin').replace('_', ' ').toUpperCase()}</Text>
+          <Text style={styles.roleText}>MEMBER</Text>
         </View>
       </View>
 
