@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { BookingModel } from '../models/Booking';
 import { TicketTypeModel } from '../models/TicketType';
 import { EventModel } from '../models/Event';
 import { AppError } from '../utils/appError';
+import { createNotificationRecord } from '../utils/notification.helper';
 import {
   calculateTicketPrice,
   validateTicketAvailability,
@@ -16,6 +18,11 @@ const bookingSchema = z.object({
   quantity: z.number().int().positive('quantity must be greater than 0'),
   promoCode: z.string().trim().optional(),
   unlockCode: z.string().trim().optional(),
+  customAnswers: z.array(z.object({
+    questionId: z.string().trim().min(1),
+    answer: z.string().trim().min(1),
+  })).optional(),
+  rsvpStatus: z.enum(['going', 'not_going']).optional(),
 }).strict();
 
 const ensureBookableEvent = async (eventId: string) => {
@@ -61,6 +68,18 @@ const validateMaxPerUser = async (userId: string, ticketTypeId: string, maxPerUs
   }
 };
 
+const generateUniqueQrCodeValue = async () => {
+  const maxAttempts = 10;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const token = `qr_${crypto.randomBytes(16).toString('hex')}`;
+    const exists = await BookingModel.exists({ qrCodeValue: token });
+    if (!exists) return token;
+  }
+
+  throw new AppError('Failed to generate a unique QR code token', 500);
+};
+
 const createConfirmedBooking = async (
   userId: string,
   eventId: string,
@@ -68,8 +87,11 @@ const createConfirmedBooking = async (
   ticket: any,
   quantity: number,
   totalAmount: number,
+  customAnswers: Array<{ questionId: string; answer: string }>,
+  rsvpStatus: 'going' | 'not_going',
 ) => {
   const bookingDate = new Date().toISOString();
+  const qrCodeValue = await generateUniqueQrCodeValue();
 
   const newBookingDoc = await BookingModel.create({
     userId,
@@ -79,10 +101,15 @@ const createConfirmedBooking = async (
     totalAmount,
     bookingStatus: 'confirmed',
     bookingDate,
-    rsvpStatus: 'going',
+    rsvpStatus,
     approvalStatus,
     checkInStatus: 'not_checked_in',
-    customAnswers: [],
+    checkedInAt: null,
+    checkedInBy: null,
+    checkInMethod: null,
+    qrCodeValue,
+    attendanceNote: undefined,
+    customAnswers,
     registrationType: ticket.isFree ? 'free' : 'paid',
   });
 
@@ -91,6 +118,15 @@ const createConfirmedBooking = async (
   });
 
   return newBookingDoc;
+};
+
+const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
+  const event = await EventModel.findById(eventId);
+  if (!event) throw new AppError('Event not found', 404);
+  if (event.hostAdminId !== hostAdminId) {
+    throw new AppError('Not authorized for this event', 403);
+  }
+  return event;
 };
 
 const handleZodError = (error: unknown, next: NextFunction) => {
@@ -124,7 +160,20 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
       ticket,
       validatedData.quantity,
       pricing.finalAmount,
+      validatedData.customAnswers || [],
+      validatedData.rsvpStatus || 'going',
     );
+
+    await createNotificationRecord({
+      userId: req.user!.id,
+      eventId: validatedData.eventId,
+      title: 'Booking Confirmed',
+      message: `Your booking ${newBookingDoc.id} is confirmed.`,
+      type: 'booking',
+      channel: 'in_app',
+      status: 'sent',
+      sentAt: new Date(),
+    });
 
     res.status(201).json({
       status: 'success',
@@ -160,8 +209,15 @@ export const getBooking = async (req: Request, res: Response, next: NextFunction
     const booking = await BookingModel.findById(req.params.id as string);
     if (!booking) return next(new AppError('Booking not found', 404));
 
-    if (booking.userId !== req.user!.id && req.user!.role !== 'host_admin') {
-      return next(new AppError('Not authorized to view this booking', 403));
+    if (booking.userId !== req.user!.id) {
+      if (req.user!.role !== 'host_admin') {
+        return next(new AppError('Not authorized to view this booking', 403));
+      }
+
+      const event = await EventModel.findById(booking.eventId);
+      if (!event || event.hostAdminId !== req.user!.id) {
+        return next(new AppError('Not authorized to view this booking', 403));
+      }
     }
 
     res.status(200).json({ status: 'success', data: { booking: booking.toJSON() } });
@@ -181,7 +237,9 @@ export const getMyBookings = async (req: Request, res: Response, next: NextFunct
 
 export const getEventBookings = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const bookings = await BookingModel.find({ eventId: req.params.eventId });
+    const eventId = String(req.params.eventId);
+    await ensureHostOwnsEvent(eventId, req.user!.id);
+    const bookings = await BookingModel.find({ eventId });
     res.status(200).json({ status: 'success', results: bookings.length, data: { bookings: bookings.map((booking) => booking.toJSON()) } });
   } catch (error) {
     next(error);
@@ -196,7 +254,18 @@ const cancelAndRestoreInventory = async (bookingId: string) => {
     throw new AppError('Booking is already cancelled', 400);
   }
 
-  const updatedBooking = await BookingModel.findByIdAndUpdate(booking.id, { bookingStatus: 'cancelled' }, { new: true });
+  const updatedBooking = await BookingModel.findByIdAndUpdate(
+    booking.id,
+    {
+      bookingStatus: 'cancelled',
+      checkInStatus: 'not_checked_in',
+      checkedInAt: null,
+      checkedInBy: null,
+      checkInMethod: null,
+    },
+    { new: true }
+  );
+
   const ticket = await TicketTypeModel.findById(booking.ticketTypeId);
   if (ticket) {
     await TicketTypeModel.findByIdAndUpdate(ticket.id, {
@@ -204,7 +273,7 @@ const cancelAndRestoreInventory = async (bookingId: string) => {
     });
   }
 
-  return updatedBooking;
+  return { booking, updatedBooking };
 };
 
 export const cancelBooking = async (req: Request, res: Response, next: NextFunction) => {
@@ -212,11 +281,30 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
     const booking = await BookingModel.findById(req.params.id as string);
     if (!booking) return next(new AppError('Booking not found', 404));
 
-    if (booking.userId !== req.user!.id && req.user!.role !== 'host_admin') {
-      return next(new AppError('Not authorized to cancel this booking', 403));
+    if (booking.userId !== req.user!.id) {
+      if (req.user!.role !== 'host_admin') {
+        return next(new AppError('Not authorized to cancel this booking', 403));
+      }
+
+      const event = await EventModel.findById(booking.eventId);
+      if (!event || event.hostAdminId !== req.user!.id) {
+        return next(new AppError('Not authorized to cancel this booking', 403));
+      }
     }
 
-    const updatedBooking = await cancelAndRestoreInventory(booking.id);
+    const { updatedBooking } = await cancelAndRestoreInventory(booking.id);
+
+    await createNotificationRecord({
+      userId: booking.userId,
+      eventId: booking.eventId,
+      title: 'Booking Cancelled',
+      message: `Your booking ${booking.id} has been cancelled.`,
+      type: 'booking',
+      channel: 'in_app',
+      status: 'sent',
+      sentAt: new Date(),
+    });
+
     res.status(200).json({ status: 'success', data: { booking: updatedBooking!.toJSON() } });
   } catch (error) {
     next(error);
@@ -225,7 +313,19 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
 
 export const refundBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const updatedBooking = await cancelAndRestoreInventory(req.params.id as string);
+    const { booking, updatedBooking } = await cancelAndRestoreInventory(req.params.id as string);
+
+    await createNotificationRecord({
+      userId: booking.userId,
+      eventId: booking.eventId,
+      title: 'Booking Refunded',
+      message: `Your booking ${booking.id} has been refunded and cancelled.`,
+      type: 'booking',
+      channel: 'in_app',
+      status: 'sent',
+      sentAt: new Date(),
+    });
+
     res.status(200).json({
       status: 'success',
       message: 'Refund processed and booking cancelled successfully',

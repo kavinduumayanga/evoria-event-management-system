@@ -7,6 +7,7 @@ import { EventDetailsScreen } from '../screens/attendee/EventDetailsScreen';
 import { TicketSelectionScreen } from '../screens/attendee/TicketSelectionScreen';
 import { PaymentSummaryScreen } from '../screens/attendee/PaymentSummaryScreen';
 import { BookingConfirmationScreen } from '../screens/attendee/BookingConfirmationScreen';
+import { MyTicketQRScreen } from '../screens/attendee/MyTicketQRScreen';
 
 const Stack = createNativeStackNavigator<AttendeeHomeStackParamList>();
 
@@ -18,6 +19,7 @@ export const AttendeeHomeStack = () => {
       <Stack.Screen name="TicketSelection" component={TicketSelectionScreen} />
       <Stack.Screen name="PaymentSummary" component={PaymentSummaryScreen} />
       <Stack.Screen name="BookingConfirmation" component={BookingConfirmationScreen} />
+      <Stack.Screen name="MyTicketQR" component={MyTicketQRScreen} />
     </Stack.Navigator>
   );
 };
