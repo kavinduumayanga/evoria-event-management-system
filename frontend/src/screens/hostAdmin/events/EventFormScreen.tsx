@@ -5,9 +5,9 @@ import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, Input, Button, LoadingState } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { EventService, VenueService } from '../../../api/services';
-import { Event, Venue, EventStatus, EventVisibility, EventType } from '../../../types';
+import { Event, Venue, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType } from '../../../types';
 
 type EventFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'EventForm'>;
 type EventFormRouteProp = RouteProp<HostAdminEventStackParamList, 'EventForm'>;
@@ -19,6 +19,7 @@ interface Props {
 
 const eventTypes: EventType[] = ['online', 'physical', 'hybrid'];
 const visibilityOptions: EventVisibility[] = ['public', 'private', 'unlisted'];
+const customQuestionTypes: CustomQuestionType[] = ['text', 'number', 'choice'];
 
 export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const eventId = route.params?.eventId;
@@ -39,6 +40,11 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [visibility, setVisibility] = useState<EventVisibility>('public');
   const [coverImage, setCoverImage] = useState('');
   const [status, setStatus] = useState<EventStatus>('draft');
+  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [customQuestions, setCustomQuestions] = useState<EventCustomQuestion[]>([]);
+  const [questionDraft, setQuestionDraft] = useState('');
+  const [questionType, setQuestionType] = useState<CustomQuestionType>('text');
+  const [questionRequired, setQuestionRequired] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -65,6 +71,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setVisibility(event.visibility);
         setCoverImage(event.coverImage || '');
         setStatus(event.status);
+        setRequiresApproval(Boolean(event.requiresApproval));
+        setCustomQuestions(event.customQuestions || []);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load event details');
@@ -105,6 +113,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         type,
         visibility,
         coverImage: coverImage.trim() ? coverImage.trim() : undefined,
+        requiresApproval,
+        customQuestions,
       };
 
       if (isEditing) {
@@ -124,6 +134,25 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) return <LoadingState />;
 
   const saveDisabled = isSaving || (isEditing && status === 'cancelled');
+
+  const addCustomQuestion = () => {
+    if (!questionDraft.trim()) {
+      Alert.alert('Validation Error', 'Custom question text cannot be empty.');
+      return;
+    }
+
+    const newQuestion: EventCustomQuestion = {
+      id: `q_${Date.now()}`,
+      question: questionDraft.trim(),
+      type: questionType,
+      required: questionRequired,
+    };
+
+    setCustomQuestions((previous) => [...previous, newQuestion]);
+    setQuestionDraft('');
+    setQuestionType('text');
+    setQuestionRequired(false);
+  };
 
   return (
     <ScreenContainer scrollable style={styles.container}>
@@ -250,6 +279,76 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           placeholder="https://example.com/image.jpg"
         />
 
+        <Text style={styles.label}>Requires Host Approval *</Text>
+        <View style={styles.selectorContainer}>
+          {[true, false].map((option) => (
+            <TouchableOpacity
+              key={option ? 'approval-on' : 'approval-off'}
+              style={[styles.chip, requiresApproval === option && styles.chipSelected]}
+              onPress={() => setRequiresApproval(option)}
+            >
+              <Text style={[styles.chipText, requiresApproval === option && styles.chipTextSelected]}>
+                {option ? 'YES' : 'NO'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Custom Questions (Optional)</Text>
+        <Input
+          label="Question"
+          value={questionDraft}
+          onChangeText={setQuestionDraft}
+          placeholder="What is your t-shirt size?"
+        />
+        <View style={styles.selectorContainer}>
+          {customQuestionTypes.map((typeOption) => (
+            <TouchableOpacity
+              key={typeOption}
+              style={[styles.chip, questionType === typeOption && styles.chipSelected]}
+              onPress={() => setQuestionType(typeOption)}
+            >
+              <Text style={[styles.chipText, questionType === typeOption && styles.chipTextSelected]}>
+                {typeOption.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.selectorContainer}>
+          {[true, false].map((requiredOption) => (
+            <TouchableOpacity
+              key={requiredOption ? 'required-yes' : 'required-no'}
+              style={[styles.chip, questionRequired === requiredOption && styles.chipSelected]}
+              onPress={() => setQuestionRequired(requiredOption)}
+            >
+              <Text style={[styles.chipText, questionRequired === requiredOption && styles.chipTextSelected]}>
+                {requiredOption ? 'REQUIRED' : 'OPTIONAL'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity style={styles.addQuestionButton} onPress={addCustomQuestion}>
+          <Plus size={16} color={theme.colors.text} />
+          <Text style={styles.addQuestionText}>Add Question</Text>
+        </TouchableOpacity>
+
+        {customQuestions.map((customQuestion) => (
+          <View key={customQuestion.id} style={styles.questionRow}>
+            <View style={styles.questionInfo}>
+              <Text style={styles.questionText}>{customQuestion.question}</Text>
+              <Text style={styles.questionMeta}>
+                {customQuestion.type.toUpperCase()} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.removeQuestionButton}
+              onPress={() => setCustomQuestions((previous) => previous.filter((item) => item.id !== customQuestion.id))}
+            >
+              <X size={14} color={theme.colors.error} />
+            </TouchableOpacity>
+          </View>
+        ))}
+
         <Button
           title={isEditing ? 'Save Changes' : 'Create Event'}
           onPress={handleSave}
@@ -295,4 +394,47 @@ const styles = StyleSheet.create({
   statusValue: { ...theme.typography.caption, fontWeight: 'bold' },
   warningText: { ...theme.typography.caption, color: theme.colors.error, marginBottom: theme.spacing.m },
   noVenueText: { color: theme.colors.textMuted, alignSelf: 'center', marginVertical: theme.spacing.s },
+  addQuestionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.m,
+    paddingVertical: theme.spacing.s,
+    marginBottom: theme.spacing.m,
+    backgroundColor: `${theme.colors.primary}20`,
+  },
+  addQuestionText: {
+    ...theme.typography.button,
+    color: theme.colors.text,
+    marginLeft: theme.spacing.s,
+  },
+  questionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.m,
+    padding: theme.spacing.s,
+    marginBottom: theme.spacing.s,
+    backgroundColor: theme.colors.surfaceLight,
+  },
+  questionInfo: {
+    flex: 1,
+    marginRight: theme.spacing.s,
+  },
+  questionText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+  },
+  questionMeta: {
+    ...theme.typography.small,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  removeQuestionButton: {
+    padding: theme.spacing.xs,
+  },
 });

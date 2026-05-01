@@ -1,5 +1,5 @@
 import apiClient from './client';
-import { Event, Booking, Venue, Session, TicketType } from '../types';
+import { Event, Booking, Venue, Session, TicketType, RegistrationAnswer, RsvpStatus } from '../types';
 import { Role } from '../store/auth.store';
 
 export interface RegisterPayload {
@@ -33,6 +33,36 @@ export interface UpdateProfilePayload {
 export interface ChangePasswordPayload {
   currentPassword: string;
   newPassword: string;
+}
+
+export interface CreateRegistrationPayload {
+  eventId: string;
+  ticketTypeId: string;
+  quantity: number;
+  rsvpStatus?: RsvpStatus;
+  customAnswers?: RegistrationAnswer[];
+}
+
+export interface ApplyPromoPayload {
+  ticketTypeId: string;
+  quantity: number;
+  promoCode: string;
+  unlockCode?: string;
+}
+
+export interface MockCheckoutPayload {
+  ticketTypeId: string;
+  quantity: number;
+  promoCode?: string;
+  unlockCode?: string;
+}
+
+export interface CreateBookingPayload {
+  eventId: string;
+  ticketTypeId: string;
+  quantity: number;
+  promoCode?: string;
+  unlockCode?: string;
 }
 
 export const AuthService = {
@@ -105,6 +135,10 @@ export const TicketService = {
   deleteTicket: async (id: string) => {
     const response = await apiClient.delete(`/tickets/${id}`);
     return response.data;
+  },
+  applyPromo: async (payload: ApplyPromoPayload) => {
+    const response = await apiClient.post('/tickets/apply-promo', payload);
+    return response.data;
   }
 };
 
@@ -121,12 +155,50 @@ export const BookingService = {
     const response = await apiClient.get(`/bookings/event/${eventId}`);
     return response.data;
   },
-  createBooking: async (data: Partial<Booking>) => {
+  createBooking: async (data: CreateBookingPayload) => {
     const response = await apiClient.post('/bookings', data);
     return response.data;
   },
   cancelBooking: async (id: string) => {
     const response = await apiClient.patch(`/bookings/${id}/cancel`);
+    return response.data;
+  },
+  refundBooking: async (id: string) => {
+    const response = await apiClient.patch(`/bookings/${id}/refund`);
+    return response.data;
+  },
+};
+
+export const PaymentService = {
+  mockCheckout: async (payload: MockCheckoutPayload) => {
+    const response = await apiClient.post('/payments/mock-checkout', payload);
+    return response.data;
+  },
+};
+
+export const RegistrationService = {
+  createRegistration: async (payload: CreateRegistrationPayload) => {
+    const response = await apiClient.post('/registrations', payload);
+    return response.data;
+  },
+  getMyRegistrations: async () => {
+    const response = await apiClient.get('/registrations/my');
+    return response.data;
+  },
+  getEventRegistrations: async (eventId: string) => {
+    const response = await apiClient.get(`/registrations/event/${eventId}`);
+    return response.data;
+  },
+  updateRsvp: async (registrationId: string, rsvpStatus: RsvpStatus) => {
+    const response = await apiClient.patch(`/registrations/${registrationId}/rsvp`, { rsvpStatus });
+    return response.data;
+  },
+  approveRegistration: async (registrationId: string) => {
+    const response = await apiClient.patch(`/registrations/${registrationId}/approve`);
+    return response.data;
+  },
+  rejectRegistration: async (registrationId: string) => {
+    const response = await apiClient.patch(`/registrations/${registrationId}/reject`);
     return response.data;
   },
 };

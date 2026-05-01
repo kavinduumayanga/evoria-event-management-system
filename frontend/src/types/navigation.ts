@@ -19,6 +19,16 @@ export type AttendeeHomeStackParamList = {
   EventList: undefined;
   EventDetails: { eventId: string };
   TicketSelection: { eventId: string };
+  PaymentSummary: {
+    eventId: string;
+    ticketTypeId: string;
+    quantity: number;
+    promoCode?: string;
+    unlockCode?: string;
+    ticketName: string;
+    currency: string;
+    unitPrice: number;
+  };
   BookingConfirmation: { bookingId: string };
 };
 
@@ -35,6 +45,7 @@ export type HostAdminEventStackParamList = {
   EventForm: { eventId?: string };
   ManageTickets: { eventId: string };
   TicketForm: { eventId: string; ticketId?: string };
+  ManageRegistrations: { eventId: string };
   ManageSessions: { eventId: string };
   SessionForm: { eventId: string; sessionId?: string };
 };

@@ -47,18 +47,32 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
         <View style={styles.content}>
           <CheckCircle size={80} color={theme.colors.success} style={{ alignSelf: 'center', marginBottom: 20 }} />
           <Text style={styles.title}>Booking Confirmed!</Text>
-          <Text style={styles.subtitle}>Your tickets have been successfully booked.</Text>
+          <Text style={styles.subtitle}>Payment Successful (Mock). Your tickets have been confirmed.</Text>
 
           {booking && (
             <GlassCard style={styles.card}>
+              {(() => {
+                const approvalStatus = booking.approvalStatus || 'approved';
+                const rsvpStatus = booking.rsvpStatus || 'going';
+                return (
+                  <>
               <Text style={styles.label}>Booking ID</Text>
               <Text style={styles.value}>{booking.id}</Text>
               
               <Text style={styles.label}>Quantity</Text>
               <Text style={styles.value}>{booking.quantity}</Text>
+
+              <Text style={styles.label}>Approval Status</Text>
+              <Text style={styles.value}>{approvalStatus.toUpperCase()}</Text>
+
+              <Text style={styles.label}>RSVP</Text>
+              <Text style={styles.value}>{rsvpStatus.replace('_', ' ').toUpperCase()}</Text>
               
               <Text style={styles.label}>Total Amount</Text>
               <Text style={styles.value}>${booking.totalAmount.toFixed(2)}</Text>
+                  </>
+                );
+              })()}
             </GlassCard>
           )}
 

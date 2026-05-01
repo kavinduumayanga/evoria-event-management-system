@@ -14,7 +14,17 @@ const eventSchema = new Schema({
   coverImage: { type: String, trim: true },
   capacity: { type: Number, required: true },
   status: { type: String, enum: ['draft', 'published', 'cancelled'], default: 'draft' },
-  visibility: { type: String, enum: ['public', 'private', 'unlisted'], default: 'public' }
+  visibility: { type: String, enum: ['public', 'private', 'unlisted'], default: 'public' },
+  requiresApproval: { type: Boolean, default: false },
+  customQuestions: {
+    type: [{
+      id: { type: String, required: true, trim: true },
+      question: { type: String, required: true, trim: true },
+      type: { type: String, enum: ['text', 'number', 'choice'], required: true },
+      required: { type: Boolean, default: false },
+    }],
+    default: [],
+  },
 }, {
   timestamps: true,
   toJSON: {

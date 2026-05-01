@@ -38,18 +38,18 @@ export const ManageBookingsScreen = () => {
     fetchBookings();
   }, []);
 
-  const handleCancelBooking = (bookingId: string) => {
-    Alert.alert('Cancel Booking', 'Are you sure you want to cancel this booking?', [
+  const handleRefundBooking = (bookingId: string) => {
+    Alert.alert('Refund Booking', 'Are you sure you want to refund and cancel this booking?', [
       { text: 'No', style: 'cancel' },
       {
-        text: 'Yes, Cancel',
+        text: 'Yes, Refund',
         style: 'destructive',
         onPress: async () => {
           try {
-            await BookingService.cancelBooking(bookingId);
+            await BookingService.refundBooking(bookingId);
             fetchBookings(); // Refresh list to get updated status
           } catch (error) {
-            Alert.alert('Error', 'Failed to cancel booking');
+            Alert.alert('Error', 'Failed to refund booking');
           }
         }
       }
@@ -75,10 +75,10 @@ export const ManageBookingsScreen = () => {
               item.bookingStatus === 'pending' || item.bookingStatus === 'confirmed' ? (
                 <TouchableOpacity 
                   style={styles.actionBtn} 
-                  onPress={() => handleCancelBooking(item.id)}
+                  onPress={() => handleRefundBooking(item.id)}
                 >
                   <X size={16} color={theme.colors.error} />
-                  <Text style={[styles.actionText, { color: theme.colors.error }]}>Cancel</Text>
+                  <Text style={[styles.actionText, { color: theme.colors.error }]}>Refund</Text>
                 </TouchableOpacity>
               ) : undefined
             }

@@ -9,7 +9,18 @@ const bookingSchema = new Schema({
   quantity: { type: Number, required: true },
   totalAmount: { type: Number, required: true },
   bookingStatus: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'confirmed' },
-  bookingDate: { type: String, required: true }
+  bookingDate: { type: String, required: true },
+  rsvpStatus: { type: String, enum: ['going', 'not_going'], default: 'going' },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+  checkInStatus: { type: String, enum: ['not_checked_in', 'checked_in'], default: 'not_checked_in' },
+  customAnswers: {
+    type: [{
+      questionId: { type: String, required: true, trim: true },
+      answer: { type: String, required: true, trim: true },
+    }],
+    default: [],
+  },
+  registrationType: { type: String, enum: ['free', 'paid'], default: 'paid' },
 }, {
   timestamps: true,
   toJSON: {

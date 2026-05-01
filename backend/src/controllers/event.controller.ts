@@ -6,17 +6,25 @@ import { TicketTypeModel } from '../models/TicketType';
 import { UserModel } from '../models/User';
 import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
-import { EventStatus, EventType, EventVisibility, Role } from '../types';
+import { EventCustomQuestion, EventStatus, EventType, EventVisibility, Role } from '../types';
 
 const EVENT_TYPES = ['online', 'physical', 'hybrid'] as const;
 const EVENT_VISIBILITIES = ['public', 'private', 'unlisted'] as const;
 const EVENT_STATUSES = ['draft', 'published', 'cancelled'] as const;
+const CUSTOM_QUESTION_TYPES = ['text', 'number', 'choice'] as const;
 
 const STATUS_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
   draft: ['published'],
   published: ['cancelled'],
   cancelled: [],
 };
+
+const customQuestionSchema = z.object({
+  id: z.string().trim().min(1, 'Custom question id is required'),
+  question: z.string().trim().min(1, 'Custom question text is required'),
+  type: z.enum(CUSTOM_QUESTION_TYPES),
+  required: z.boolean().optional(),
+});
 
 const createEventSchema = z.object({
   title: z.string().trim().min(1, 'Title is required'),
@@ -29,6 +37,8 @@ const createEventSchema = z.object({
   visibility: z.enum(EVENT_VISIBILITIES).default('public'),
   coverImage: z.string().trim().optional(),
   capacity: z.number().int().positive('Capacity must be greater than 0'),
+  requiresApproval: z.boolean().default(false),
+  customQuestions: z.array(customQuestionSchema).default([]),
 }).strict();
 
 const updateEventSchema = createEventSchema.partial().strict();
@@ -48,6 +58,8 @@ interface EventInput {
   visibility: EventVisibility;
   coverImage?: string;
   capacity: number;
+  requiresApproval: boolean;
+  customQuestions: EventCustomQuestion[];
 }
 
 const parseTimeToMinutes = (value: string): number | null => {
@@ -163,6 +175,15 @@ const validateEventData = async (eventInput: EventInput) => {
     throw new AppError('Capacity must be greater than 0', 400);
   }
 
+  const duplicateQuestionIds = new Set<string>();
+  for (const customQuestion of eventInput.customQuestions) {
+    const normalizedId = customQuestion.id.trim();
+    if (duplicateQuestionIds.has(normalizedId)) {
+      throw new AppError('Custom question ids must be unique', 400);
+    }
+    duplicateQuestionIds.add(normalizedId);
+  }
+
   await validateVenueRules(eventInput.type, eventInput.venueId);
 };
 
@@ -178,6 +199,13 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
     visibility: validatedData.visibility,
     coverImage: normalizeCoverImage(validatedData.coverImage),
     capacity: validatedData.capacity,
+    requiresApproval: validatedData.requiresApproval,
+    customQuestions: validatedData.customQuestions.map((question) => ({
+      id: question.id.trim(),
+      question: question.question.trim(),
+      type: question.type,
+      required: question.required ?? false,
+    })),
   };
 };
 
@@ -197,6 +225,15 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
       ? normalizeCoverImage(updates.coverImage)
       : normalizeCoverImage(event.coverImage),
     capacity: updates.capacity !== undefined ? updates.capacity : event.capacity,
+    requiresApproval: updates.requiresApproval !== undefined ? updates.requiresApproval : Boolean(event.requiresApproval),
+    customQuestions: updates.customQuestions !== undefined
+      ? updates.customQuestions.map((question) => ({
+          id: question.id.trim(),
+          question: question.question.trim(),
+          type: question.type,
+          required: question.required ?? false,
+        }))
+      : (event.customQuestions || []),
   };
 };
 
@@ -211,6 +248,7 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
   if (updates.capacity !== undefined) payload.capacity = updates.capacity;
   if (updates.type !== undefined) payload.type = updates.type;
   if (updates.visibility !== undefined) payload.visibility = updates.visibility;
+  if (updates.requiresApproval !== undefined) payload.requiresApproval = updates.requiresApproval;
 
   if (Object.prototype.hasOwnProperty.call(updates, 'venueId')) {
     payload.venueId = normalizeVenueId(updates.venueId);
@@ -218,6 +256,15 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
 
   if (Object.prototype.hasOwnProperty.call(updates, 'coverImage')) {
     payload.coverImage = normalizeCoverImage(updates.coverImage) || null;
+  }
+
+  if (updates.customQuestions !== undefined) {
+    payload.customQuestions = updates.customQuestions.map((question) => ({
+      id: question.id.trim(),
+      question: question.question.trim(),
+      type: question.type,
+      required: question.required ?? false,
+    }));
   }
 
   return payload;
