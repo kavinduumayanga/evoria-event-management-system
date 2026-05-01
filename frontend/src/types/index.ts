@@ -1,5 +1,6 @@
 export type Role = 'host_admin' | 'attendee';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
+export type ModerationStatus = 'pending' | 'approved' | 'rejected';
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type EventType = 'online' | 'physical' | 'hybrid';
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
@@ -45,6 +46,10 @@ export interface Event {
   meetingLink?: string;
   coverImage?: string;
   capacity: number;
+  isFlagged: boolean;
+  isFeatured: boolean;
+  moderationStatus: ModerationStatus;
+  priorityAccessEnabled?: boolean;
   status: EventStatus;
   visibility: EventVisibility;
   requiresApproval?: boolean;
@@ -87,6 +92,9 @@ export interface Booking {
   totalAmount: number;
   bookingStatus: BookingStatus;
   bookingDate: string;
+  isWaitlisted: boolean;
+  waitlistPosition: number | null;
+  wasWaitlisted?: boolean;
   rsvpStatus: RsvpStatus;
   approvalStatus: ApprovalStatus;
   checkInStatus: CheckInStatus;
@@ -160,4 +168,41 @@ export interface DashboardAnalytics {
   totalBookings: number;
   totalRevenue: number;
   totalAttendees: number;
+}
+
+export interface PlatformAnalytics {
+  totalUsers: number;
+  totalEvents: number;
+  flaggedEvents: number;
+  suspendedUsers: number;
+  totalReports: number;
+}
+
+export interface ReportRecord {
+  id: string;
+  reporterId: string;
+  targetType: 'event' | 'user';
+  targetId: string;
+  reason: string;
+  isResolved: boolean;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  reporter?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  target?: {
+    id: string;
+    type: 'event' | 'user';
+    title?: string;
+    name?: string;
+    email?: string;
+    moderationStatus?: ModerationStatus;
+    isFlagged?: boolean;
+    isSuspended?: boolean;
+    reportCount?: number;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
 }

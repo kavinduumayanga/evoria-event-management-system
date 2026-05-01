@@ -1,5 +1,6 @@
 export type Role = 'host_admin' | 'attendee';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
+export type ModerationStatus = 'pending' | 'approved' | 'rejected';
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type EventType = 'online' | 'physical' | 'hybrid';
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
@@ -36,6 +37,8 @@ export interface User {
   phone?: string;
   profileImage?: string;
   isActive: boolean;
+  isSuspended: boolean;
+  reportCount: number;
   resetPasswordToken?: string;
   resetPasswordExpires?: string;
   createdAt: string;
@@ -60,6 +63,10 @@ export interface Event {
   meetingLink?: string;
   coverImage?: string;
   capacity: number;
+  isFlagged: boolean;
+  isFeatured: boolean;
+  moderationStatus: ModerationStatus;
+  priorityAccessEnabled?: boolean;
   status: EventStatus;
   visibility: EventVisibility;
   requiresApproval?: boolean;
@@ -102,6 +109,9 @@ export interface Booking {
   totalAmount: number;
   bookingStatus: BookingStatus;
   bookingDate: string;
+  isWaitlisted: boolean;
+  waitlistPosition: number | null;
+  wasWaitlisted?: boolean;
   rsvpStatus: RsvpStatus;
   approvalStatus: ApprovalStatus;
   checkInStatus: CheckInStatus;
@@ -129,6 +139,19 @@ export interface Notification {
   scheduledAt?: string | null;
   sentAt?: string | null;
   createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  targetType: 'event' | 'user';
+  targetId: string;
+  reason: string;
+  isResolved: boolean;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

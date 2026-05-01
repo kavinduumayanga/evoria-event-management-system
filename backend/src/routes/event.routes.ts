@@ -12,6 +12,7 @@ import {
   incrementEventView,
   getRecommendedEvents,
   getEventCalendar,
+  toggleEventFeatured,
 } from '../controllers/event.controller';
 import { protect, restrictTo } from '../middleware/auth.middleware';
 
@@ -35,5 +36,6 @@ router.post('/', createEvent);
 router.put('/:id', updateEvent);
 router.delete('/:id', deleteEvent);
 router.patch('/:id/status', updateEventStatus);
+router.patch('/:id/feature', toggleEventFeatured);
 
 export default router;

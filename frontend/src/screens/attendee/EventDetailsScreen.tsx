@@ -6,10 +6,10 @@ import { RouteProp } from '@react-navigation/native';
 import * as Calendar from 'expo-calendar';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Event, Venue, Session, TicketType } from '../../types';
-import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard } from '../../components';
+import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { EventService } from '../../api/services';
+import { EventService, ReportService } from '../../api/services';
 import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Link as LinkIcon } from 'lucide-react-native';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -35,6 +35,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [recommendedEvents, setRecommendedEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   useEffect(() => {
     fetchEventDetails();
@@ -131,6 +134,30 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     await Linking.openURL(event.meetingLink);
   };
 
+  const handleSubmitReport = async () => {
+    if (!event) return;
+    if (!reportReason.trim()) {
+      Alert.alert('Report Event', 'Please enter a reason before submitting.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReport(true);
+      await ReportService.createReport({
+        targetType: 'event',
+        targetId: event.id,
+        reason: reportReason.trim(),
+      });
+      setReportReason('');
+      setShowReportForm(false);
+      Alert.alert('Report Submitted', 'Thanks for your report. Our moderation team will review it.');
+    } catch (submitError: any) {
+      Alert.alert('Report Failed', submitError.response?.data?.message || 'Unable to submit report right now.');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   if (isLoading) return <LoadingState />;
 
   if (error) {
@@ -150,6 +177,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   const isAvailable = tickets.some((ticket) => ticket.isActive && ticket.quantity > ticket.soldCount);
+  const isEventFull = event.bookingCount >= event.capacity;
 
   return (
     <GradientBackground>
@@ -216,7 +244,29 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   icon={<LinkIcon size={16} color={theme.colors.text} />}
                 />
               ) : null}
+              <Button
+                title={showReportForm ? 'Hide Report Form' : 'Report Event'}
+                variant="outline"
+                onPress={() => setShowReportForm((previous) => !previous)}
+              />
             </View>
+
+            {showReportForm && (
+              <View style={styles.reportBox}>
+                <Input
+                  label="Reason"
+                  value={reportReason}
+                  onChangeText={setReportReason}
+                  placeholder="Tell us what is wrong with this event"
+                  multiline
+                />
+                <Button
+                  title="Submit Report"
+                  onPress={handleSubmitReport}
+                  isLoading={isSubmittingReport}
+                />
+              </View>
+            )}
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About</Text>
@@ -273,9 +323,12 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         </ScrollView>
 
         <View style={styles.footer}>
+          {isEventFull && (
+            <Text style={styles.waitlistHint}>Event full - joining now adds you to waitlist.</Text>
+          )}
           <Button
-            title={isAvailable ? 'Book Tickets' : 'Sold Out'}
-            disabled={!isAvailable || event.status !== 'published'}
+            title={isEventFull ? 'Join Waitlist' : (isAvailable ? 'Book Tickets' : 'Sold Out')}
+            disabled={event.status !== 'published' || (!isEventFull && !isAvailable)}
             onPress={() => navigation.navigate('TicketSelection', { eventId })}
             style={styles.bookButton}
           />
@@ -342,6 +395,10 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.m,
     gap: theme.spacing.s,
   },
+  reportBox: {
+    marginBottom: theme.spacing.l,
+    gap: theme.spacing.s,
+  },
   section: {
     marginBottom: theme.spacing.xl,
   },
@@ -405,6 +462,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(9, 9, 11, 0.9)',
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+  },
+  waitlistHint: {
+    ...theme.typography.caption,
+    color: theme.colors.warning,
+    marginBottom: theme.spacing.s,
   },
   bookButton: {
     width: '100%',

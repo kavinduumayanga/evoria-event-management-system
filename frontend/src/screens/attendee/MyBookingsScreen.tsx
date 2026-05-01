@@ -60,6 +60,16 @@ export const MyBookingsScreen = () => {
     <ScreenContainer style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Registrations</Text>
+        <TouchableOpacity
+          style={styles.waitlistNavButton}
+          onPress={() =>
+            navigation.navigate('HomeStack', {
+              screen: 'MyWaitlist',
+            })
+          }
+        >
+          <Text style={styles.waitlistNavText}>My Waitlist</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -70,22 +80,30 @@ export const MyBookingsScreen = () => {
             booking={item}
             actions={
               <View style={styles.actionsWrapper}>
-                <View style={styles.rsvpActions}>
-                  <TouchableOpacity
-                    style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'going' && styles.rsvpButtonActive]}
-                    onPress={() => handleRsvpUpdate(item.id, 'going')}
-                  >
-                    <Text style={styles.rsvpButtonText}>Going</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'not_going' && styles.rsvpButtonActive]}
-                    onPress={() => handleRsvpUpdate(item.id, 'not_going')}
-                  >
-                    <Text style={styles.rsvpButtonText}>Not Going</Text>
-                  </TouchableOpacity>
-                </View>
+                {item.isWaitlisted ? (
+                  <View style={styles.waitingBanner}>
+                    <Text style={styles.waitingBannerText}>
+                      Waiting in queue{item.waitlistPosition ? ` (#${item.waitlistPosition})` : ''}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.rsvpActions}>
+                    <TouchableOpacity
+                      style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'going' && styles.rsvpButtonActive]}
+                      onPress={() => handleRsvpUpdate(item.id, 'going')}
+                    >
+                      <Text style={styles.rsvpButtonText}>Going</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'not_going' && styles.rsvpButtonActive]}
+                      onPress={() => handleRsvpUpdate(item.id, 'not_going')}
+                    >
+                      <Text style={styles.rsvpButtonText}>Not Going</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-                {item.bookingStatus === 'confirmed' && (
+                {item.bookingStatus === 'confirmed' && !item.isWaitlisted && (
                   <TouchableOpacity
                     style={styles.qrBtn}
                     onPress={() =>
@@ -121,6 +139,9 @@ const styles = StyleSheet.create({
   header: {
     padding: theme.spacing.m,
     paddingTop: theme.spacing.xl,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
     ...theme.typography.h1,
@@ -173,6 +194,33 @@ const styles = StyleSheet.create({
   qrBtnText: {
     ...theme.typography.caption,
     color: theme.colors.primaryLight,
+    fontWeight: '700',
+  },
+  waitlistNavButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.warning,
+    borderRadius: theme.borderRadius.s,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 6,
+    backgroundColor: `${theme.colors.warning}1A`,
+  },
+  waitlistNavText: {
+    ...theme.typography.small,
+    color: theme.colors.warning,
+    fontWeight: '700',
+  },
+  waitingBanner: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: theme.colors.warning,
+    backgroundColor: `${theme.colors.warning}1A`,
+    borderRadius: theme.borderRadius.s,
+    paddingVertical: theme.spacing.s,
+    alignItems: 'center',
+  },
+  waitingBannerText: {
+    ...theme.typography.caption,
+    color: theme.colors.warning,
     fontWeight: '700',
   },
 });

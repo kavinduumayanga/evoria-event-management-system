@@ -44,6 +44,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [visibility, setVisibility] = useState<EventVisibility>('public');
   const [coverImage, setCoverImage] = useState('');
   const [status, setStatus] = useState<EventStatus>('draft');
+  const [priorityAccessEnabled, setPriorityAccessEnabled] = useState(false);
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [customQuestions, setCustomQuestions] = useState<EventCustomQuestion[]>([]);
   const [questionDraft, setQuestionDraft] = useState('');
@@ -79,6 +80,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setVisibility(event.visibility);
         setCoverImage(event.coverImage || '');
         setStatus(event.status);
+        setPriorityAccessEnabled(Boolean(event.priorityAccessEnabled));
         setRequiresApproval(Boolean(event.requiresApproval));
         setCustomQuestions(event.customQuestions || []);
       }
@@ -128,6 +130,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         type,
         visibility,
         coverImage: coverImage.trim() ? coverImage.trim() : undefined,
+        priorityAccessEnabled,
         requiresApproval,
         customQuestions,
       };
@@ -326,6 +329,21 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
               onPress={() => setRequiresApproval(option)}
             >
               <Text style={[styles.chipText, requiresApproval === option && styles.chipTextSelected]}>
+                {option ? 'YES' : 'NO'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Priority Access Enabled *</Text>
+        <View style={styles.selectorContainer}>
+          {[true, false].map((option) => (
+            <TouchableOpacity
+              key={option ? 'priority-on' : 'priority-off'}
+              style={[styles.chip, priorityAccessEnabled === option && styles.chipSelected]}
+              onPress={() => setPriorityAccessEnabled(option)}
+            >
+              <Text style={[styles.chipText, priorityAccessEnabled === option && styles.chipTextSelected]}>
                 {option ? 'YES' : 'NO'}
               </Text>
             </TouchableOpacity>

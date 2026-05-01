@@ -8,6 +8,7 @@ import {
   validateTicketAvailability,
   validateUnlockCode,
 } from '../utils/ticketPricing';
+import { isEventAtCapacityForQuantity } from '../utils/waitlist.helper';
 
 const mockCheckoutSchema = z.object({
   ticketTypeId: z.string().trim().min(1, 'ticketTypeId is required'),
@@ -30,12 +31,21 @@ export const mockCheckout = async (req: Request, res: Response, next: NextFuncti
     const event = await EventModel.findById(ticket.eventId);
     if (!event) return next(new AppError('Event not found', 404));
 
+    if (event.moderationStatus && event.moderationStatus !== 'approved') {
+      return next(new AppError('Event is not approved for booking', 400));
+    }
+
     if (event.status !== 'published') {
       return next(new AppError('Event is not available for booking', 400));
     }
 
     if (event.visibility === 'private') {
       return next(new AppError('Event is private', 403));
+    }
+
+    const eventAtCapacity = await isEventAtCapacityForQuantity(event.id, validatedData.quantity);
+    if (eventAtCapacity) {
+      return next(new AppError('Event is full. Join waitlist instead of payment.', 409));
     }
 
     validateUnlockCode(ticket as any, validatedData.unlockCode);

@@ -24,12 +24,12 @@ export const getEventAnalytics = async (req: Request, res: Response, next: NextF
     const totalApproved = bookings.filter((booking) => booking.approvalStatus === 'approved').length;
     const totalAttended = bookings.filter((booking) => booking.checkInStatus === 'checked_in').length;
     const totalRevenue = bookings
-      .filter((booking) => booking.registrationType === 'paid' && booking.bookingStatus !== 'cancelled')
+      .filter((booking) => booking.registrationType === 'paid' && booking.bookingStatus !== 'cancelled' && !booking.isWaitlisted)
       .reduce((sum, booking) => sum + booking.totalAmount, 0);
     const ticketsSold = bookings
-      .filter((booking) => booking.bookingStatus !== 'cancelled')
+      .filter((booking) => booking.bookingStatus !== 'cancelled' && !booking.isWaitlisted)
       .reduce((sum, booking) => sum + booking.quantity, 0);
-    const confirmedBookings = bookings.filter((booking) => booking.bookingStatus === 'confirmed').length;
+    const confirmedBookings = bookings.filter((booking) => booking.bookingStatus === 'confirmed' && !booking.isWaitlisted).length;
     const viewsCount = event.viewsCount || 0;
     const conversionRate = viewsCount > 0 ? roundToTwo((confirmedBookings / viewsCount) * 100) : 0;
 
@@ -67,7 +67,7 @@ export const getDashboardAnalytics = async (req: Request, res: Response, next: N
     }
 
     const bookings = await BookingModel.find({ eventId: { $in: eventIds } });
-    const activeBookings = bookings.filter((booking) => booking.bookingStatus !== 'cancelled');
+    const activeBookings = bookings.filter((booking) => booking.bookingStatus !== 'cancelled' && !booking.isWaitlisted);
 
     const totalEvents = events.length;
     const totalBookings = bookings.length;

@@ -10,6 +10,9 @@ const bookingSchema = new Schema({
   totalAmount: { type: Number, required: true },
   bookingStatus: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'confirmed' },
   bookingDate: { type: String, required: true },
+  isWaitlisted: { type: Boolean, default: false },
+  waitlistPosition: { type: Number, default: null },
+  wasWaitlisted: { type: Boolean, default: false },
   rsvpStatus: { type: String, enum: ['going', 'not_going'], default: 'going' },
   approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
   checkInStatus: { type: String, enum: ['not_checked_in', 'checked_in'], default: 'not_checked_in' },
@@ -39,5 +42,7 @@ const bookingSchema = new Schema({
 });
 
 bookingSchema.index({ qrCodeValue: 1 }, { unique: true, sparse: true });
+bookingSchema.index({ eventId: 1, isWaitlisted: 1, waitlistPosition: 1 });
+bookingSchema.index({ userId: 1, eventId: 1, isWaitlisted: 1, bookingStatus: 1 });
 
 export const BookingModel = mongoose.model('Booking', bookingSchema);

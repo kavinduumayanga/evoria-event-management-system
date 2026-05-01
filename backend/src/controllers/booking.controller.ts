@@ -11,6 +11,13 @@ import {
   validateTicketAvailability,
   validateUnlockCode,
 } from '../utils/ticketPricing';
+import {
+  ensureNoActiveWaitlistEntry,
+  getNextWaitlistPosition,
+  isEventAtCapacityForQuantity,
+  normalizeWaitlistPositions,
+  promoteNextWaitlistedBooking,
+} from '../utils/waitlist.helper';
 
 const bookingSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
@@ -28,6 +35,10 @@ const bookingSchema = z.object({
 const ensureBookableEvent = async (eventId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
+
+  if (event.moderationStatus && event.moderationStatus !== 'approved') {
+    throw new AppError('This event is not approved for bookings', 400);
+  }
 
   if (event.status !== 'published') {
     throw new AppError('Cannot book an event that is not published', 400);
@@ -110,6 +121,9 @@ const createConfirmedBooking = async (
     totalAmount,
     bookingStatus: 'confirmed',
     bookingDate,
+    isWaitlisted: false,
+    waitlistPosition: null,
+    wasWaitlisted: false,
     rsvpStatus,
     approvalStatus,
     checkInStatus: 'not_checked_in',
@@ -128,6 +142,44 @@ const createConfirmedBooking = async (
   await adjustEventBookingCount(eventId, quantity);
 
   return newBookingDoc;
+};
+
+const createWaitlistBooking = async (
+  userId: string,
+  eventId: string,
+  ticket: any,
+  quantity: number,
+  totalAmount: number,
+  customAnswers: Array<{ questionId: string; answer: string }>,
+  rsvpStatus: 'going' | 'not_going',
+) => {
+  await ensureNoActiveWaitlistEntry(userId, eventId);
+  const waitlistPosition = await getNextWaitlistPosition(eventId);
+
+  const bookingDate = new Date().toISOString();
+  const waitlistBooking = await BookingModel.create({
+    userId,
+    eventId,
+    ticketTypeId: ticket.id,
+    quantity,
+    totalAmount,
+    bookingStatus: 'pending',
+    bookingDate,
+    isWaitlisted: true,
+    waitlistPosition,
+    wasWaitlisted: true,
+    rsvpStatus,
+    approvalStatus: 'pending',
+    checkInStatus: 'not_checked_in',
+    checkedInAt: null,
+    checkedInBy: null,
+    checkInMethod: null,
+    attendanceNote: undefined,
+    customAnswers,
+    registrationType: ticket.isFree ? 'free' : 'paid',
+  });
+
+  return waitlistBooking;
 };
 
 const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
@@ -153,14 +205,61 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
     const ticket = await ensureTicketForEvent(validatedData.ticketTypeId, validatedData.eventId);
 
     validateUnlockCode(ticket as any, validatedData.unlockCode);
-    validateTicketAvailability(ticket as any, validatedData.quantity);
     await validateMaxPerUser(req.user!.id, ticket.id, ticket.maxPerUser, validatedData.quantity);
+
+    const eventAtCapacity = await isEventAtCapacityForQuantity(validatedData.eventId, validatedData.quantity);
+    if (!eventAtCapacity) {
+      validateTicketAvailability(ticket as any, validatedData.quantity);
+    } else {
+      if (ticket.quantity <= 0) {
+        return next(new AppError('Ticket is not available for waitlist', 400));
+      }
+
+      if (validatedData.quantity > ticket.quantity) {
+        return next(new AppError('Requested quantity exceeds ticket capacity', 400));
+      }
+    }
 
     const pricing = calculateTicketPrice(
       ticket as any,
       validatedData.quantity,
       validatedData.promoCode,
     );
+
+    if (eventAtCapacity) {
+      const waitlistBooking = await createWaitlistBooking(
+        req.user!.id,
+        validatedData.eventId,
+        ticket,
+        validatedData.quantity,
+        pricing.finalAmount,
+        validatedData.customAnswers || [],
+        validatedData.rsvpStatus || 'going',
+      );
+
+      await createNotificationRecord({
+        userId: req.user!.id,
+        eventId: validatedData.eventId,
+        title: 'Added to Waitlist',
+        message: `Event full. You were added to waitlist at position ${waitlistBooking.waitlistPosition}.`,
+        type: 'booking',
+        channel: 'in_app',
+        status: 'sent',
+        sentAt: new Date(),
+      });
+
+      return res.status(201).json({
+        status: 'success',
+        message: 'Event full - you have been added to the waitlist',
+        data: {
+          booking: waitlistBooking.toJSON(),
+          waitlist: {
+            isWaitlisted: true,
+            waitlistPosition: waitlistBooking.waitlistPosition,
+          },
+        },
+      });
+    }
 
     // Free tickets are immediately confirmed; paid tickets use mock payment simulation in-app.
     const newBookingDoc = await createConfirmedBooking(
@@ -256,7 +355,7 @@ export const getEventBookings = async (req: Request, res: Response, next: NextFu
   }
 };
 
-const cancelAndRestoreInventory = async (bookingId: string) => {
+const cancelAndRestoreInventory = async (bookingId: string, actedBy?: string) => {
   const booking = await BookingModel.findById(bookingId);
   if (!booking) throw new AppError('Booking not found', 404);
 
@@ -264,10 +363,15 @@ const cancelAndRestoreInventory = async (bookingId: string) => {
     throw new AppError('Booking is already cancelled', 400);
   }
 
+  const wasWaitlisted = Boolean(booking.isWaitlisted);
+  const wasConfirmed = booking.bookingStatus === 'confirmed' && !wasWaitlisted;
+
   const updatedBooking = await BookingModel.findByIdAndUpdate(
     booking.id,
     {
       bookingStatus: 'cancelled',
+      isWaitlisted: false,
+      waitlistPosition: null,
       checkInStatus: 'not_checked_in',
       checkedInAt: null,
       checkedInBy: null,
@@ -276,16 +380,25 @@ const cancelAndRestoreInventory = async (bookingId: string) => {
     { new: true }
   );
 
-  const ticket = await TicketTypeModel.findById(booking.ticketTypeId);
-  if (ticket) {
-    await TicketTypeModel.findByIdAndUpdate(ticket.id, {
-      soldCount: Math.max(0, ticket.soldCount - booking.quantity),
-    });
+  if (wasWaitlisted) {
+    await normalizeWaitlistPositions(booking.eventId);
+    return { booking, updatedBooking, promotedBooking: null };
   }
 
-  await adjustEventBookingCount(booking.eventId, -booking.quantity);
+  if (wasConfirmed) {
+    const ticket = await TicketTypeModel.findById(booking.ticketTypeId);
+    if (ticket) {
+      await TicketTypeModel.findByIdAndUpdate(ticket.id, {
+        soldCount: Math.max(0, ticket.soldCount - booking.quantity),
+      });
+    }
 
-  return { booking, updatedBooking };
+    await adjustEventBookingCount(booking.eventId, -booking.quantity);
+  }
+
+  const promotedBooking = await promoteNextWaitlistedBooking(booking.eventId, actedBy);
+
+  return { booking, updatedBooking, promotedBooking };
 };
 
 export const cancelBooking = async (req: Request, res: Response, next: NextFunction) => {
@@ -304,7 +417,7 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
       }
     }
 
-    const { updatedBooking } = await cancelAndRestoreInventory(booking.id);
+    const { updatedBooking, promotedBooking } = await cancelAndRestoreInventory(booking.id, req.user!.id);
 
     await createNotificationRecord({
       userId: booking.userId,
@@ -317,7 +430,13 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
       sentAt: new Date(),
     });
 
-    res.status(200).json({ status: 'success', data: { booking: updatedBooking!.toJSON() } });
+    res.status(200).json({
+      status: 'success',
+      data: {
+        booking: updatedBooking!.toJSON(),
+        promotedBooking: promotedBooking ? promotedBooking.toJSON() : null,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -325,7 +444,7 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
 
 export const refundBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { booking, updatedBooking } = await cancelAndRestoreInventory(req.params.id as string);
+    const { booking, updatedBooking, promotedBooking } = await cancelAndRestoreInventory(req.params.id as string, req.user?.id);
 
     await createNotificationRecord({
       userId: booking.userId,
@@ -341,7 +460,10 @@ export const refundBooking = async (req: Request, res: Response, next: NextFunct
     res.status(200).json({
       status: 'success',
       message: 'Refund processed and booking cancelled successfully',
-      data: { booking: updatedBooking!.toJSON() },
+      data: {
+        booking: updatedBooking!.toJSON(),
+        promotedBooking: promotedBooking ? promotedBooking.toJSON() : null,
+      },
     });
   } catch (error) {
     next(error);

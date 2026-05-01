@@ -41,13 +41,19 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
     }
   };
 
+  const isWaitlisted = Boolean(booking?.isWaitlisted);
+
   return (
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
           <CheckCircle size={80} color={theme.colors.success} style={{ alignSelf: 'center', marginBottom: 20 }} />
-          <Text style={styles.title}>Booking Confirmed!</Text>
-          <Text style={styles.subtitle}>Payment Successful (Mock). Your tickets have been confirmed.</Text>
+          <Text style={styles.title}>{isWaitlisted ? 'Waitlist Joined' : 'Booking Confirmed!'}</Text>
+          <Text style={styles.subtitle}>
+            {isWaitlisted
+              ? 'Event is full. You are now in the waitlist queue and will be promoted automatically when seats open.'
+              : 'Payment Successful (Mock). Your tickets have been confirmed.'}
+          </Text>
 
           {booking && (
             <GlassCard style={styles.card}>
@@ -58,6 +64,13 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
                   <>
               <Text style={styles.label}>Booking ID</Text>
               <Text style={styles.value}>{booking.id}</Text>
+
+              {booking.isWaitlisted && (
+                <>
+                  <Text style={styles.label}>Waitlist Position</Text>
+                  <Text style={styles.value}>#{booking.waitlistPosition || '-'}</Text>
+                </>
+              )}
               
               <Text style={styles.label}>Quantity</Text>
               <Text style={styles.value}>{booking.quantity}</Text>
@@ -77,8 +90,12 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
           )}
 
           <Button 
-            title="View My Bookings" 
-            onPress={() => navigation.navigate('MyBookings')} 
+            title={isWaitlisted ? 'View My Waitlist' : 'View My Bookings'}
+            onPress={() => (
+              isWaitlisted
+                ? navigation.navigate('HomeStack', { screen: 'MyWaitlist' })
+                : navigation.navigate('MyBookings')
+            )}
             style={{ marginTop: 20 }}
           />
           <Button 

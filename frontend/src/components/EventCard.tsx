@@ -15,12 +15,22 @@ interface EventCardProps {
 export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, actions }) => {
   const isCancelled = event.status === 'cancelled';
   const isPublished = event.status === 'published';
+  const moderationStatus = event.moderationStatus || 'approved';
 
   const getStatusColor = () => {
     switch (event.status) {
       case 'published': return theme.colors.success;
       case 'draft': return theme.colors.warning;
       case 'cancelled': return theme.colors.error;
+      default: return theme.colors.textMuted;
+    }
+  };
+
+  const getModerationColor = () => {
+    switch (moderationStatus) {
+      case 'approved': return theme.colors.success;
+      case 'pending': return theme.colors.warning;
+      case 'rejected': return theme.colors.error;
       default: return theme.colors.textMuted;
     }
   };
@@ -52,11 +62,21 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, act
         </View>
 
         <View style={styles.badgeRow}>
+          {event.isFeatured && (
+            <View style={[styles.metaBadge, { borderColor: theme.colors.warning, backgroundColor: `${theme.colors.warning}20` }]}>
+              <Text style={[styles.metaBadgeText, { color: theme.colors.warning }]}>FEATURED</Text>
+            </View>
+          )}
           <View style={styles.metaBadge}>
             <Text style={styles.metaBadgeText}>{(event.type || 'physical').toUpperCase()}</Text>
           </View>
           <View style={styles.metaBadge}>
             <Text style={styles.metaBadgeText}>{event.visibility.toUpperCase()}</Text>
+          </View>
+          <View style={[styles.metaBadge, { borderColor: getModerationColor() }]}>
+            <Text style={[styles.metaBadgeText, { color: getModerationColor() }]}>
+              {moderationStatus.toUpperCase()}
+            </Text>
           </View>
         </View>
 
@@ -144,6 +164,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: theme.spacing.s,
     gap: theme.spacing.s,
+    flexWrap: 'wrap',
   },
   metaBadge: {
     borderWidth: 1,
