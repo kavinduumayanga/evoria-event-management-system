@@ -3,9 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } fr
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState } from '../../../components';
+import { ScreenContainer, FormInput, PrimaryButton, SecondaryButton, LoadingState, GlassCard, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { ArrowLeft, Plus, X } from 'lucide-react-native';
+import { ArrowLeft, Plus, X, Upload, HelpCircle, Ticket, MapPin, Tag } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { EventService, UploadService, VenueService } from '../../../api/services';
 import { Event, Venue, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode } from '../../../types';
@@ -334,7 +334,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <View style={styles.form}>
         {isEditing && (
-          <View style={styles.statusRow}>
+          <GlassCard style={styles.statusCard}>
             <Text style={styles.statusLabel}>Current Status:</Text>
             <Text
               style={[
@@ -346,80 +346,82 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               {status.toUpperCase()}
             </Text>
-          </View>
+            {status === 'cancelled' && <Text style={styles.warningText}>Cancelled events cannot be edited.</Text>}
+          </GlassCard>
         )}
 
-        {isEditing && status === 'cancelled' && (
-          <Text style={styles.warningText}>Cancelled events cannot be edited.</Text>
-        )}
-
-        <Input label="Event Title *" value={title} onChangeText={setTitle} placeholder="Annual Tech Meetup" />
-        <Input
+        <FormInput label="Event Title *" value={title} onChangeText={setTitle} placeholder="Annual Tech Meetup" />
+        <FormInput
           label="Description *"
           value={description}
           onChangeText={setDescription}
           placeholder="Describe your event"
           multiline
+          numberOfLines={4}
         />
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <Input label="Date (ISO) *" value={date} onChangeText={setDate} placeholder="2026-10-15" />
+            <FormInput label="Date (ISO) *" value={date} onChangeText={setDate} placeholder="2026-10-15" />
           </View>
           <View style={styles.flexHalf}>
-            <Input label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="100" keyboardType="numeric" />
+            <FormInput label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="100" keyboardType="numeric" />
           </View>
         </View>
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <Input label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
+            <FormInput label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
           </View>
           <View style={styles.flexHalf}>
-            <Input label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
+            <FormInput label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
           </View>
         </View>
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <Input label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" />
+            <FormInput label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" />
           </View>
           <View style={styles.flexHalf}>
-            <Input label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="17:00" />
+            <FormInput label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="17:00" />
           </View>
         </View>
 
-        <Text style={styles.label}>Event Type *</Text>
-        <View style={styles.selectorContainer}>
-          {eventTypes.map((eventType) => (
-            <TouchableOpacity
-              key={eventType}
-              style={[styles.chip, type === eventType && styles.chipSelected]}
-              onPress={() => {
-                setType(eventType);
-                if (eventType === 'online') setVenueId('');
-              }}
-            >
-              <Text style={[styles.chipText, type === eventType && styles.chipTextSelected]}>
-                {eventType.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.segmentedControlSection}>
+          <Text style={styles.label}>Event Type *</Text>
+          <GlassCard style={styles.segmentedControlContainer}>
+            {eventTypes.map((eventType) => (
+              <TouchableOpacity
+                key={eventType}
+                style={[styles.segmentButton, type === eventType && styles.segmentButtonSelected]}
+                onPress={() => {
+                  setType(eventType);
+                  if (eventType === 'online') setVenueId('');
+                }}
+              >
+                <Text style={[styles.segmentButtonText, type === eventType && styles.segmentButtonTextSelected]}>
+                  {eventType.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </GlassCard>
         </View>
 
-        <Text style={styles.label}>Pricing Mode *</Text>
-        <View style={styles.selectorContainer}>
-          {pricingModes.map((modeOption) => (
-            <TouchableOpacity
-              key={modeOption}
-              style={[styles.chip, pricingMode === modeOption && styles.chipSelected]}
-              onPress={() => setPricingMode(modeOption)}
-            >
-              <Text style={[styles.chipText, pricingMode === modeOption && styles.chipTextSelected]}>
-                {modeOption.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.segmentedControlSection}>
+          <Text style={styles.label}>Pricing Mode *</Text>
+          <GlassCard style={styles.segmentedControlContainer}>
+            {pricingModes.map((modeOption) => (
+              <TouchableOpacity
+                key={modeOption}
+                style={[styles.segmentButton, pricingMode === modeOption && styles.segmentButtonSelected]}
+                onPress={() => setPricingMode(modeOption)}
+              >
+                <Text style={[styles.segmentButtonText, pricingMode === modeOption && styles.segmentButtonTextSelected]}>
+                  {modeOption.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </GlassCard>
         </View>
 
         <Text style={styles.label}>{requiresVenue ? 'Select Venue *' : 'Select Venue (Optional)'}</Text>
@@ -450,19 +452,21 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           </ScrollView>
         </View>
 
-        <Text style={styles.label}>Visibility *</Text>
-        <View style={styles.selectorContainer}>
-          {visibilityOptions.map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={[styles.chip, visibility === option && styles.chipSelected]}
-              onPress={() => setVisibility(option)}
-            >
-              <Text style={[styles.chipText, visibility === option && styles.chipTextSelected]}>
-                {option.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.segmentedControlSection}>
+          <Text style={styles.label}>Visibility *</Text>
+          <GlassCard style={styles.segmentedControlContainer}>
+            {visibilityOptions.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.segmentButton, visibility === option && styles.segmentButtonSelected]}
+                onPress={() => setVisibility(option)}
+              >
+                <Text style={[styles.segmentButtonText, visibility === option && styles.segmentButtonTextSelected]}>
+                  {option.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </GlassCard>
         </View>
 
         <Text style={styles.label}>Event Photo</Text>
@@ -477,23 +481,22 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.coverPlaceholderText}>No event photo selected</Text>
           </View>
         )}
-        <Button
+        <SecondaryButton
           title={isUploadingImage ? 'Uploading Image...' : 'Upload Event Photo'}
           onPress={handleUploadEventImage}
-          isLoading={isUploadingImage}
-          variant="outline"
+          icon={!isUploadingImage ? <Upload size={16} color={theme.colors.text} /> : undefined}
           style={styles.uploadButton}
         />
-        <Input
+        <FormInput
           label="Cover Image URL (Optional)"
           value={coverImage}
           onChangeText={setCoverImage}
           placeholder="https://example.com/image.jpg"
         />
 
-        <Text style={styles.label}>Contact Details</Text>
-        <Input label="Contact Name" value={contactName} onChangeText={setContactName} placeholder="Event support team" />
-        <Input
+        <Text style={styles.sectionTitle}>Contact Details</Text>
+        <FormInput label="Contact Name" value={contactName} onChangeText={setContactName} placeholder="Event support team" />
+        <FormInput
           label="Contact Email"
           value={contactEmail}
           onChangeText={setContactEmail}
@@ -501,17 +504,17 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           autoCapitalize="none"
           keyboardType="email-address"
         />
-        <Input label="Contact Phone" value={contactPhone} onChangeText={setContactPhone} placeholder="+94 77 123 4567" />
+        <FormInput label="Contact Phone" value={contactPhone} onChangeText={setContactPhone} placeholder="+94 77 123 4567" />
 
-        <Text style={styles.label}>Branding Colors (Optional)</Text>
-        <Input
+        <Text style={styles.sectionTitle}>Branding Colors (Optional)</Text>
+        <FormInput
           label="Primary Color"
           value={brandingPrimaryColor}
           onChangeText={setBrandingPrimaryColor}
           placeholder="#22D3EE"
           autoCapitalize="characters"
         />
-        <Input
+        <FormInput
           label="Accent Color"
           value={brandingAccentColor}
           onChangeText={setBrandingAccentColor}
@@ -523,14 +526,15 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={[styles.colorSwatch, { backgroundColor: isValidHexColor(brandingAccentColor) && brandingAccentColor.trim() ? brandingAccentColor.trim() : theme.colors.surfaceLight }]} />
         </View>
 
-        <Input
+        <FormInput
           label="Tags (comma-separated)"
           value={tagsInput}
           onChangeText={setTagsInput}
           placeholder="conference, startup, ai"
+          leftIcon={<Tag size={16} color={theme.colors.textMuted} />}
         />
         {(type === 'online' || type === 'hybrid') && (
-          <Input
+          <FormInput
             label={`Meeting Link (${type === 'hybrid' ? 'Hybrid' : 'Online'}) *`}
             value={meetingLink}
             onChangeText={setMeetingLink}
@@ -538,92 +542,105 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           />
         )}
 
-        <Text style={styles.label}>Requires Host Approval *</Text>
-        <View style={styles.selectorContainer}>
-          {[true, false].map((option) => (
-            <TouchableOpacity
-              key={option ? 'approval-on' : 'approval-off'}
-              style={[styles.chip, requiresApproval === option && styles.chipSelected]}
-              onPress={() => setRequiresApproval(option)}
-            >
-              <Text style={[styles.chipText, requiresApproval === option && styles.chipTextSelected]}>
-                {option ? 'YES' : 'NO'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.segmentedControlSection}>
+          <Text style={styles.label}>Requires Host Approval *</Text>
+          <GlassCard style={styles.segmentedControlContainer}>
+            {[true, false].map((option) => (
+              <TouchableOpacity
+                key={option ? 'approval-on' : 'approval-off'}
+                style={[styles.segmentButton, requiresApproval === option && styles.segmentButtonSelected]}
+                onPress={() => setRequiresApproval(option)}
+              >
+                <Text style={[styles.segmentButtonText, requiresApproval === option && styles.segmentButtonTextSelected]}>
+                  {option ? 'YES' : 'NO'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </GlassCard>
         </View>
 
-        <Text style={styles.label}>Priority Access Enabled *</Text>
-        <View style={styles.selectorContainer}>
-          {[true, false].map((option) => (
-            <TouchableOpacity
-              key={option ? 'priority-on' : 'priority-off'}
-              style={[styles.chip, priorityAccessEnabled === option && styles.chipSelected]}
-              onPress={() => setPriorityAccessEnabled(option)}
-            >
-              <Text style={[styles.chipText, priorityAccessEnabled === option && styles.chipTextSelected]}>
-                {option ? 'YES' : 'NO'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.segmentedControlSection}>
+          <Text style={styles.label}>Priority Access Enabled *</Text>
+          <GlassCard style={styles.segmentedControlContainer}>
+            {[true, false].map((option) => (
+              <TouchableOpacity
+                key={option ? 'priority-on' : 'priority-off'}
+                style={[styles.segmentButton, priorityAccessEnabled === option && styles.segmentButtonSelected]}
+                onPress={() => setPriorityAccessEnabled(option)}
+              >
+                <Text style={[styles.segmentButtonText, priorityAccessEnabled === option && styles.segmentButtonTextSelected]}>
+                  {option ? 'YES' : 'NO'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </GlassCard>
         </View>
 
-        <Text style={styles.label}>Custom Questions (Optional)</Text>
-        <Input
-          label="Question"
-          value={questionDraft}
-          onChangeText={setQuestionDraft}
-          placeholder="What is your t-shirt size?"
-        />
-        <View style={styles.selectorContainer}>
-          {customQuestionTypes.map((typeOption) => (
-            <TouchableOpacity
-              key={typeOption}
-              style={[styles.chip, questionType === typeOption && styles.chipSelected]}
-              onPress={() => setQuestionType(typeOption)}
-            >
-              <Text style={[styles.chipText, questionType === typeOption && styles.chipTextSelected]}>
-                {typeOption.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={styles.selectorContainer}>
-          {[true, false].map((requiredOption) => (
-            <TouchableOpacity
-              key={requiredOption ? 'required-yes' : 'required-no'}
-              style={[styles.chip, questionRequired === requiredOption && styles.chipSelected]}
-              onPress={() => setQuestionRequired(requiredOption)}
-            >
-              <Text style={[styles.chipText, questionRequired === requiredOption && styles.chipTextSelected]}>
-                {requiredOption ? 'REQUIRED' : 'OPTIONAL'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <TouchableOpacity style={styles.addQuestionButton} onPress={addCustomQuestion}>
-          <Plus size={16} color={theme.colors.text} />
-          <Text style={styles.addQuestionText}>Add Question</Text>
-        </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Custom Questions (Optional)</Text>
+        <GlassCard style={styles.customQuestionsCard}>
+          <FormInput
+            label="Question"
+            value={questionDraft}
+            onChangeText={setQuestionDraft}
+            placeholder="What is your t-shirt size?"
+            leftIcon={<HelpCircle size={16} color={theme.colors.textMuted} />}
+          />
+          <View style={styles.row}>
+            <View style={styles.segmentedControlSection}>
+              <Text style={styles.label}>Type</Text>
+              <GlassCard style={styles.segmentedControlContainer}>
+                {customQuestionTypes.map((typeOption) => (
+                  <TouchableOpacity
+                    key={typeOption}
+                    style={[styles.segmentButton, questionType === typeOption && styles.segmentButtonSelected]}
+                    onPress={() => setQuestionType(typeOption)}
+                  >
+                    <Text style={[styles.segmentButtonText, questionType === typeOption && styles.segmentButtonTextSelected]}>
+                      {typeOption.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </GlassCard>
+            </View>
+          </View>
+          <View style={styles.row}>
+            <View style={styles.segmentedControlSection}>
+              <Text style={styles.label}>Required?</Text>
+              <GlassCard style={styles.segmentedControlContainer}>
+                {[true, false].map((requiredOption) => (
+                  <TouchableOpacity
+                    key={requiredOption ? 'required-yes' : 'required-no'}
+                    style={[styles.segmentButton, questionRequired === requiredOption && styles.segmentButtonSelected]}
+                    onPress={() => setQuestionRequired(requiredOption)}
+                  >
+                    <Text style={[styles.segmentButtonText, questionRequired === requiredOption && styles.segmentButtonTextSelected]}>
+                      {requiredOption ? 'REQUIRED' : 'OPTIONAL'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </GlassCard>
+            </View>
+          </View>
+          <SecondaryButton title="Add Question" onPress={addCustomQuestion} icon={<Plus size={16} color={theme.colors.text} />} />
+        </GlassCard>
 
         {customQuestions.map((customQuestion) => (
-          <View key={customQuestion.id} style={styles.questionRow}>
+          <GlassCard key={customQuestion.id} style={styles.questionRow}>
             <View style={styles.questionInfo}>
               <Text style={styles.questionText}>{customQuestion.question}</Text>
               <Text style={styles.questionMeta}>
                 {customQuestion.type.toUpperCase()} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.removeQuestionButton}
+            <IconButton
+              icon={<X size={14} color={theme.colors.error} />}
               onPress={() => setCustomQuestions((previous) => previous.filter((item) => item.id !== customQuestion.id))}
-            >
-              <X size={14} color={theme.colors.error} />
-            </TouchableOpacity>
-          </View>
+              variant="outline"
+            />
+          </GlassCard>
         ))}
 
-        <Button
+        <PrimaryButton
           title={isEditing ? 'Save Changes' : 'Create Event'}
           onPress={handleSave}
           isLoading={isSaving}
@@ -649,6 +666,38 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
     marginLeft: 4,
     marginTop: theme.spacing.s,
+  },
+  sectionTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.text,
+    marginTop: theme.spacing.l,
+    marginBottom: theme.spacing.m,
+  },
+  segmentedControlSection: {
+    marginBottom: theme.spacing.m,
+    flex: 1,
+  },
+  segmentedControlContainer: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: theme.borderRadius.m,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.s,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.s,
+  },
+  segmentButtonSelected: {
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+  },
+  segmentButtonText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+  },
+  segmentButtonTextSelected: {
+    color: theme.colors.primaryLight,
   },
   selectorContainer: { flexDirection: 'row', marginBottom: theme.spacing.m, gap: theme.spacing.s },
   chip: {
@@ -701,37 +750,25 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   saveButton: { marginTop: theme.spacing.xl, marginBottom: theme.spacing.xxl },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.m },
-  statusLabel: { ...theme.typography.caption, color: theme.colors.textMuted, marginRight: theme.spacing.s },
-  statusValue: { ...theme.typography.caption, fontWeight: 'bold' },
-  warningText: { ...theme.typography.caption, color: theme.colors.error, marginBottom: theme.spacing.m },
-  noVenueText: { color: theme.colors.textMuted, alignSelf: 'center', marginVertical: theme.spacing.s },
-  addQuestionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.m,
-    paddingVertical: theme.spacing.s,
-    marginBottom: theme.spacing.m,
-    backgroundColor: `${theme.colors.primary}20`,
+  statusCard: {
+    padding: theme.spacing.m,
+    marginBottom: theme.spacing.l,
+    alignItems: 'flex-start',
   },
-  addQuestionText: {
-    ...theme.typography.button,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.s,
+  statusLabel: { ...theme.typography.caption, color: theme.colors.textMuted, marginRight: theme.spacing.s },
+  statusValue: { ...theme.typography.h3, fontWeight: 'bold', marginTop: theme.spacing.xs },
+  warningText: { ...theme.typography.caption, color: theme.colors.error, marginTop: theme.spacing.s },
+  noVenueText: { color: theme.colors.textMuted, alignSelf: 'center', marginVertical: theme.spacing.s },
+  customQuestionsCard: {
+    padding: theme.spacing.m,
+    marginBottom: theme.spacing.m,
   },
   questionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    padding: theme.spacing.s,
+    padding: theme.spacing.m,
     marginBottom: theme.spacing.s,
-    backgroundColor: theme.colors.surfaceLight,
   },
   questionInfo: {
     flex: 1,
@@ -743,10 +780,7 @@ const styles = StyleSheet.create({
   },
   questionMeta: {
     ...theme.typography.small,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  removeQuestionButton: {
-    padding: theme.spacing.xs,
+    color: theme.colors.primaryLight,
+    marginTop: 4,
   },
 });
