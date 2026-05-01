@@ -238,6 +238,19 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
   try {
     const validatedData = bookingSchema.parse(req.body);
     const event = await ensureBookableEvent(validatedData.eventId);
+    const existingBooking = await BookingModel.findOne({
+      userId: req.user!.id,
+      eventId: validatedData.eventId,
+      bookingStatus: { $ne: 'cancelled' },
+    }).select('_id isWaitlisted');
+
+    if (existingBooking) {
+      const message = existingBooking.isWaitlisted
+        ? 'You are already on this event waitlist'
+        : 'You are already registered for this event';
+      return next(new AppError(message, 409));
+    }
+
     const pricingMode = normalizePricingMode(event.pricingMode);
     let ticket: any;
 

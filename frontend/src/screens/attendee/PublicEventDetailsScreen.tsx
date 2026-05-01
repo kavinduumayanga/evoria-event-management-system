@@ -160,9 +160,15 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
 
       const status = response.data.registration.status;
       setRegistrationStatus(status);
+      await fetchPublicEvent();
       Alert.alert('Registration Submitted', `Your registration status is ${status.toUpperCase()}.`);
     } catch (submitError: any) {
-      Alert.alert('Registration Failed', submitError?.response?.data?.message || 'Unable to submit registration');
+      const message = submitError?.response?.data?.message || 'Unable to submit registration';
+      if (submitError?.response?.status === 409) {
+        Alert.alert('Already Registered', message);
+      } else {
+        Alert.alert('Registration Failed', message);
+      }
     } finally {
       setIsSubmittingRegistration(false);
     }
@@ -189,7 +195,11 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {event.image ? (
             <Image source={{ uri: event.image }} style={styles.coverImage} resizeMode="cover" />
           ) : (

@@ -7,8 +7,8 @@ import { AppError } from '../utils/appError';
 import { canManageEvent } from '../utils/eventPermissions';
 import { sendRegistrationStatusCommunications } from '../utils/registrationCommunication.helper';
 
-const guestStatusValues = ['pending', 'going', 'ongoing', 'checked_in', 'not_going', 'declined'] as const;
-const bulkActionValues = ['going', 'ongoing', 'not_going', 'declined', 'checkin'] as const;
+const guestStatusValues = ['pending', 'going', 'checked_in', 'not_going', 'declined'] as const;
+const bulkActionValues = ['going', 'not_going', 'declined', 'checkin'] as const;
 
 const updateGuestStatusSchema = z.object({
   status: z.enum(guestStatusValues),
@@ -18,6 +18,14 @@ const bulkActionSchema = z.object({
   action: z.enum(bulkActionValues),
   ids: z.array(z.string().trim().min(1)).min(1, 'ids must contain at least one registration id'),
 }).strict();
+
+const statusTransitions: Record<string, string[]> = {
+  pending: ['going', 'not_going', 'declined'],
+  going: ['checked_in', 'not_going', 'declined'],
+  not_going: ['going', 'declined'],
+  declined: ['pending'],
+  checked_in: [],
+};
 
 const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
@@ -47,7 +55,7 @@ const generateUniqueQrCodeValue = async (): Promise<string> => {
   throw new AppError('Failed to generate a unique QR code token', 500);
 };
 
-const shouldHaveQr = (status: string) => status === 'going' || status === 'ongoing' || status === 'checked_in';
+const shouldHaveQr = (status: string) => status === 'going' || status === 'checked_in';
 
 const escapeCsvValue = (value: string | number) => {
   const stringValue = String(value ?? '');
@@ -144,6 +152,10 @@ export const updateGuestStatus = async (req: Request, res: Response, next: NextF
       return next(new AppError(`Guest already ${status}`, 400));
     }
 
+    if (!(statusTransitions[registration.status] || []).includes(status)) {
+      return next(new AppError(`Invalid status transition from ${registration.status} to ${status}`, 400));
+    }
+
     const updatePayload: Record<string, unknown> = { status };
 
     if (shouldHaveQr(status) && !registration.qrCodeValue) {
@@ -201,7 +213,7 @@ export const getGuestQr = async (req: Request, res: Response, next: NextFunction
 
     const registration = await ensureCanManageRegistration(registrationId, req.user!.id);
     if (!shouldHaveQr(registration.status)) {
-      return next(new AppError('QR is available only for going/ongoing/checked-in guests', 400));
+      return next(new AppError('QR is available only for going/checked-in guests', 400));
     }
 
     if (!registration.qrCodeValue) {
@@ -229,6 +241,10 @@ export const markGuestCheckIn = async (req: Request, res: Response, next: NextFu
 
     if (registration.status === 'declined' || registration.status === 'not_going') {
       return next(new AppError('Declined/Not-going guests cannot be checked in', 400));
+    }
+
+    if (registration.status === 'pending') {
+      return next(new AppError('Guest must be marked going before check-in', 400));
     }
 
     if (registration.status === 'checked_in') {
@@ -273,7 +289,12 @@ export const runBulkGuestAction = async (req: Request, res: Response, next: Next
     let updated = 0;
     for (const registration of registrations) {
       if (action === 'checkin') {
-        if (registration.status === 'declined' || registration.status === 'not_going' || registration.status === 'checked_in') {
+        if (
+          registration.status === 'declined'
+          || registration.status === 'not_going'
+          || registration.status === 'checked_in'
+          || registration.status === 'pending'
+        ) {
           continue;
         }
 
@@ -286,6 +307,10 @@ export const runBulkGuestAction = async (req: Request, res: Response, next: Next
         registration.checkInMethod = 'manual';
         await registration.save();
         updated += 1;
+        continue;
+      }
+
+      if (!(statusTransitions[registration.status] || []).includes(action)) {
         continue;
       }
 

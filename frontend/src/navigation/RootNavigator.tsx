@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuthStore, initAuth } from '../store/auth.store';
@@ -12,25 +12,14 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export const RootNavigator = () => {
   const token = useAuthStore((state) => state.token);
   const isAuthLoading = useAuthStore((state) => state.isAuthLoading);
-  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-    const initializeAuth = async () => {
-      await initAuth();
-      if (isMounted) {
-        setIsAuthReady(true);
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      isMounted = false;
-    };
+    initAuth().catch((error) => {
+      console.error('Auth initialization failed', error);
+    });
   }, []);
 
-  if (!isAuthReady || isAuthLoading) {
+  if (isAuthLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
         <ActivityIndicator size="large" color={theme.colors.primary} />

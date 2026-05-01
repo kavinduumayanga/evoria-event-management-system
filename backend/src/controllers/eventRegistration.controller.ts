@@ -27,8 +27,22 @@ const publicRegistrationSchema = z.object({
 }).strict();
 
 const registrationStatusSchema = z.object({
-  status: z.enum(['pending', 'going', 'ongoing', 'checked_in', 'not_going', 'declined']),
+  status: z.enum(['pending', 'going', 'checked_in', 'not_going', 'declined']),
 }).strict();
+
+const statusTransitions: Record<string, string[]> = {
+  pending: ['going', 'not_going', 'declined'],
+  going: ['checked_in', 'not_going', 'declined'],
+  not_going: ['going', 'declined'],
+  declined: ['pending'],
+  checked_in: [],
+};
+
+const canTransitionStatus = (currentStatus: string, nextStatus: string) => {
+  return (statusTransitions[currentStatus] || []).includes(nextStatus);
+};
+
+const shouldHaveQr = (status: string) => status === 'going' || status === 'checked_in';
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
@@ -122,16 +136,23 @@ export const createPublicEventRegistration = async (req: Request, res: Response,
 
     validateCustomAnswers(eventQuestions, validatedData.customAnswers);
 
+    const requester = await resolveOptionalRequester(req);
     const normalizedEmail = normalizeEmail(validatedData.email);
-    const existing = await RegistrationModel.findOne({
-      eventId: event.id,
-      emailLower: normalizedEmail,
-    }).select('_id');
-    if (existing) {
-      return next(new AppError('This email is already registered for this event', 409));
+    const duplicateFilters: Array<Record<string, unknown>> = [
+      { eventId: event.id, emailLower: normalizedEmail },
+    ];
+
+    if (requester?.id) {
+      duplicateFilters.push({ eventId: event.id, userId: requester.id });
     }
 
-    const requester = await resolveOptionalRequester(req);
+    const existing = await RegistrationModel.findOne({ $or: duplicateFilters }).select('_id userId email');
+    if (existing) {
+      const duplicateMessage = requester?.id && String(existing.userId || '') === requester.id
+        ? 'You are already registered for this event'
+        : 'This email is already registered for this event';
+      return next(new AppError(duplicateMessage, 409));
+    }
 
     const registration = await RegistrationModel.create({
       eventId: event.id,
@@ -163,7 +184,7 @@ export const createPublicEventRegistration = async (req: Request, res: Response,
       return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
     }
     if (error?.code === 11000) {
-      return next(new AppError('This email is already registered for this event', 409));
+      return next(new AppError('A registration already exists for this event', 409));
     }
     next(error);
   }
@@ -214,9 +235,13 @@ export const updateRegistrationStatus = async (req: Request, res: Response, next
       return next(new AppError(`Registration already ${status}`, 400));
     }
 
+    if (!canTransitionStatus(registration.status, status)) {
+      return next(new AppError(`Invalid status transition from ${registration.status} to ${status}`, 400));
+    }
+
     const updatePayload: Record<string, unknown> = { status };
 
-    if ((status === 'going' || status === 'ongoing' || status === 'checked_in') && !registration.qrCodeValue) {
+    if (shouldHaveQr(status) && !registration.qrCodeValue) {
       updatePayload.qrCodeValue = await generateUniqueQrCodeValue();
     }
 

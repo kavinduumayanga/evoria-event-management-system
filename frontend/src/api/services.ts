@@ -563,7 +563,7 @@ export const GuestService = {
     const response = await apiClient.patch(`/guests/${id}/checkin`);
     return response.data;
   },
-  bulkAction: async (payload: { action: 'going' | 'ongoing' | 'not_going' | 'declined' | 'checkin'; ids: string[] }) => {
+  bulkAction: async (payload: { action: 'going' | 'not_going' | 'declined' | 'checkin'; ids: string[] }) => {
     const response = await apiClient.post('/guests/bulk-action', payload);
     return response.data;
   },
