@@ -11,6 +11,9 @@ export type PromoDiscountType = 'percentage' | 'fixed';
 export type VenueType = 'physical' | 'online' | 'hybrid';
 export type SessionStatus = 'scheduled' | 'cancelled' | 'completed';
 export type CustomQuestionType = 'text' | 'number' | 'choice';
+export type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
+export type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
+export type NotificationStatus = 'sent' | 'scheduled' | 'failed';
 
 export interface EventCustomQuestion {
   id: string;
@@ -96,8 +99,30 @@ export interface Booking {
   rsvpStatus: RsvpStatus;
   approvalStatus: ApprovalStatus;
   checkInStatus: CheckInStatus;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
+  checkInMethod?: 'qr' | 'manual' | null;
+  qrCodeValue?: string;
+  attendanceNote?: string;
   customAnswers: RegistrationAnswer[];
   registrationType: RegistrationType;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  eventId?: string | null;
+  title: string;
+  message: string;
+  type: NotificationType;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  isRead: boolean;
+  scheduledAt?: string | null;
+  sentAt?: string | null;
+  createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }

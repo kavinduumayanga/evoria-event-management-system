@@ -13,6 +13,11 @@ const bookingSchema = new Schema({
   rsvpStatus: { type: String, enum: ['going', 'not_going'], default: 'going' },
   approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
   checkInStatus: { type: String, enum: ['not_checked_in', 'checked_in'], default: 'not_checked_in' },
+  checkedInAt: { type: Date, default: null },
+  checkedInBy: { type: String, default: null },
+  checkInMethod: { type: String, enum: ['qr', 'manual', null], default: null },
+  qrCodeValue: { type: String, trim: true },
+  attendanceNote: { type: String, trim: true },
   customAnswers: {
     type: [{
       questionId: { type: String, required: true, trim: true },
@@ -32,5 +37,7 @@ const bookingSchema = new Schema({
     }
   }
 });
+
+bookingSchema.index({ qrCodeValue: 1 }, { unique: true, sparse: true });
 
 export const BookingModel = mongoose.model('Booking', bookingSchema);

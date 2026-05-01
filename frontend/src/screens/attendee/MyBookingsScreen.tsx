@@ -4,9 +4,15 @@ import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState } fr
 import { theme } from '../../constants/theme';
 import { RegistrationService } from '../../api/services';
 import { Booking } from '../../types';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { AttendeeTabParamList } from '../../types/navigation';
+import { QrCode } from 'lucide-react-native';
+
+type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyBookings'>;
 
 export const MyBookingsScreen = () => {
+  const navigation = useNavigation<AttendeeTabNavigationProp>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,19 +69,36 @@ export const MyBookingsScreen = () => {
           <BookingCard
             booking={item}
             actions={
-              <View style={styles.rsvpActions}>
-                <TouchableOpacity
-                  style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'going' && styles.rsvpButtonActive]}
-                  onPress={() => handleRsvpUpdate(item.id, 'going')}
-                >
-                  <Text style={styles.rsvpButtonText}>Going</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'not_going' && styles.rsvpButtonActive]}
-                  onPress={() => handleRsvpUpdate(item.id, 'not_going')}
-                >
-                  <Text style={styles.rsvpButtonText}>Not Going</Text>
-                </TouchableOpacity>
+              <View style={styles.actionsWrapper}>
+                <View style={styles.rsvpActions}>
+                  <TouchableOpacity
+                    style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'going' && styles.rsvpButtonActive]}
+                    onPress={() => handleRsvpUpdate(item.id, 'going')}
+                  >
+                    <Text style={styles.rsvpButtonText}>Going</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.rsvpButton, (item.rsvpStatus || 'going') === 'not_going' && styles.rsvpButtonActive]}
+                    onPress={() => handleRsvpUpdate(item.id, 'not_going')}
+                  >
+                    <Text style={styles.rsvpButtonText}>Not Going</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {item.bookingStatus === 'confirmed' && (
+                  <TouchableOpacity
+                    style={styles.qrBtn}
+                    onPress={() =>
+                      navigation.navigate('HomeStack', {
+                        screen: 'MyTicketQR',
+                        params: { bookingId: item.id },
+                      })
+                    }
+                  >
+                    <QrCode size={16} color={theme.colors.primaryLight} />
+                    <Text style={styles.qrBtnText}>View QR</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             }
           />
@@ -108,6 +131,10 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xxl,
     flexGrow: 1,
   },
+  actionsWrapper: {
+    width: '100%',
+    gap: theme.spacing.s,
+  },
   rsvpActions: {
     flexDirection: 'row',
     gap: theme.spacing.s,
@@ -130,5 +157,22 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.text,
     fontWeight: '600',
+  },
+  qrBtn: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.s,
+    paddingVertical: theme.spacing.s,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    backgroundColor: 'rgba(139, 92, 246, 0.12)',
+  },
+  qrBtnText: {
+    ...theme.typography.caption,
+    color: theme.colors.primaryLight,
+    fontWeight: '700',
   },
 });
