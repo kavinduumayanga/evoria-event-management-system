@@ -118,6 +118,18 @@ export const createRegistration = async (req: Request, res: Response, next: Next
 
     validateCustomAnswers(eventQuestions, validatedData.customAnswers);
 
+    const existingRegistration = await BookingModel.findOne({
+      userId: req.user!.id,
+      eventId: validatedData.eventId,
+      bookingStatus: { $ne: 'cancelled' },
+    }).select('_id isWaitlisted');
+    if (existingRegistration) {
+      const message = existingRegistration.isWaitlisted
+        ? 'You are already on this event waitlist'
+        : 'You are already registered for this event';
+      return next(new AppError(message, 409));
+    }
+
     const eventAtCapacity = await isEventAtCapacityForQuantity(validatedData.eventId, validatedData.quantity);
     if (!eventAtCapacity) {
       validateTicketAvailability(ticket as any, validatedData.quantity);

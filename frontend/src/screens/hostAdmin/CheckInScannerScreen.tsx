@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -33,7 +33,7 @@ interface AttendanceRecord {
 
 interface RecentScanRecord {
   id: string;
-  status: 'success' | 'duplicate' | 'invalid';
+  status: 'success' | 'duplicate' | 'invalid' | 'declined' | 'cancelled';
   message: string;
 }
 
@@ -63,9 +63,11 @@ export const CheckInScannerScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [manualNote, setManualNote] = useState('');
   const [manualRegistrationId, setManualRegistrationId] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
+  const lastScanRef = useRef<{ value: string; scannedAt: number } | null>(null);
 
   const fetchAttendance = useCallback(async (eventId: string) => {
     if (!eventId) return;
@@ -118,12 +120,14 @@ export const CheckInScannerScreen = () => {
 
     if (!permission?.granted) {
       const result = await requestPermission();
+      setHasCameraPermission(result.granted);
       if (!result.granted) {
-        Alert.alert('Camera Permission', 'Camera permission is required to scan QR codes.');
+        setIsScannerOpen(true);
         return;
       }
     }
 
+    setHasCameraPermission(true);
     setIsScannerOpen(true);
   };
 
@@ -136,20 +140,37 @@ export const CheckInScannerScreen = () => {
 
   const handleScan = async (result: BarcodeScanningResult) => {
     if (isProcessingScan) return;
+    const qrCodeValue = String(result.data || '').trim();
+    if (!qrCodeValue) return;
+
+    const now = Date.now();
+    const lastScan = lastScanRef.current;
+    if (lastScan && lastScan.value === qrCodeValue && (now - lastScan.scannedAt) < 3500) {
+      return;
+    }
+
+    lastScanRef.current = { value: qrCodeValue, scannedAt: now };
 
     try {
       setIsProcessingScan(true);
-      const response = await CheckInService.scanQr(result.data);
+      const response = await CheckInService.scanQr(qrCodeValue);
       pushRecentScan('success', response.message || 'Check-in successful');
       Alert.alert('Success', response.message || 'Check-in successful');
       await fetchAttendance(selectedEventId);
     } catch (scanError: any) {
       const statusCode = scanError?.response?.status;
       const message = scanError?.response?.data?.message || 'Invalid QR code';
+      const responseStatus = String(scanError?.response?.data?.status || '').toLowerCase();
 
-      if (statusCode === 409 || scanError?.response?.data?.status === 'duplicate') {
+      if (statusCode === 409 || responseStatus === 'duplicate') {
         pushRecentScan('duplicate', message);
         Alert.alert('Duplicate', message);
+      } else if (responseStatus === 'declined' || /declined|not-going/i.test(message)) {
+        pushRecentScan('declined', message);
+        Alert.alert('Declined', message);
+      } else if (responseStatus === 'cancelled' || /cancelled/i.test(message)) {
+        pushRecentScan('cancelled', message);
+        Alert.alert('Cancelled', message);
       } else {
         pushRecentScan('invalid', message);
         Alert.alert('Invalid QR', message);
@@ -157,7 +178,7 @@ export const CheckInScannerScreen = () => {
     } finally {
       setTimeout(() => {
         setIsProcessingScan(false);
-      }, 1000);
+      }, 900);
     }
   };
 
@@ -207,6 +228,7 @@ export const CheckInScannerScreen = () => {
                 style={[styles.eventChip, isSelected && styles.eventChipSelected]}
                 onPress={async () => {
                   setSelectedEventId(item.id);
+                  lastScanRef.current = null;
                   await fetchAttendance(item.id);
                 }}
               >
@@ -236,16 +258,25 @@ export const CheckInScannerScreen = () => {
 
       {isScannerOpen && (
         <GlassCard style={styles.cameraWrap}>
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onBarcodeScanned={isProcessingScan ? undefined : handleScan}
-          />
-          <View style={styles.scanHint}>
-            <QrCode size={14} color={theme.colors.primaryLight} />
-            <Text style={styles.scanHintText}>Align guest QR code inside camera view</Text>
-          </View>
+          {!permission?.granted || hasCameraPermission === false ? (
+            <View style={styles.permissionFallback}>
+              <Text style={styles.permissionText}>Camera access is required to scan QR codes.</Text>
+              <Button title="Grant Camera Access" onPress={openScanner} />
+            </View>
+          ) : (
+            <>
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={isProcessingScan ? undefined : handleScan}
+              />
+              <View style={styles.scanHint}>
+                <QrCode size={14} color={theme.colors.primaryLight} />
+                <Text style={styles.scanHintText}>Align guest QR code inside camera view</Text>
+              </View>
+            </>
+          )}
         </GlassCard>
       )}
 
@@ -312,7 +343,9 @@ export const CheckInScannerScreen = () => {
                   ? theme.colors.success
                   : scan.status === 'duplicate'
                     ? theme.colors.warning
-                    : theme.colors.error;
+                    : scan.status === 'declined' || scan.status === 'cancelled'
+                      ? theme.colors.secondary
+                      : theme.colors.error;
                 return (
                   <View key={scan.id} style={styles.recentRow}>
                     <Text style={[styles.recentStatus, { color }]}>{scan.status.toUpperCase()}</Text>
@@ -426,6 +459,14 @@ const styles = StyleSheet.create({
     gap: theme.spacing.s,
   },
   scanHintText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  permissionFallback: {
+    padding: theme.spacing.m,
+    gap: theme.spacing.s,
+  },
+  permissionText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
   },

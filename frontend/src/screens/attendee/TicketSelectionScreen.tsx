@@ -140,7 +140,12 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
 
       navigation.navigate('BookingConfirmation', { bookingId: booking.id });
     } catch (registrationError: any) {
-      Alert.alert('Registration Failed', registrationError?.response?.data?.message || 'Unable to register for this free event.');
+      const message = registrationError?.response?.data?.message || 'Unable to register for this free event.';
+      if (registrationError?.response?.status === 409) {
+        Alert.alert('Already Registered', message);
+      } else {
+        Alert.alert('Registration Failed', message);
+      }
     } finally {
       setIsBooking(false);
     }
@@ -181,7 +186,12 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
         );
         navigation.navigate('BookingConfirmation', { bookingId: response.data.booking.id });
       } catch (waitlistError: any) {
-        Alert.alert('Waitlist Failed', waitlistError.response?.data?.message || 'Unable to join waitlist');
+        const message = waitlistError?.response?.data?.message || 'Unable to join waitlist';
+        if (waitlistError?.response?.status === 409) {
+          Alert.alert('Already Registered', message);
+        } else {
+          Alert.alert('Waitlist Failed', message);
+        }
       } finally {
         setIsBooking(false);
       }
@@ -199,7 +209,12 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
         });
         navigation.navigate('BookingConfirmation', { bookingId: response.data.booking.id });
       } catch (bookingError: any) {
-        Alert.alert('Booking Failed', bookingError.response?.data?.message || 'Unable to confirm booking');
+        const message = bookingError?.response?.data?.message || 'Unable to confirm booking';
+        if (bookingError?.response?.status === 409) {
+          Alert.alert('Already Registered', message);
+        } else {
+          Alert.alert('Booking Failed', message);
+        }
       } finally {
         setIsBooking(false);
       }
@@ -231,7 +246,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
             <Text style={styles.headerTitle}>Free Registration</Text>
           </View>
 
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             {error && <Text style={styles.errorText}>{error}</Text>}
             <GlassCard style={styles.ticketCard} variant="dark">
               <Text style={styles.ticketName}>{event?.title || 'Event'}</Text>
@@ -270,7 +285,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
           <Text style={styles.headerTitle}>Select Ticket</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {error && <Text style={styles.errorText}>{error}</Text>}
 
         {tickets.map((ticket) => {

@@ -29,8 +29,8 @@ interface AuthState {
   updateUser: (user: Partial<User>) => Promise<void>;
 }
 
-const AUTH_TOKEN_KEY = 'auth_token';
-const AUTH_USER_KEY = 'user';
+export const AUTH_TOKEN_KEY = 'auth_token';
+export const AUTH_USER_KEY = 'user';
 
 const setAuthState = (partial: Pick<AuthState, 'user' | 'token' | 'isLoading' | 'isAuthLoading'>) => {
   const current = useAuthStore.getState();
@@ -78,6 +78,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 let initAuthPromise: Promise<void> | null = null;
 let hasInitializedAuth = false;
+
+export const getPersistedAuthToken = async () => AsyncStorage.getItem(AUTH_TOKEN_KEY);
 
 // Initialize auth state
 export const initAuth = async () => {
@@ -142,4 +144,9 @@ export const initAuth = async () => {
   })();
 
   return initAuthPromise;
+};
+
+export const waitForAuthInitialization = async () => {
+  if (hasInitializedAuth) return;
+  await initAuth();
 };

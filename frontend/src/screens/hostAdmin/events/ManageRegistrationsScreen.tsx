@@ -23,7 +23,6 @@ const statusOptions: FilterStatus[] = [
   'all',
   'pending',
   'going',
-  'ongoing',
   'checked_in',
   'not_going',
   'declined',
@@ -35,8 +34,6 @@ const getStatusColor = (status: string) => {
       return theme.colors.success;
     case 'going':
       return theme.colors.primaryLight;
-    case 'ongoing':
-      return theme.colors.secondary;
     case 'pending':
       return theme.colors.warning;
     case 'declined':
@@ -172,9 +169,6 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
                 <TouchableOpacity style={[styles.actionBtn, styles.goingAction]} onPress={() => setGuestStatus(item.id, 'going')}>
                   <Text style={[styles.actionText, { color: theme.colors.primaryLight }]}>Going</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.ongoingAction]} onPress={() => setGuestStatus(item.id, 'ongoing')}>
-                  <Text style={[styles.actionText, { color: theme.colors.secondary }]}>Ongoing</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={[styles.actionBtn, styles.notGoingAction]} onPress={() => setGuestStatus(item.id, 'not_going')}>
                   <Text style={[styles.actionText, { color: theme.colors.textMuted }]}>Not Going</Text>
                 </TouchableOpacity>
@@ -296,10 +290,6 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primaryLight,
     backgroundColor: `${theme.colors.primaryLight}1A`,
   },
-  ongoingAction: {
-    borderColor: theme.colors.secondary,
-    backgroundColor: `${theme.colors.secondary}1A`,
-  },
   notGoingAction: {
     borderColor: theme.colors.border,
     backgroundColor: `${theme.colors.surfaceLight}66`,
@@ -318,4 +308,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
