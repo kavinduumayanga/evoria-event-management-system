@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -6,9 +6,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
 import { ArrowLeft, Calendar as CalendarIcon, Clock, Link as LinkIcon, Mail, MapPin, Phone, Share2 } from 'lucide-react-native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { Button, ErrorState, GlassCard, LoadingState, ScreenContainer } from '../../components';
-import { EventService, PublicEventDetails } from '../../api/services';
+import { Button, ErrorState, GlassCard, Input, LoadingState, ScreenContainer } from '../../components';
+import { EventService, PublicEventDetails, RegistrationService } from '../../api/services';
 import { theme } from '../../constants/theme';
+import { useAuthStore } from '../../store/auth.store';
 
 type PublicEventNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
 type PublicEventRouteProp = RouteProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
@@ -20,9 +21,18 @@ interface Props {
 
 export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { slug } = route.params;
+  const currentUser = useAuthStore((state) => state.user);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [publicData, setPublicData] = useState<PublicEventDetails | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [nic, setNic] = useState('');
+  const [customAnswerMap, setCustomAnswerMap] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
+  const [isSubmittingRegistration, setIsSubmittingRegistration] = useState(false);
 
   const fetchPublicEvent = async () => {
     try {
@@ -46,6 +56,21 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const event = publicData?.event;
   const sessions = publicData?.agenda.sessions || [];
   const tickets = publicData?.tickets || [];
+  const registrationQuestions = publicData?.registrationFields?.customQuestions || [];
+  const isLoggedIn = Boolean(currentUser?.id);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    setName((previous) => previous || currentUser.name || '');
+    setEmail((previous) => previous || currentUser.email || '');
+    setMobile((previous) => previous || currentUser.phone || '');
+  }, [currentUser]);
+
+  const requiredQuestionIds = useMemo(
+    () => new Set(registrationQuestions.filter((question) => question.required).map((question) => question.id)),
+    [registrationQuestions],
+  );
 
   const handleShare = async () => {
     if (!event?.publicUrl) return;
@@ -86,6 +111,61 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
     }
 
     Alert.alert('Contact unavailable', 'No valid host contact method is available.');
+  };
+
+  const validateRegistrationForm = () => {
+    const nextErrors: Record<string, string> = {};
+
+    if (!name.trim()) nextErrors.name = 'Name is required';
+    if (!email.trim()) nextErrors.email = 'Email is required';
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      nextErrors.email = 'Please enter a valid email address';
+    }
+    if (!mobile.trim()) nextErrors.mobile = 'Mobile is required';
+    if (!nic.trim()) nextErrors.nic = 'NIC is required';
+
+    for (const question of registrationQuestions) {
+      if (!requiredQuestionIds.has(question.id)) continue;
+      const answer = customAnswerMap[question.id] || '';
+      if (!answer.trim()) {
+        nextErrors[`q_${question.id}`] = 'This question is required';
+      }
+    }
+
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmitRegistration = async () => {
+    if (!event) return;
+    if (!validateRegistrationForm()) return;
+
+    try {
+      setIsSubmittingRegistration(true);
+
+      const customAnswers = registrationQuestions
+        .map((question) => ({
+          questionId: question.id,
+          answer: (customAnswerMap[question.id] || '').trim(),
+        }))
+        .filter((answer) => answer.answer.length > 0);
+
+      const response = await RegistrationService.submitPublicRegistration(event.publicSlug, {
+        name: name.trim(),
+        email: email.trim(),
+        mobile: mobile.trim(),
+        nic: nic.trim(),
+        customAnswers,
+      });
+
+      const status = response.data.registration.status;
+      setRegistrationStatus(status);
+      Alert.alert('Registration Submitted', `Your registration status is ${status.toUpperCase()}.`);
+    } catch (submitError: any) {
+      Alert.alert('Registration Failed', submitError?.response?.data?.message || 'Unable to submit registration');
+    } finally {
+      setIsSubmittingRegistration(false);
+    }
   };
 
   if (isLoading) return <LoadingState />;
@@ -194,13 +274,57 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                 <Text style={styles.sectionText}>No active tickets available.</Text>
               )}
             </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Event Registration</Text>
+              <Input label="Name *" value={name} onChangeText={setName} placeholder="Your full name" error={formErrors.name} />
+              <Input
+                label="Email *"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                error={formErrors.email}
+              />
+              <Input label="Mobile *" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" error={formErrors.mobile} />
+              <Input label="NIC *" value={nic} onChangeText={setNic} placeholder="200012345678" error={formErrors.nic} />
+
+              {registrationQuestions.map((question) => (
+                <Input
+                  key={question.id}
+                  label={`${question.question}${question.required ? ' *' : ''}`}
+                  value={customAnswerMap[question.id] || ''}
+                  onChangeText={(value) => {
+                    setCustomAnswerMap((previous) => ({ ...previous, [question.id]: value }));
+                    setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
+                  }}
+                  placeholder={question.type === 'number' ? 'Enter a number' : 'Your answer'}
+                  keyboardType={question.type === 'number' ? 'numeric' : 'default'}
+                  error={formErrors[`q_${question.id}`]}
+                />
+              ))}
+
+              {registrationStatus ? (
+                <GlassCard style={styles.statusCard}>
+                  <Text style={styles.statusTitle}>Registration Status</Text>
+                  <Text style={styles.statusText}>{registrationStatus.toUpperCase()}</Text>
+                </GlassCard>
+              ) : null}
+
+              <Button
+                title="Submit Registration"
+                onPress={handleSubmitRegistration}
+                isLoading={isSubmittingRegistration}
+              />
+            </View>
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
           <Button
-            title={isSoldOut ? 'Sold Out' : 'Register'}
-            disabled={isSoldOut}
+            title={isLoggedIn ? (isSoldOut ? 'Sold Out' : 'Book Tickets') : 'Login To Book Tickets'}
+            disabled={isSoldOut || !isLoggedIn}
             onPress={() => navigation.navigate('TicketSelection', { eventId: event.id })}
           />
         </View>
@@ -337,5 +461,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: 'rgba(9, 9, 11, 0.92)',
+  },
+  statusCard: {
+    marginBottom: theme.spacing.m,
+    padding: theme.spacing.m,
+  },
+  statusTitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: 2,
+  },
+  statusText: {
+    ...theme.typography.h3,
+    color: theme.colors.success,
   },
 });

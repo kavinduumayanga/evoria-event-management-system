@@ -1,5 +1,16 @@
 import apiClient from './client';
-import { Event, Booking, Venue, Session, TicketType, RegistrationAnswer, RsvpStatus } from '../types';
+import {
+  Event,
+  Booking,
+  Venue,
+  Session,
+  TicketType,
+  RegistrationAnswer,
+  RsvpStatus,
+  EventRegistration,
+  EventRegistrationStatus,
+  EventCustomQuestion,
+} from '../types';
 import { API_URL } from '../constants/api';
 
 export interface RegisterPayload {
@@ -39,6 +50,14 @@ export interface CreateRegistrationPayload {
   ticketTypeId: string;
   quantity: number;
   rsvpStatus?: RsvpStatus;
+  customAnswers?: RegistrationAnswer[];
+}
+
+export interface PublicEventRegistrationPayload {
+  name: string;
+  email: string;
+  mobile: string;
+  nic: string;
   customAnswers?: RegistrationAnswer[];
 }
 
@@ -195,6 +214,14 @@ export interface PublicEventDetails {
     soldCount: number;
     maxPerUser: number;
   }>;
+  registrationFields: {
+    defaultFields: Array<{
+      key: 'name' | 'email' | 'mobile' | 'nic';
+      label: string;
+      required: boolean;
+    }>;
+    customQuestions: EventCustomQuestion[];
+  };
   visibilityInfo: {
     visibility: 'public' | 'private' | 'unlisted';
     discoveryVisible: boolean;
@@ -290,6 +317,10 @@ export const EventService = {
     const response = await apiClient.patch(`/events/${id}/visibility`, { visibility });
     return response.data;
   },
+  updateRegistrationFields: async (eventId: string, customQuestions: EventCustomQuestion[]) => {
+    const response = await apiClient.patch(`/events/${eventId}/registration-fields`, { customQuestions });
+    return response.data;
+  },
   addEventAdmin: async (id: string, payload: AddEventAdminPayload) => {
     const response = await apiClient.post(`/events/${id}/admins`, payload);
     return response.data;
@@ -370,6 +401,10 @@ export const PaymentService = {
 };
 
 export const RegistrationService = {
+  submitPublicRegistration: async (slug: string, payload: PublicEventRegistrationPayload) => {
+    const response = await apiClient.post(`/public/events/${slug}/register`, payload);
+    return response.data as { status: string; data: { registration: EventRegistration } };
+  },
   createRegistration: async (payload: CreateRegistrationPayload) => {
     const response = await apiClient.post('/registrations', payload);
     return response.data;
@@ -378,9 +413,17 @@ export const RegistrationService = {
     const response = await apiClient.get('/registrations/my');
     return response.data;
   },
+  getEventRegistrationsV2: async (eventId: string) => {
+    const response = await apiClient.get(`/events/${eventId}/registrations`);
+    return response.data as { status: string; results: number; data: { registrations: EventRegistration[] } };
+  },
   getEventRegistrations: async (eventId: string) => {
     const response = await apiClient.get(`/registrations/event/${eventId}`);
     return response.data;
+  },
+  updateRegistrationStatus: async (registrationId: string, status: EventRegistrationStatus) => {
+    const response = await apiClient.patch(`/registrations/${registrationId}/status`, { status });
+    return response.data as { status: string; data: { registration: EventRegistration } };
   },
   updateRsvp: async (registrationId: string, rsvpStatus: RsvpStatus) => {
     const response = await apiClient.patch(`/registrations/${registrationId}/rsvp`, { rsvpStatus });

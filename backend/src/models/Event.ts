@@ -1,6 +1,13 @@
 import mongoose, { Schema } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
+const customQuestionSchema = new Schema({
+  id: { type: String, required: true, trim: true },
+  question: { type: String, required: true, trim: true },
+  type: { type: String, enum: ['text', 'number', 'choice'], required: true },
+  required: { type: Boolean, default: false },
+}, { _id: false });
+
 const eventSchema = new Schema({
   _id: { type: String, default: uuidv4 },
   title: { type: String, required: true, trim: true },
@@ -35,13 +42,17 @@ const eventSchema = new Schema({
   visibility: { type: String, enum: ['public', 'private', 'unlisted'], default: 'public' },
   requiresApproval: { type: Boolean, default: false },
   customQuestions: {
-    type: [{
-      id: { type: String, required: true, trim: true },
-      question: { type: String, required: true, trim: true },
-      type: { type: String, enum: ['text', 'number', 'choice'], required: true },
-      required: { type: Boolean, default: false },
-    }],
+    type: [customQuestionSchema],
     default: [],
+  },
+  registrationFields: {
+    type: new Schema({
+      customQuestions: {
+        type: [customQuestionSchema],
+        default: [],
+      },
+    }, { _id: false }),
+    default: () => ({ customQuestions: [] }),
   },
 }, {
   timestamps: true,
