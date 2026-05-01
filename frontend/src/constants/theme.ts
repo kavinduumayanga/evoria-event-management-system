@@ -1,18 +1,18 @@
 export const theme = {
   colors: {
-    background: '#09090b', // Deep dark
-    surface: '#18181b', // Slightly lighter dark
-    surfaceLight: '#27272a',
-    primary: '#8b5cf6', // Neon purple
-    primaryLight: '#a78bfa',
-    secondary: '#3b82f6', // Neon blue
-    accent: '#ec4899', // Neon pink
-    text: '#f8fafc',
-    textMuted: '#94a3b8',
-    border: '#27272a',
-    error: '#ef4444',
-    success: '#10b981',
-    warning: '#f59e0b',
+    background: '#09090B', // Deepest dark
+    surface: '#121214', // Elevated dark
+    surfaceLight: '#1E1E20', // Higher elevation
+    primary: '#E5E5E5', // Premium Off-White for contrast
+    primaryLight: '#FFFFFF',
+    secondary: '#38BDF8', // Icy blue for subtle accents
+    accent: '#818CF8', // Muted violet
+    text: '#FAFAFA', // Soft white
+    textMuted: '#A1A1AA', // Zinc 400
+    border: 'rgba(255, 255, 255, 0.08)', // Ultra-subtle border
+    error: '#F87171', // Soft red
+    success: '#34D399', // Soft emerald
+    warning: '#FBBF24', // Soft amber
   },
   spacing: {
     xs: 4,
@@ -23,42 +23,42 @@ export const theme = {
     xxl: 48,
   },
   borderRadius: {
-    s: 4,
-    m: 8,
-    l: 16,
-    xl: 24,
+    s: 6,
+    m: 12,
+    l: 20,
+    xl: 28,
     round: 9999,
   },
   typography: {
-    h1: { fontSize: 32, fontWeight: 'bold' as const },
-    h2: { fontSize: 24, fontWeight: 'bold' as const },
-    h3: { fontSize: 20, fontWeight: '600' as const },
-    body: { fontSize: 16, fontWeight: 'normal' as const },
-    caption: { fontSize: 14, fontWeight: 'normal' as const },
-    small: { fontSize: 12, fontWeight: 'normal' as const },
-    button: { fontSize: 16, fontWeight: '600' as const },
+    h1: { fontSize: 34, fontWeight: '800' as const, letterSpacing: -1 },
+    h2: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.5 },
+    h3: { fontSize: 22, fontWeight: '600' as const, letterSpacing: -0.3 },
+    body: { fontSize: 16, fontWeight: '400' as const, letterSpacing: 0.2, lineHeight: 24 },
+    caption: { fontSize: 14, fontWeight: '400' as const, letterSpacing: 0.3 },
+    small: { fontSize: 12, fontWeight: '500' as const, letterSpacing: 0.5 },
+    button: { fontSize: 16, fontWeight: '600' as const, letterSpacing: 0.5 },
   },
   shadows: {
-    neon: {
-      shadowColor: '#8b5cf6',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 10,
-      elevation: 8,
-    },
-    neonBlue: {
-      shadowColor: '#3b82f6',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 10,
-      elevation: 8,
+    premium: {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 16,
+      elevation: 10,
     },
     subtle: {
-      shadowColor: '#000',
+      shadowColor: '#000000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    glow: {
+      shadowColor: '#FFFFFF',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 4,
     },
   },
 };

@@ -48,12 +48,12 @@ const styles = StyleSheet.create({
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: theme.colors.surfaceLight,
     paddingVertical: theme.spacing.s,
     paddingHorizontal: theme.spacing.l,
     borderRadius: theme.borderRadius.round,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: theme.colors.border,
   },
   retryIcon: {
     marginRight: theme.spacing.s,

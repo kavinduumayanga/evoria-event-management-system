@@ -16,7 +16,7 @@ export const NeonCard: React.FC<NeonCardProps> = ({
   accentColor = theme.colors.primary 
 }) => {
   const CardContent = (
-    <View style={[styles.cardContainer, style, { shadowColor: accentColor }]}>
+    <View style={[styles.cardContainer, style]}>
       <View style={styles.blurContainer}>
         {children}
       </View>
@@ -38,13 +38,10 @@ const styles = StyleSheet.create({
   cardContainer: {
     borderRadius: theme.borderRadius.l,
     overflow: 'hidden',
-    backgroundColor: 'rgba(20, 20, 30, 0.7)',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    borderColor: theme.colors.border,
+    ...theme.shadows.subtle,
   },
   blurContainer: {
     padding: theme.spacing.m,

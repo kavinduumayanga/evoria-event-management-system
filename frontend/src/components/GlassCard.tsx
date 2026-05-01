@@ -16,17 +16,17 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 }) => {
   const getBackgroundColor = () => {
     switch (variant) {
-      case 'light': return 'rgba(39, 39, 42, 0.7)'; // surfaceLight with opacity
-      case 'neon': return 'rgba(139, 92, 246, 0.15)'; // primary with opacity
+      case 'light': return 'rgba(30, 30, 32, 0.7)'; // surfaceLight with opacity
+      case 'neon': return 'rgba(56, 189, 248, 0.1)'; // secondary with opacity
       case 'dark':
-      default: return 'rgba(24, 24, 27, 0.7)'; // surface with opacity
+      default: return 'rgba(18, 18, 20, 0.7)'; // surface with opacity
     }
   };
 
   const getBorderColor = () => {
     switch (variant) {
-      case 'neon': return 'rgba(139, 92, 246, 0.3)';
-      default: return 'rgba(255, 255, 255, 0.05)';
+      case 'neon': return 'rgba(56, 189, 248, 0.3)';
+      default: return theme.colors.border;
     }
   };
 
@@ -38,7 +38,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
         },
-        variant === 'neon' ? theme.shadows.neon : {},
+        variant === 'neon' ? theme.shadows.glow : {},
         style,
       ]}
       {...props}
