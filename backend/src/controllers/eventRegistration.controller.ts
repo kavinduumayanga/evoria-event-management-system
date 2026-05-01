@@ -7,8 +7,11 @@ import { EventModel } from '../models/Event';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
 import { canManageEvent } from '../utils/eventPermissions';
-import { createNotificationsForUsers } from '../utils/notification.helper';
 import { getEventRegistrationQuestions } from '../utils/eventRegistrationFields';
+import {
+  sendPendingRegistrationCommunications,
+  sendRegistrationStatusCommunications,
+} from '../utils/registrationCommunication.helper';
 
 const registrationAnswerSchema = z.object({
   questionId: z.string().trim().min(1, 'questionId is required'),
@@ -37,18 +40,6 @@ const generateUniqueQrCodeValue = async (): Promise<string> => {
   }
 
   throw new AppError('Failed to generate a unique QR code token', 500);
-};
-
-const resolveOwnerId = (event: any): string => {
-  const ownerId = typeof event?.ownerId === 'string' ? event.ownerId.trim() : '';
-  if (ownerId) return ownerId;
-  return typeof event?.hostAdminId === 'string' ? event.hostAdminId.trim() : '';
-};
-
-const resolveEventManagerIds = (event: any): string[] => {
-  const ownerId = resolveOwnerId(event);
-  const adminIds = Array.isArray(event?.adminIds) ? event.adminIds : [];
-  return Array.from(new Set([ownerId, ...adminIds.map((id: string) => String(id || '').trim())].filter(Boolean)));
 };
 
 const resolveOptionalRequester = async (req: Request): Promise<{ id: string } | null> => {
@@ -159,18 +150,7 @@ export const createPublicEventRegistration = async (req: Request, res: Response,
       registeredAt: new Date(),
     });
 
-    const managerIds = resolveEventManagerIds(event);
-    if (managerIds.length > 0) {
-      await createNotificationsForUsers(managerIds, {
-        eventId: event.id,
-        title: 'New Registration',
-        message: `${registration.name} (${registration.email}) submitted a registration for ${event.title}.`,
-        type: 'booking',
-        channel: 'in_app',
-        status: 'sent',
-        sentAt: new Date(),
-      });
-    }
+    await sendPendingRegistrationCommunications(req, event, registration);
 
     res.status(201).json({
       status: 'success',
@@ -257,11 +237,20 @@ export const updateRegistrationStatus = async (req: Request, res: Response, next
       updatePayload,
       { new: true },
     );
+    if (!updatedRegistration) return next(new AppError('Registration not found after update', 404));
+
+    await sendRegistrationStatusCommunications(
+      req,
+      event,
+      updatedRegistration,
+      status,
+      req.user!.id,
+    );
 
     res.status(200).json({
       status: 'success',
       data: {
-        registration: updatedRegistration!.toJSON(),
+        registration: updatedRegistration.toJSON(),
       },
     });
   } catch (error: any) {

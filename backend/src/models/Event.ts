@@ -22,6 +22,7 @@ const eventSchema = new Schema({
   publicSlug: { type: String, required: true, unique: true, trim: true, lowercase: true, index: true },
   venueId: { type: String, default: null },
   type: { type: String, enum: ['online', 'physical', 'hybrid'], required: true },
+  pricingMode: { type: String, enum: ['free', 'ticketed'], default: 'ticketed' },
   category: { type: String, trim: true, default: '' },
   city: { type: String, trim: true, default: '' },
   tags: { type: [String], default: [] },
@@ -75,6 +76,7 @@ const eventSchema = new Schema({
     virtuals: true,
     transform: (doc, ret: any) => {
       ret.id = ret._id;
+      ret.pricingMode = ret.pricingMode || 'ticketed';
       delete ret._id;
       delete ret.__v;
     }

@@ -84,6 +84,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
   }, [selectedTicket]);
 
   const isEventFull = Boolean(event && event.bookingCount >= event.capacity);
+  const isFreeEventMode = (event?.pricingMode || 'ticketed') === 'free';
 
   const applyPromoCode = async () => {
     if (!selectedTicket) return;
@@ -107,6 +108,41 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       Alert.alert('Promo Error', applyError.response?.data?.message || 'Failed to apply promo code');
     } finally {
       setIsApplyingPromo(false);
+    }
+  };
+
+  const handleFreeRegister = async () => {
+    if (!event) return;
+
+    try {
+      setIsBooking(true);
+      const response = await BookingService.createBooking({
+        eventId,
+        quantity: 1,
+      });
+
+      const booking = response?.data?.booking;
+      if (!booking?.id) {
+        Alert.alert('Registered', 'Free event registration submitted.');
+        return;
+      }
+
+      if (booking.isWaitlisted) {
+        Alert.alert(
+          'Added to Waitlist',
+          booking.waitlistPosition
+            ? `Event full - you are now #${booking.waitlistPosition} on the waitlist.`
+            : 'Event full - you were added to waitlist.',
+        );
+      } else {
+        Alert.alert('Registered', 'Free event registration confirmed.');
+      }
+
+      navigation.navigate('BookingConfirmation', { bookingId: booking.id });
+    } catch (registrationError: any) {
+      Alert.alert('Registration Failed', registrationError?.response?.data?.message || 'Unable to register for this free event.');
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -183,6 +219,46 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
   };
 
   if (isLoading) return <LoadingState />;
+
+  if (isFreeEventMode) {
+    return (
+      <GradientBackground>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <ArrowLeft color={theme.colors.text} size={24} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Free Registration</Text>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.content}>
+            {error && <Text style={styles.errorText}>{error}</Text>}
+            <GlassCard style={styles.ticketCard} variant="dark">
+              <Text style={styles.ticketName}>{event?.title || 'Event'}</Text>
+              <Text style={styles.ticketPrice}>This event is free to attend.</Text>
+              <Text style={styles.ticketMeta}>Capacity: {event?.capacity || 0}</Text>
+              <Text style={styles.ticketMeta}>Booked: {event?.bookingCount || 0}</Text>
+            </GlassCard>
+
+            {isEventFull && (
+              <Text style={styles.waitlistMessage}>
+                Event full - register to join the waitlist.
+              </Text>
+            )}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Button
+              title={isEventFull ? 'Join Waitlist' : 'Register'}
+              onPress={handleFreeRegister}
+              isLoading={isBooking}
+              disabled={Boolean(error)}
+            />
+          </View>
+        </SafeAreaView>
+      </GradientBackground>
+    );
+  }
 
   return (
     <GradientBackground>

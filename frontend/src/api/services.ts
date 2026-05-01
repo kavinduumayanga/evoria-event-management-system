@@ -77,7 +77,7 @@ export interface MockCheckoutPayload {
 
 export interface CreateBookingPayload {
   eventId: string;
-  ticketTypeId: string;
+  ticketTypeId?: string;
   quantity: number;
   promoCode?: string;
   unlockCode?: string;
@@ -139,6 +139,33 @@ export interface AddEventAdminPayload {
   email: string;
 }
 
+export interface EventInvitePayload {
+  email: string;
+  message?: string;
+}
+
+export interface EventBroadcastPayload {
+  subject?: string;
+  title?: string;
+  message: string;
+}
+
+export interface EventCommunicationEntry {
+  id: string;
+  source: 'email_log' | 'in_app_notification';
+  channel: 'in_app' | 'email_mock' | 'sms_mock';
+  recipientUserId: string | null;
+  recipientEmail: string | null;
+  subject: string;
+  message: string;
+  type: string;
+  status: string;
+  createdBy: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
 export interface PublicEventDetails {
   event: {
     id: string;
@@ -169,6 +196,7 @@ export interface PublicEventDetails {
     capacity: number;
     bookingCount: number;
     type: 'online' | 'physical' | 'hybrid';
+    pricingMode: 'free' | 'ticketed';
     visibility: 'public' | 'private' | 'unlisted';
     about: string;
     description: string;
@@ -370,6 +398,43 @@ export const EventService = {
   removeEventAdmin: async (id: string, userId: string) => {
     const response = await apiClient.delete(`/events/${id}/admins/${userId}`);
     return response.data;
+  },
+  inviteGuest: async (eventId: string, payload: EventInvitePayload) => {
+    const response = await apiClient.post(`/events/${eventId}/invite`, payload);
+    return response.data as {
+      status: string;
+      message: string;
+      data: {
+        invite: Record<string, unknown>;
+        publicUrl: string;
+      };
+    };
+  },
+  blastMessage: async (eventId: string, payload: EventBroadcastPayload) => {
+    const response = await apiClient.post(`/events/${eventId}/blast`, payload);
+    return response.data as {
+      status: string;
+      message: string;
+      results: number;
+      data: {
+        publicUrl: string;
+        recipients: number;
+        inAppRecipients: number;
+        emailLogs: Array<Record<string, unknown>>;
+      };
+    };
+  },
+  getEventCommunications: async (eventId: string, limit = 100) => {
+    const response = await apiClient.get(`/events/${eventId}/communications`, {
+      params: { limit },
+    });
+    return response.data as {
+      status: string;
+      results: number;
+      data: {
+        communications: EventCommunicationEntry[];
+      };
+    };
   },
   toggleFeature: async (id: string) => {
     const response = await apiClient.patch(`/events/${id}/feature`);
