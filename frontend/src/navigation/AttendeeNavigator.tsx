@@ -2,10 +2,11 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AttendeeTabParamList } from '../types/navigation';
 import { theme } from '../constants/theme';
-import { Home, Ticket, User } from 'lucide-react-native';
+import { Home, Ticket, User, Bell } from 'lucide-react-native';
 import { AttendeeHomeStack } from './AttendeeHomeStack';
 import { AttendeeProfileStack } from './AttendeeProfileStack';
 import { MyBookingsScreen } from '../screens/attendee/MyBookingsScreen';
+import { NotificationsScreen } from '../screens/common/NotificationsScreen';
 
 const Tab = createBottomTabNavigator<AttendeeTabParamList>();
 
@@ -37,6 +38,14 @@ export const AttendeeNavigator = () => {
           tabBarLabel: 'Tickets',
           tabBarIcon: ({ color, size }) => <Ticket color={color} size={size} /> 
         }} 
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          tabBarLabel: 'Alerts',
+          tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
+        }}
       />
       <Tab.Screen 
         name="Profile" 

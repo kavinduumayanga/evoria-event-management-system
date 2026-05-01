@@ -7,6 +7,8 @@ import bookingRoutes from './booking.routes';
 import venueRoutes from './venue.routes';
 import sessionRoutes from './session.routes';
 import uploadRoutes from './upload.routes';
+import checkinRoutes from './checkin.routes';
+import notificationRoutes from './notification.routes';
 
 const router = Router();
 
@@ -18,5 +20,7 @@ router.use('/bookings', bookingRoutes);
 router.use('/venues', venueRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/uploads', uploadRoutes);
+router.use('/checkins', checkinRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

@@ -1,12 +1,18 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState } from '../../components';
 import { theme } from '../../constants/theme';
 import { BookingService } from '../../api/services';
 import { Booking } from '../../types';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { AttendeeTabParamList } from '../../types/navigation';
+import { QrCode } from 'lucide-react-native';
+
+type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyBookings'>;
 
 export const MyBookingsScreen = () => {
+  const navigation = useNavigation<AttendeeTabNavigationProp>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +55,27 @@ export const MyBookingsScreen = () => {
       <FlatList
         data={bookings}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <BookingCard booking={item} />}
+        renderItem={({ item }) => (
+          <BookingCard
+            booking={item}
+            actions={
+              item.bookingStatus === 'confirmed' ? (
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() =>
+                    navigation.navigate('HomeStack', {
+                      screen: 'MyTicketQR',
+                      params: { bookingId: item.id },
+                    })
+                  }
+                >
+                  <QrCode size={16} color={theme.colors.primaryLight} />
+                  <Text style={styles.actionText}>View QR</Text>
+                </TouchableOpacity>
+              ) : undefined
+            }
+          />
+        )}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -77,5 +103,22 @@ const styles = StyleSheet.create({
     padding: theme.spacing.m,
     paddingBottom: theme.spacing.xxl,
     flexGrow: 1,
+  },
+  actionBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.s,
+    paddingVertical: theme.spacing.s,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    backgroundColor: 'rgba(139, 92, 246, 0.12)',
+  },
+  actionText: {
+    ...theme.typography.caption,
+    color: theme.colors.primaryLight,
+    fontWeight: '700',
   },
 });

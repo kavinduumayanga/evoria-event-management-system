@@ -35,6 +35,24 @@ export interface ChangePasswordPayload {
   newPassword: string;
 }
 
+export interface CreateNotificationPayload {
+  userIds?: string[];
+  eventId?: string;
+  title: string;
+  message: string;
+  type?: 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
+  channel?: 'in_app' | 'email_mock' | 'sms_mock';
+  scheduledAt?: string;
+}
+
+export interface EventBlastPayload {
+  title: string;
+  message: string;
+  type?: 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
+  channel?: 'in_app' | 'email_mock' | 'sms_mock';
+  scheduledAt?: string;
+}
+
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
@@ -90,6 +108,10 @@ export const EventService = {
 };
 
 export const TicketService = {
+  getTicket: async (id: string) => {
+    const response = await apiClient.get(`/tickets/${id}`);
+    return response.data;
+  },
   getEventTickets: async (eventId: string) => {
     const response = await apiClient.get(`/tickets/event/${eventId}`);
     return response.data;
@@ -125,8 +147,33 @@ export const BookingService = {
     const response = await apiClient.post('/bookings', data);
     return response.data;
   },
+  getBooking: async (id: string) => {
+    const response = await apiClient.get(`/bookings/${id}`);
+    return response.data;
+  },
   cancelBooking: async (id: string) => {
     const response = await apiClient.patch(`/bookings/${id}/cancel`);
+    return response.data;
+  },
+};
+
+export const CheckInService = {
+  getBookingQr: async (bookingId: string) => {
+    const response = await apiClient.get(`/checkins/qr/${bookingId}`);
+    return response.data;
+  },
+  scanQr: async (qrCodeValue: string) => {
+    const response = await apiClient.post('/checkins/scan', { qrCodeValue });
+    return response.data;
+  },
+  manualCheckIn: async (bookingId: string, attendanceNote?: string) => {
+    const response = await apiClient.patch(`/checkins/${bookingId}/manual`, {
+      attendanceNote,
+    });
+    return response.data;
+  },
+  getEventAttendance: async (eventId: string) => {
+    const response = await apiClient.get(`/checkins/event/${eventId}`);
     return response.data;
   },
 };
@@ -192,6 +239,37 @@ export const UserService = {
   },
   deactivateAccount: async () => {
     const response = await apiClient.patch('/users/deactivate');
+    return response.data;
+  },
+};
+
+export const NotificationService = {
+  createNotification: async (payload: CreateNotificationPayload) => {
+    const response = await apiClient.post('/notifications', payload);
+    return response.data;
+  },
+  eventBlast: async (eventId: string, payload: EventBlastPayload) => {
+    const response = await apiClient.post(`/notifications/event-blast/${eventId}`, payload);
+    return response.data;
+  },
+  getMyNotifications: async () => {
+    const response = await apiClient.get('/notifications/my');
+    return response.data;
+  },
+  markAsRead: async (id: string) => {
+    const response = await apiClient.patch(`/notifications/${id}/read`);
+    return response.data;
+  },
+  deleteNotification: async (id: string) => {
+    const response = await apiClient.delete(`/notifications/${id}`);
+    return response.data;
+  },
+  getEventNotifications: async (eventId: string) => {
+    const response = await apiClient.get(`/notifications/event/${eventId}`);
+    return response.data;
+  },
+  processScheduled: async () => {
+    const response = await apiClient.post('/notifications/process-scheduled');
     return response.data;
   },
 };

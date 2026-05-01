@@ -12,6 +12,7 @@ export type AuthStackParamList = {
 export type AttendeeTabParamList = {
   HomeStack: NavigatorScreenParams<AttendeeHomeStackParamList>;
   MyBookings: undefined;
+  Notifications: undefined;
   Profile: NavigatorScreenParams<AttendeeProfileStackParamList>;
 };
 
@@ -20,6 +21,7 @@ export type AttendeeHomeStackParamList = {
   EventDetails: { eventId: string };
   TicketSelection: { eventId: string };
   BookingConfirmation: { bookingId: string };
+  MyTicketQR: { bookingId: string };
 };
 
 export type HostAdminTabParamList = {
@@ -27,6 +29,9 @@ export type HostAdminTabParamList = {
   EventsStack: NavigatorScreenParams<HostAdminEventStackParamList>;
   VenuesStack: NavigatorScreenParams<HostAdminVenueStackParamList>;
   ManageBookings: undefined;
+  CheckIns: undefined;
+  Announcements: undefined;
+  Notifications: undefined;
   Profile: NavigatorScreenParams<HostAdminProfileStackParamList>;
 };
 

@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState } from '../../components';
 import { theme } from '../../constants/theme';
-import { BookingService } from '../../api/services';
+import { BookingService, CheckInService } from '../../api/services';
 import { Booking } from '../../types';
 import { useFocusEffect } from '@react-navigation/native';
-import { X } from 'lucide-react-native';
+import { X, UserCheck } from 'lucide-react-native';
 
 export const ManageBookingsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -56,6 +56,23 @@ export const ManageBookingsScreen = () => {
     ]);
   };
 
+  const handleManualCheckIn = (bookingId: string) => {
+    Alert.alert('Manual Check-in', 'Mark this attendee as checked in?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        onPress: async () => {
+          try {
+            await CheckInService.manualCheckIn(bookingId);
+            fetchBookings();
+          } catch (err: any) {
+            Alert.alert('Error', err?.response?.data?.message || 'Failed to check in attendee');
+          }
+        },
+      },
+    ]);
+  };
+
   if (isLoading && !isRefreshing) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchBookings} /></ScreenContainer>;
 
@@ -72,15 +89,26 @@ export const ManageBookingsScreen = () => {
           <BookingCard 
             booking={item} 
             actions={
-              item.bookingStatus === 'pending' || item.bookingStatus === 'confirmed' ? (
-                <TouchableOpacity 
-                  style={styles.actionBtn} 
-                  onPress={() => handleCancelBooking(item.id)}
-                >
-                  <X size={16} color={theme.colors.error} />
-                  <Text style={[styles.actionText, { color: theme.colors.error }]}>Cancel</Text>
-                </TouchableOpacity>
-              ) : undefined
+              <>
+                {(item.bookingStatus === 'pending' || item.bookingStatus === 'confirmed') && (
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => handleCancelBooking(item.id)}
+                  >
+                    <X size={16} color={theme.colors.error} />
+                    <Text style={[styles.actionText, { color: theme.colors.error }]}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
+                {item.bookingStatus === 'confirmed' && item.checkInStatus !== 'checked_in' && (
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.checkInBtn]}
+                    onPress={() => handleManualCheckIn(item.id)}
+                  >
+                    <UserCheck size={16} color={theme.colors.success} />
+                    <Text style={[styles.actionText, { color: theme.colors.success }]}>Manual Check-in</Text>
+                  </TouchableOpacity>
+                )}
+              </>
             }
           />
         )}
@@ -126,5 +154,9 @@ const styles = StyleSheet.create({
   actionText: {
     ...theme.typography.button,
     marginLeft: theme.spacing.s,
-  }
+  },
+  checkInBtn: {
+    borderColor: theme.colors.success,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
 });

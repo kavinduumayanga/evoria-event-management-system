@@ -2,13 +2,16 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HostAdminTabParamList } from '../types/navigation';
 import { theme } from '../constants/theme';
-import { LayoutDashboard, CalendarDays, Users, User, MapPin } from 'lucide-react-native';
+import { LayoutDashboard, CalendarDays, Users, User, MapPin, QrCode, Megaphone, Bell } from 'lucide-react-native';
 
 import { DashboardScreen } from '../screens/hostAdmin/DashboardScreen';
 import { HostAdminEventStack } from './HostAdminEventStack';
 import { HostAdminVenueStack } from './HostAdminVenueStack';
 import { HostAdminProfileStack } from './HostAdminProfileStack';
 import { ManageBookingsScreen } from '../screens/hostAdmin/ManageBookingsScreen';
+import { CheckInScannerScreen } from '../screens/hostAdmin/CheckInScannerScreen';
+import { AnnouncementScreen } from '../screens/hostAdmin/AnnouncementScreen';
+import { NotificationsScreen } from '../screens/common/NotificationsScreen';
 
 const Tab = createBottomTabNavigator<HostAdminTabParamList>();
 
@@ -55,6 +58,30 @@ export const HostAdminNavigator = () => {
           tabBarLabel: 'Bookings',
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} /> 
         }} 
+      />
+      <Tab.Screen
+        name="CheckIns"
+        component={CheckInScannerScreen}
+        options={{
+          tabBarLabel: 'Check-in',
+          tabBarIcon: ({ color, size }) => <QrCode color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="Announcements"
+        component={AnnouncementScreen}
+        options={{
+          tabBarLabel: 'Broadcast',
+          tabBarIcon: ({ color, size }) => <Megaphone color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          tabBarLabel: 'Alerts',
+          tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
+        }}
       />
       <Tab.Screen 
         name="Profile" 

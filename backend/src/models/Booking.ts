@@ -9,7 +9,25 @@ const bookingSchema = new Schema({
   quantity: { type: Number, required: true },
   totalAmount: { type: Number, required: true },
   bookingStatus: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'confirmed' },
-  bookingDate: { type: String, required: true }
+  bookingDate: { type: String, required: true },
+  rsvpStatus: { type: String, enum: ['going', 'not_going'], default: 'going' },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+  checkInStatus: { type: String, enum: ['not_checked_in', 'checked_in'], default: 'not_checked_in' },
+  checkedInAt: { type: Date, default: null },
+  checkedInBy: { type: String, default: null },
+  checkInMethod: { type: String, enum: ['qr', 'manual', null], default: null },
+  qrCodeValue: { type: String, trim: true },
+  attendanceNote: { type: String, trim: true },
+  customAnswers: {
+    type: [
+      {
+        questionId: { type: String, required: true },
+        answer: { type: String, required: true },
+      },
+    ],
+    default: [],
+  },
+  registrationType: { type: String, enum: ['free', 'paid'], default: 'paid' },
 }, {
   timestamps: true,
   toJSON: {
@@ -21,5 +39,7 @@ const bookingSchema = new Schema({
     }
   }
 });
+
+bookingSchema.index({ qrCodeValue: 1 }, { unique: true, sparse: true });
 
 export const BookingModel = mongoose.model('Booking', bookingSchema);
