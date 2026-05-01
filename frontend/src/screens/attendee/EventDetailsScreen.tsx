@@ -10,8 +10,8 @@ import { Event, Venue, Session, TicketType } from '../../types';
 import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { EventService, PublicEventDetails, ReportService } from '../../api/services';
-import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Link as LinkIcon, Share2, Mail, Phone, UserRound } from 'lucide-react-native';
+import { EventService, NotificationService, PublicEventDetails, ReportService } from '../../api/services';
+import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Share2, Mail, Phone, UserRound, Users2, Pencil, Ticket, Eye, Copy, Send } from 'lucide-react-native';
 import { useAuthStore } from '../../store/auth.store';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -42,6 +42,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [eventAdminEmail, setEventAdminEmail] = useState('');
+  const [isAddingEventAdmin, setIsAddingEventAdmin] = useState(false);
+  const [blastTitle, setBlastTitle] = useState('');
+  const [blastMessage, setBlastMessage] = useState('');
+  const [isSendingBlast, setIsSendingBlast] = useState(false);
 
   useEffect(() => {
     fetchEventDetails();
@@ -172,6 +177,21 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   };
 
+  const handleInviteGuests = async () => {
+    if (!event) return;
+    const shareUrl = resolveShareUrl();
+    if (!shareUrl) {
+      Alert.alert('Invite Unavailable', 'Public URL is not available for this event.');
+      return;
+    }
+
+    await Share.share({
+      title: `Invitation: ${event.title}`,
+      message: `You are invited to ${event.title}. Register here: ${shareUrl}`,
+      url: shareUrl,
+    });
+  };
+
   const handleCopyEventUrl = async () => {
     const shareUrl = resolveShareUrl();
     if (!shareUrl) {
@@ -213,6 +233,26 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     Alert.alert('Contact Unavailable', 'Unable to open host contact options on this device.');
   };
 
+  const handleOpenEditEvent = () => {
+    if (!event) return;
+    navigation.navigate('EventForm', { eventId: event.id });
+  };
+
+  const handleOpenGuestList = () => {
+    if (!event) return;
+    navigation.navigate('ManageRegistrations', { eventId: event.id });
+  };
+
+  const handleOpenCheckInGuests = () => {
+    if (!event) return;
+    navigation.navigate('ManageRegistrations', { eventId: event.id });
+  };
+
+  const handleOpenManageTickets = () => {
+    if (!event) return;
+    navigation.navigate('ManageTickets', { eventId: event.id });
+  };
+
   const handleUpdateVisibility = async (visibility: 'public' | 'private' | 'unlisted') => {
     if (!event) return;
 
@@ -222,6 +262,52 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       fetchEventDetails();
     } catch (updateError: any) {
       Alert.alert('Update Failed', updateError?.response?.data?.message || 'Unable to update event visibility.');
+    }
+  };
+
+  const handleAddEventAdmin = async () => {
+    if (!event) return;
+    const email = eventAdminEmail.trim();
+    if (!email) {
+      Alert.alert('Add Event Admin', 'Please enter an email address.');
+      return;
+    }
+
+    try {
+      setIsAddingEventAdmin(true);
+      await EventService.addEventAdmin(event.id, { email });
+      setEventAdminEmail('');
+      Alert.alert('Success', 'Event admin added successfully.');
+      fetchEventDetails();
+    } catch (addError: any) {
+      Alert.alert('Add Admin Failed', addError?.response?.data?.message || 'Unable to add event admin.');
+    } finally {
+      setIsAddingEventAdmin(false);
+    }
+  };
+
+  const handleSendBlastMessage = async () => {
+    if (!event) return;
+    if (!blastTitle.trim() || !blastMessage.trim()) {
+      Alert.alert('Missing Fields', 'Blast title and message are required.');
+      return;
+    }
+
+    try {
+      setIsSendingBlast(true);
+      const response = await NotificationService.eventBlast(event.id, {
+        title: blastTitle.trim(),
+        message: blastMessage.trim(),
+        type: 'announcement',
+        channel: 'in_app',
+      });
+      setBlastTitle('');
+      setBlastMessage('');
+      Alert.alert('Blast Sent', response?.message || 'Blast message sent to attendees.');
+    } catch (blastError: any) {
+      Alert.alert('Blast Failed', blastError?.response?.data?.message || 'Unable to send blast message.');
+    } finally {
+      setIsSendingBlast(false);
     }
   };
 
@@ -270,7 +356,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const isAvailable = tickets.some((ticket) => ticket.isActive && ticket.quantity > ticket.soldCount);
   const isEventFull = event.bookingCount >= event.capacity;
   const canRegister = event.visibility === 'public';
-  const isManager = Boolean(
+  const canManageEvent = Boolean(
     publicData?.event.isManageableByCurrentUser
     || (currentUser && (event.ownerId === currentUser.id || (event.adminIds || []).includes(currentUser.id)))
   );
@@ -343,7 +429,6 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.inlineActions}>
               <Button title="Add to Calendar" variant="outline" onPress={handleCalendarAction} />
               <Button title="Share" variant="outline" icon={<Share2 size={16} color={theme.colors.primary} />} onPress={handleShareEvent} />
-              <Button title="Copy URL" variant="outline" icon={<LinkIcon size={16} color={theme.colors.primary} />} onPress={handleCopyEventUrl} />
               <Button
                 title="Contact Host"
                 variant="outline"
@@ -354,7 +439,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Button
                   title="Open Meeting Link"
                   onPress={handleOpenMeetingLink}
-                  icon={<LinkIcon size={16} color={theme.colors.text} />}
+                  icon={<Eye size={16} color={theme.colors.text} />}
                 />
               ) : null}
               {event.publicSlug ? (
@@ -369,14 +454,65 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 variant="outline"
                 onPress={() => setShowReportForm((previous) => !previous)}
               />
-              {isManager ? (
-                <View style={styles.manageButtons}>
-                  <Button title="Set Public" variant="secondary" onPress={() => handleUpdateVisibility('public')} />
-                  <Button title="Set Unlisted" variant="secondary" onPress={() => handleUpdateVisibility('unlisted')} />
-                  <Button title="Set Private" variant="secondary" onPress={() => handleUpdateVisibility('private')} />
-                </View>
-              ) : null}
             </View>
+
+            {canManageEvent ? (
+              <GlassCard style={styles.managePanel}>
+                <Text style={styles.manageTitle}>Manager Actions</Text>
+                <View style={styles.manageActionGrid}>
+                  <Button title="Edit Event" variant="secondary" icon={<Pencil size={16} color={theme.colors.text} />} onPress={handleOpenEditEvent} />
+                  <Button title="Check-in Guests" variant="secondary" icon={<Users2 size={16} color={theme.colors.text} />} onPress={handleOpenCheckInGuests} />
+                  <Button title="Invite Guests" variant="secondary" icon={<Share2 size={16} color={theme.colors.text} />} onPress={handleInviteGuests} />
+                  <Button title="Guest List" variant="secondary" icon={<Users2 size={16} color={theme.colors.text} />} onPress={handleOpenGuestList} />
+                  <Button title="Manage Tickets" variant="secondary" icon={<Ticket size={16} color={theme.colors.text} />} onPress={handleOpenManageTickets} />
+                  <Button title="Copy Public URL" variant="outline" icon={<Copy size={16} color={theme.colors.primary} />} onPress={handleCopyEventUrl} />
+                </View>
+
+                <View style={styles.manageSection}>
+                  <Text style={styles.manageSectionTitle}>Add Event Admins</Text>
+                  <Input
+                    label="Admin Email"
+                    value={eventAdminEmail}
+                    onChangeText={setEventAdminEmail}
+                    placeholder="user@example.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <Button
+                    title="Add Event Admin"
+                    onPress={handleAddEventAdmin}
+                    isLoading={isAddingEventAdmin}
+                  />
+                </View>
+
+                <View style={styles.manageSection}>
+                  <Text style={styles.manageSectionTitle}>Visibility Settings</Text>
+                  <View style={styles.visibilityButtons}>
+                    <Button title="Set Public" variant="outline" onPress={() => handleUpdateVisibility('public')} />
+                    <Button title="Set Unlisted" variant="outline" onPress={() => handleUpdateVisibility('unlisted')} />
+                    <Button title="Set Private" variant="outline" onPress={() => handleUpdateVisibility('private')} />
+                  </View>
+                </View>
+
+                <View style={styles.manageSection}>
+                  <Text style={styles.manageSectionTitle}>Send Blast Message</Text>
+                  <Input label="Blast Title" value={blastTitle} onChangeText={setBlastTitle} placeholder="Important event update" />
+                  <Input
+                    label="Blast Message"
+                    value={blastMessage}
+                    onChangeText={setBlastMessage}
+                    placeholder="Write your message to all attendees"
+                    multiline
+                  />
+                  <Button
+                    title="Send Blast Message"
+                    icon={<Send size={16} color={theme.colors.text} />}
+                    onPress={handleSendBlastMessage}
+                    isLoading={isSendingBlast}
+                  />
+                </View>
+              </GlassCard>
+            ) : null}
 
             {showReportForm && (
               <View style={styles.reportBox}>
@@ -534,7 +670,31 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.m,
     gap: theme.spacing.s,
   },
-  manageButtons: {
+  managePanel: {
+    marginBottom: theme.spacing.l,
+    padding: theme.spacing.m,
+    borderColor: `${theme.colors.primary}66`,
+    backgroundColor: 'rgba(67, 56, 202, 0.08)',
+  },
+  manageTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.primaryLight,
+    marginBottom: theme.spacing.s,
+  },
+  manageActionGrid: {
+    gap: theme.spacing.s,
+  },
+  manageSection: {
+    marginTop: theme.spacing.m,
+  },
+  manageSectionTitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.s,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  visibilityButtons: {
     gap: theme.spacing.s,
   },
   reportBox: {
