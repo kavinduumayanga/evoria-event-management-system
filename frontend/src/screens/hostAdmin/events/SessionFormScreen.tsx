@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState } from '../../../components';
+import { ScreenContainer, FormInput, PrimaryButton, LoadingState } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { SessionService } from '../../../api/services';
@@ -107,17 +107,17 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.form}>
-        <Input label="Session Title *" value={title} onChangeText={setTitle} placeholder="Keynote Speech" />
-        <Input label="Description" value={description} onChangeText={setDescription} placeholder="Brief topic overview" />
-        <Input label="Speaker Name" value={speakerName} onChangeText={setSpeakerName} placeholder="Jane Doe" />
+        <FormInput label="Session Title *" value={title} onChangeText={setTitle} placeholder="Keynote Speech" />
+        <FormInput label="Description" value={description} onChangeText={setDescription} placeholder="Brief topic overview" />
+        <FormInput label="Speaker Name" value={speakerName} onChangeText={setSpeakerName} placeholder="Jane Doe" />
         
         <View style={styles.row}>
-          <View style={styles.flexHalf}><Input label="Date *" value={sessionDate} onChangeText={setSessionDate} placeholder="2026-10-15" /></View>
+          <View style={styles.flexHalf}><FormInput label="Date *" value={sessionDate} onChangeText={setSessionDate} placeholder="YYYY-MM-DD" /></View>
         </View>
 
         <View style={styles.row}>
-          <View style={styles.flexHalf}><Input label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00 AM" /></View>
-          <View style={styles.flexHalf}><Input label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="10:00 AM" /></View>
+          <View style={styles.flexHalf}><FormInput label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" /></View>
+          <View style={styles.flexHalf}><FormInput label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="10:00" /></View>
         </View>
 
         <Text style={styles.label}>Status</Text>
@@ -133,7 +133,7 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
           ))}
         </View>
 
-        <Button title={isEditing ? 'Save Changes' : 'Create Session'} onPress={handleSave} isLoading={isSaving} style={styles.saveButton} />
+        <PrimaryButton title={isEditing ? 'Save Changes' : 'Create Session'} onPress={handleSave} isLoading={isSaving} style={styles.saveButton} />
       </View>
     </ScreenContainer>
   );
@@ -148,10 +148,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: theme.spacing.m },
   flexHalf: { flex: 1 },
   label: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: theme.spacing.xs, marginLeft: 4, marginTop: theme.spacing.s },
-  selectorContainer: { flexDirection: 'row', marginBottom: theme.spacing.m, gap: theme.spacing.s },
-  chip: { paddingHorizontal: theme.spacing.m, paddingVertical: theme.spacing.s, borderRadius: theme.borderRadius.m, borderWidth: 1, borderColor: theme.colors.border },
-  chipSelected: { borderColor: theme.colors.primary, backgroundColor: 'rgba(139, 92, 246, 0.1)' },
-  chipText: { ...theme.typography.caption, color: theme.colors.textMuted },
+  selectorContainer: { flexDirection: 'row', marginBottom: theme.spacing.m, gap: theme.spacing.xs, backgroundColor: theme.colors.surfaceLight, padding: 4, borderRadius: theme.borderRadius.m },
+  chip: { flex: 1, paddingVertical: theme.spacing.m, borderRadius: theme.borderRadius.m, alignItems: 'center' },
+  chipSelected: { backgroundColor: 'rgba(139, 92, 246, 0.15)' },
+  chipText: { ...theme.typography.body, color: theme.colors.textMuted },
   chipTextSelected: { color: theme.colors.primary, fontWeight: 'bold' },
   saveButton: { marginTop: theme.spacing.xl, marginBottom: theme.spacing.xxl },
 });

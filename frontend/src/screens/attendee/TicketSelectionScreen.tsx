@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { GradientBackground, Button, GlassCard, LoadingState, Input } from '../../components';
+import { GradientBackground, PrimaryButton, SecondaryButton, GlassCard, LoadingState, FormInput } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { Event, TicketType } from '../../types';
@@ -263,7 +263,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
           </ScrollView>
 
           <View style={styles.footer}>
-            <Button
+            <PrimaryButton
               title={isEventFull ? 'Join Waitlist' : 'Register'}
               onPress={handleFreeRegister}
               isLoading={isBooking}
@@ -323,7 +323,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
           {selectedTicket && (
             <>
               {selectedTicket.unlockCode && (
-                <Input
+                <FormInput
                   label="Unlock Code (Required)"
                   value={unlockCode}
                   onChangeText={setUnlockCode}
@@ -333,31 +333,30 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
 
               {!selectedTicket.isFree && !isEventFull && (
                 <>
-                  <Input
+                  <FormInput
                     label="Promo Code"
                     value={promoCode}
                     onChangeText={setPromoCode}
                     placeholder="Enter promo code"
                     autoCapitalize="characters"
                   />
-                  <Button
+                  <SecondaryButton
                     title="Apply Promo"
                     onPress={applyPromoCode}
                     isLoading={isApplyingPromo}
-                    variant="outline"
                   />
                 </>
               )}
 
               {promoPreview && (
-                <View style={styles.promoResult}>
+                <GlassCard style={styles.promoResult} variant="neonPurple">
                   <Text style={styles.promoText}>
                     Discount Applied: {promoPreview.currency} {promoPreview.discountAmount.toFixed(2)}
                   </Text>
                   <Text style={styles.promoText}>
                     Final Amount: {promoPreview.currency} {promoPreview.finalAmount.toFixed(2)}
                   </Text>
-                </View>
+                </GlassCard>
               )}
             </>
           )}
@@ -366,21 +365,20 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
         {selectedTicket && !error && (
           <View style={styles.footer}>
             <View style={styles.quantityContainer}>
-              <Button title="-" size="small" variant="outline" onPress={() => setQuantity(Math.max(1, quantity - 1))} />
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => setQuantity(Math.max(1, quantity - 1))}>
+                <Text style={styles.qtyBtnText}>-</Text>
+              </TouchableOpacity>
               <Text style={styles.quantity}>{quantity}</Text>
-              <Button
-                title="+"
-                size="small"
-                variant="outline"
-                onPress={() => {
-                  const maxQuantity = isEventFull
-                    ? selectedTicket.maxPerUser
-                    : Math.min(selectedTicket.maxPerUser, remainingForSelected);
-                  setQuantity(Math.min(maxQuantity, quantity + 1));
-                }}
-              />
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => {
+                const maxQuantity = isEventFull
+                  ? selectedTicket.maxPerUser
+                  : Math.min(selectedTicket.maxPerUser, remainingForSelected);
+                setQuantity(Math.min(maxQuantity, quantity + 1));
+              }}>
+                <Text style={styles.qtyBtnText}>+</Text>
+              </TouchableOpacity>
             </View>
-            <Button
+            <PrimaryButton
               title={isEventFull ? 'Join Waitlist' : (selectedTicket.isFree ? 'Book Free Ticket' : 'Continue to Payment')}
               onPress={handleContinue}
               isLoading={isBooking}
@@ -419,15 +417,12 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.m,
     marginBottom: theme.spacing.s,
     padding: theme.spacing.m,
-    borderRadius: theme.borderRadius.m,
-    backgroundColor: theme.colors.surfaceLight,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   promoText: {
-    ...theme.typography.caption,
+    ...theme.typography.body,
     color: theme.colors.text,
     marginBottom: 2,
+    fontWeight: '600'
   },
   footer: {
     padding: theme.spacing.l,
@@ -440,9 +435,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: theme.spacing.m,
-    gap: theme.spacing.m,
+    gap: theme.spacing.xl,
   },
-  quantity: { ...theme.typography.h2, color: theme.colors.text },
+  qtyBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.borderRadius.round,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+  },
+  qtyBtnText: {
+    ...theme.typography.h2,
+    color: theme.colors.text,
+    lineHeight: 28,
+  },
+  quantity: { ...theme.typography.h2, color: theme.colors.text, minWidth: 30, textAlign: 'center' },
   errorText: {
     ...theme.typography.body,
     color: theme.colors.error,

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminVenueStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState } from '../../../components';
+import { ScreenContainer, FormInput, PrimaryButton, LoadingState } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
@@ -98,11 +98,11 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.form}>
-        <Input label="Venue Name *" value={name} onChangeText={setName} placeholder="Main Hall" />
-        <Input label="Address *" value={address} onChangeText={setAddress} placeholder="123 Event Street" />
-        <Input label="City *" value={city} onChangeText={setCity} placeholder="New York" />
-        <Input label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="500" keyboardType="numeric" />
-        <Input label="Contact Info" value={contactInfo} onChangeText={setContactInfo} placeholder="contact@venue.com" />
+        <FormInput label="Venue Name *" value={name} onChangeText={setName} placeholder="Main Hall" />
+        <FormInput label="Address *" value={address} onChangeText={setAddress} placeholder="123 Event Street" />
+        <FormInput label="City *" value={city} onChangeText={setCity} placeholder="New York" />
+        <FormInput label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="500" keyboardType="numeric" />
+        <FormInput label="Contact Info" value={contactInfo} onChangeText={setContactInfo} placeholder="contact@venue.com" />
 
         <Text style={styles.label}>Venue Type</Text>
         <View style={styles.typeSelector}>
@@ -119,7 +119,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
           ))}
         </View>
 
-        <Button title={isEditing ? 'Save Changes' : 'Create Venue'} onPress={handleSave} isLoading={isSaving} style={styles.saveButton} />
+        <PrimaryButton title={isEditing ? 'Save Changes' : 'Create Venue'} onPress={handleSave} isLoading={isSaving} style={styles.saveButton} />
       </View>
     </ScreenContainer>
   );
@@ -153,21 +153,20 @@ const styles = StyleSheet.create({
   },
   typeSelector: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: theme.spacing.xl,
+    backgroundColor: theme.colors.surfaceLight,
+    padding: 4,
+    borderRadius: theme.borderRadius.m,
+    gap: theme.spacing.xs,
   },
   typeOption: {
     flex: 1,
     paddingVertical: theme.spacing.m,
-    marginHorizontal: theme.spacing.xs,
     borderRadius: theme.borderRadius.m,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
     alignItems: 'center',
   },
   typeOptionSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
   },
   typeText: {
     ...theme.typography.body,

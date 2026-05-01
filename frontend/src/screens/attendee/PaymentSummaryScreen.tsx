@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { GradientBackground, Button, GlassCard, LoadingState } from '../../components';
+import { GradientBackground, PrimaryButton, GlassCard, LoadingState } from '../../components';
 import { theme } from '../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { BookingService, PaymentService } from '../../api/services';
@@ -114,7 +114,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
           {error ? (
             <GlassCard style={styles.errorCard}>
               <Text style={styles.errorText}>{error}</Text>
-              <Button title="Retry" onPress={fetchSummary} style={{ marginTop: theme.spacing.m }} />
+              <PrimaryButton title="Retry" onPress={fetchSummary} style={{ marginTop: theme.spacing.m }} />
             </GlassCard>
           ) : (
             <GlassCard style={styles.summaryCard}>
@@ -135,7 +135,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
 
         {!error && (
           <View style={styles.footer}>
-            <Button title="Confirm Payment" onPress={confirmPayment} isLoading={isConfirming} />
+            <PrimaryButton title="Confirm Payment" onPress={confirmPayment} isLoading={isConfirming} />
           </View>
         )}
       </SafeAreaView>
