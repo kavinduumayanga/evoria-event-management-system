@@ -2,13 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { BookingModel } from '../models/Booking';
 import { EventModel } from '../models/Event';
 import { AppError } from '../utils/appError';
+import { canManageEvent, manageableEventQuery } from '../utils/eventPermissions';
 
 const roundToTwo = (value: number) => Math.round(value * 100) / 100;
 
-const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) {
+  if (!canManageEvent(userId, event)) {
     throw new AppError('Not authorized to access this event analytics', 403);
   }
   return event;
@@ -17,7 +18,7 @@ const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
 export const getEventAnalytics = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const eventId = String(req.params.eventId);
-    const event = await ensureHostOwnsEvent(eventId, req.user!.id);
+    const event = await ensureCanManageEvent(eventId, req.user!.id);
     const bookings = await BookingModel.find({ eventId });
 
     const totalRegistrations = bookings.length;
@@ -51,7 +52,7 @@ export const getEventAnalytics = async (req: Request, res: Response, next: NextF
 
 export const getDashboardAnalytics = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const events = await EventModel.find({ hostAdminId: req.user!.id });
+    const events = await EventModel.find(manageableEventQuery(req.user!.id));
     const eventIds = events.map((event) => event.id);
 
     if (!eventIds.length) {

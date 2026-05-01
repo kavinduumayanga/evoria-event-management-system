@@ -5,6 +5,7 @@ import { BookingModel } from '../models/Booking';
 import { TicketTypeModel } from '../models/TicketType';
 import { EventModel } from '../models/Event';
 import { AppError } from '../utils/appError';
+import { canManageEvent, manageableEventQuery } from '../utils/eventPermissions';
 import { createNotificationRecord } from '../utils/notification.helper';
 import {
   calculateTicketPrice,
@@ -182,10 +183,10 @@ const createWaitlistBooking = async (
   return waitlistBooking;
 };
 
-const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) {
+  if (!canManageEvent(userId, event)) {
     throw new AppError('Not authorized for this event', 403);
   }
   return event;
@@ -306,7 +307,14 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
 
 export const getBookings = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const bookings = await BookingModel.find();
+    const manageableEvents = await EventModel.find(manageableEventQuery(req.user!.id)).select('_id');
+    const manageableEventIds = manageableEvents.map((event) => event.id);
+
+    if (!manageableEventIds.length) {
+      return res.status(200).json({ status: 'success', results: 0, data: { bookings: [] } });
+    }
+
+    const bookings = await BookingModel.find({ eventId: { $in: manageableEventIds } });
     res.status(200).json({ status: 'success', results: bookings.length, data: { bookings: bookings.map((booking) => booking.toJSON()) } });
   } catch (error) {
     next(error);
@@ -319,12 +327,8 @@ export const getBooking = async (req: Request, res: Response, next: NextFunction
     if (!booking) return next(new AppError('Booking not found', 404));
 
     if (booking.userId !== req.user!.id) {
-      if (req.user!.role !== 'host_admin') {
-        return next(new AppError('Not authorized to view this booking', 403));
-      }
-
       const event = await EventModel.findById(booking.eventId);
-      if (!event || event.hostAdminId !== req.user!.id) {
+      if (!event || !canManageEvent(req.user!.id, event)) {
         return next(new AppError('Not authorized to view this booking', 403));
       }
     }
@@ -347,7 +351,7 @@ export const getMyBookings = async (req: Request, res: Response, next: NextFunct
 export const getEventBookings = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const eventId = String(req.params.eventId);
-    await ensureHostOwnsEvent(eventId, req.user!.id);
+    await ensureCanManageEvent(eventId, req.user!.id);
     const bookings = await BookingModel.find({ eventId });
     res.status(200).json({ status: 'success', results: bookings.length, data: { bookings: bookings.map((booking) => booking.toJSON()) } });
   } catch (error) {
@@ -407,12 +411,8 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
     if (!booking) return next(new AppError('Booking not found', 404));
 
     if (booking.userId !== req.user!.id) {
-      if (req.user!.role !== 'host_admin') {
-        return next(new AppError('Not authorized to cancel this booking', 403));
-      }
-
       const event = await EventModel.findById(booking.eventId);
-      if (!event || event.hostAdminId !== req.user!.id) {
+      if (!event || !canManageEvent(req.user!.id, event)) {
         return next(new AppError('Not authorized to cancel this booking', 403));
       }
     }
@@ -444,6 +444,11 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
 
 export const refundBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const existingBooking = await BookingModel.findById(req.params.id as string);
+    if (!existingBooking) return next(new AppError('Booking not found', 404));
+
+    await ensureCanManageEvent(existingBooking.eventId, req.user!.id);
+
     const { booking, updatedBooking, promotedBooking } = await cancelAndRestoreInventory(req.params.id as string, req.user?.id);
 
     await createNotificationRecord({

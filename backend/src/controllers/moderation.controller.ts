@@ -2,6 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { EventModel } from '../models/Event';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
+import { manageableEventQuery } from '../utils/eventPermissions';
+
+const ensureCanUseModeration = async (userId: string) => {
+  const managedEventCount = await EventModel.countDocuments(manageableEventQuery(userId));
+  if (!managedEventCount) {
+    throw new AppError('You do not have permission to perform moderation actions', 403);
+  }
+};
 
 const findEventOrThrow = async (id: string) => {
   const event = await EventModel.findById(id);
@@ -21,6 +29,7 @@ const findUserOrThrow = async (id: string) => {
 
 export const approveEventModeration = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureCanUseModeration(req.user!.id);
     await findEventOrThrow(req.params.id as string);
 
     const event = await EventModel.findByIdAndUpdate(
@@ -45,6 +54,7 @@ export const approveEventModeration = async (req: Request, res: Response, next: 
 
 export const rejectEventModeration = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureCanUseModeration(req.user!.id);
     await findEventOrThrow(req.params.id as string);
 
     const event = await EventModel.findByIdAndUpdate(
@@ -69,6 +79,7 @@ export const rejectEventModeration = async (req: Request, res: Response, next: N
 
 export const suspendUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureCanUseModeration(req.user!.id);
     const userId = req.params.id as string;
 
     if (userId === req.user!.id) {
@@ -96,6 +107,7 @@ export const suspendUser = async (req: Request, res: Response, next: NextFunctio
 
 export const activateUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureCanUseModeration(req.user!.id);
     await findUserOrThrow(req.params.id as string);
 
     const user = await UserModel.findByIdAndUpdate(

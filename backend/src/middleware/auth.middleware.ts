@@ -9,7 +9,7 @@ declare global {
     interface Request {
       user?: {
         id: string;
-        role: Role;
+        role?: Role;
       };
     }
   }
@@ -28,7 +28,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
       return next(new AppError('Unauthorized access. Please log in.', 401));
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string; role: Role };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string; role?: Role; tokenVersion?: number };
 
     const currentUser = await UserModel.findById(decoded.id).select('+isActive +isSuspended');
     if (!currentUser) {
@@ -45,7 +45,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     req.user = {
       id: currentUser.id,
-      role: currentUser.role as Role,
+      role: currentUser.role as Role | undefined,
     };
 
     next();
@@ -56,7 +56,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
 export const restrictTo = (...roles: Role[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !req.user.role || !roles.includes(req.user.role)) {
       return next(new AppError('You do not have permission to perform this action', 403));
     }
     next();

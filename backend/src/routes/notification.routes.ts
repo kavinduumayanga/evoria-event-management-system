@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 import {
   createNotification,
   getMyNotifications,
@@ -18,7 +18,6 @@ router.get('/my', getMyNotifications);
 router.patch('/:id/read', markNotificationAsRead);
 router.delete('/:id', deleteNotification);
 
-router.use(restrictTo('host_admin'));
 router.post('/', createNotification);
 router.post('/event-blast/:eventId', eventBlastNotifications);
 router.get('/event/:eventId', getEventNotifications);

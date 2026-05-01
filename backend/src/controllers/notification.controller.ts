@@ -6,6 +6,7 @@ import { UserModel } from '../models/User';
 import { EventModel } from '../models/Event';
 import { AppError } from '../utils/appError';
 import { createNotificationsForUsers } from '../utils/notification.helper';
+import { canManageEvent } from '../utils/eventPermissions';
 
 const notificationCreateSchema = z.object({
   userIds: z.array(z.string()).optional(),
@@ -25,10 +26,10 @@ const eventBlastSchema = z.object({
   scheduledAt: z.string().optional(),
 });
 
-const ensureEventOwnership = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) throw new AppError('Not authorized for this event', 403);
+  if (!canManageEvent(userId, event)) throw new AppError('Not authorized for this event', 403);
   return event;
 };
 
@@ -79,7 +80,7 @@ export const createNotification = async (req: Request, res: Response, next: Next
     let recipientIds: string[] = [];
 
     if (validated.eventId) {
-      await ensureEventOwnership(validated.eventId, req.user!.id);
+      await ensureCanManageEvent(validated.eventId, req.user!.id);
       const attendeeIds = await resolveEventAttendeeIds(validated.eventId);
       recipientIds = recipientIds.concat(attendeeIds);
     }
@@ -172,14 +173,10 @@ export const deleteNotification = async (req: Request, res: Response, next: Next
     if (!notification) return next(new AppError('Notification not found', 404));
 
     if (notification.userId !== req.user!.id) {
-      if (req.user!.role !== 'host_admin') {
-        return next(new AppError('Not authorized to delete this notification', 403));
-      }
-
       let allowed = notification.createdBy === req.user!.id;
       if (!allowed && notification.eventId) {
         const event = await EventModel.findById(notification.eventId);
-        allowed = !!event && event.hostAdminId === req.user!.id;
+        allowed = !!event && canManageEvent(req.user!.id, event);
       }
 
       if (!allowed) {
@@ -203,7 +200,7 @@ export const eventBlastNotifications = async (req: Request, res: Response, next:
     const validated = eventBlastSchema.parse(req.body);
     const { status, scheduledDate, sentAt } = resolveNotificationStatus(validated.scheduledAt);
 
-    await ensureEventOwnership(eventId, req.user!.id);
+    await ensureCanManageEvent(eventId, req.user!.id);
     const attendeeIds = await resolveEventAttendeeIds(eventId);
 
     if (!attendeeIds.length) {
@@ -244,7 +241,7 @@ export const eventBlastNotifications = async (req: Request, res: Response, next:
 export const getEventNotifications = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const eventId = String(req.params.eventId);
-    await ensureEventOwnership(eventId, req.user!.id);
+    await ensureCanManageEvent(eventId, req.user!.id);
 
     const notifications = await NotificationModel.find({ eventId }).sort({ createdAt: -1 });
     res.status(200).json({

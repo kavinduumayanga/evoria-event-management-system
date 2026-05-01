@@ -5,6 +5,7 @@ import { EventModel } from '../models/Event';
 import { TicketTypeModel } from '../models/TicketType';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
+import { canManageEvent } from '../utils/eventPermissions';
 
 const approvalStatusValues = ['pending', 'approved', 'rejected'] as const;
 const bookingStatusValues = ['pending', 'confirmed', 'cancelled'] as const;
@@ -37,10 +38,10 @@ interface GuestRecord {
   ticketName: string;
 }
 
-const ensureHostOwnsEvent = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) {
+  if (!canManageEvent(userId, event)) {
     throw new AppError('Not authorized to manage guests for this event', 403);
   }
   return event;
@@ -92,7 +93,6 @@ const resolveSearchUserIds = async (search: string) => {
 
   const regex = normalizeSearchRegex(normalizedSearch);
   const users = await UserModel.find({
-    role: 'attendee',
     $or: [{ name: regex }, { email: regex }],
   }).select('_id');
 
@@ -148,10 +148,10 @@ const buildGuestRecords = async (
   });
 };
 
-const ensureHostOwnsBookingEvent = async (booking: any, hostAdminId: string) => {
+const ensureCanManageBookingEvent = async (booking: any, userId: string) => {
   const event = await EventModel.findById(booking.eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) {
+  if (!canManageEvent(userId, event)) {
     throw new AppError('Not authorized to manage this guest record', 403);
   }
   return event;
@@ -159,7 +159,7 @@ const ensureHostOwnsBookingEvent = async (booking: any, hostAdminId: string) => 
 
 export const getEventGuests = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await ensureHostOwnsEvent(req.params.eventId as string, req.user!.id);
+    await ensureCanManageEvent(req.params.eventId as string, req.user!.id);
     const guests = await buildGuestRecords(req.params.eventId as string, req.query);
 
     res.status(200).json({
@@ -178,7 +178,7 @@ export const updateGuestApprovalStatus = async (req: Request, res: Response, nex
     const registration = await BookingModel.findById(req.params.id as string);
     if (!registration) return next(new AppError('Guest record not found', 404));
 
-    await ensureHostOwnsBookingEvent(registration, req.user!.id);
+    await ensureCanManageBookingEvent(registration, req.user!.id);
 
     const updatePayload: Record<string, unknown> = { approvalStatus };
     if (approvalStatus === 'rejected') {
@@ -205,7 +205,7 @@ export const markGuestCheckIn = async (req: Request, res: Response, next: NextFu
     const registration = await BookingModel.findById(req.params.id as string);
     if (!registration) return next(new AppError('Guest record not found', 404));
 
-    await ensureHostOwnsBookingEvent(registration, req.user!.id);
+    await ensureCanManageBookingEvent(registration, req.user!.id);
 
     if (registration.bookingStatus === 'cancelled') {
       return next(new AppError('Cancelled bookings cannot be checked in', 400));
@@ -245,13 +245,13 @@ export const runBulkGuestAction = async (req: Request, res: Response, next: Next
     }
 
     const eventIds = [...new Set(registrations.map((registration) => registration.eventId))];
-    const events = await EventModel.find({ _id: { $in: eventIds } }).select('_id hostAdminId');
+    const events = await EventModel.find({ _id: { $in: eventIds } }).select('_id hostAdminId adminIds');
     const eventMap = new Map(events.map((event) => [event.id, event]));
 
     for (const registration of registrations) {
       const event = eventMap.get(registration.eventId);
       if (!event) return next(new AppError('Event not found for one or more records', 404));
-      if (event.hostAdminId !== req.user!.id) {
+      if (!canManageEvent(req.user!.id, event)) {
         return next(new AppError('Not authorized to manage one or more guest records', 403));
       }
     }
@@ -296,7 +296,7 @@ export const runBulkGuestAction = async (req: Request, res: Response, next: Next
 export const exportEventGuestsCsv = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const eventId = req.params.eventId as string;
-    await ensureHostOwnsEvent(eventId, req.user!.id);
+    await ensureCanManageEvent(eventId, req.user!.id);
     const guests = await buildGuestRecords(eventId, req.query);
 
     const header = ['name', 'email', 'ticket', 'status', 'rsvp', 'check-in'];
