@@ -50,6 +50,30 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, []);
 
+  const handleEmailFocus = () => {
+    if (__DEV__) {
+      console.log('[LoginScreen] email focused');
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (__DEV__) {
+      console.log('[LoginScreen] email blurred');
+    }
+  };
+
+  const handlePasswordFocus = () => {
+    if (__DEV__) {
+      console.log('[LoginScreen] password focused');
+    }
+  };
+
+  const handlePasswordBlur = () => {
+    if (__DEV__) {
+      console.log('[LoginScreen] password blurred');
+    }
+  };
+
   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -104,8 +128,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         >
           <ScrollView
             contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="always"
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.title}>Welcome Back</Text>
@@ -119,14 +142,23 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
+                onFocus={handleEmailFocus}
+                onBlur={handleEmailBlur}
               />
 
               <Input
                 label="Password"
                 placeholder="Enter your password"
                 isPassword
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                textContentType="password"
+                returnKeyType="done"
                 value={password}
                 onChangeText={setPassword}
+                onFocus={handlePasswordFocus}
+                onBlur={handlePasswordBlur}
               />
 
               <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
