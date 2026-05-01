@@ -10,6 +10,7 @@ import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
 import { EventCustomQuestion, EventStatus, EventType, EventVisibility } from '../types';
 import { canManageEvent, isEventOwner, manageableEventQuery } from '../utils/eventPermissions';
+import { getEventRegistrationQuestions } from '../utils/eventRegistrationFields';
 
 const EVENT_TYPES = ['online', 'physical', 'hybrid'] as const;
 const EVENT_VISIBILITIES = ['public', 'private', 'unlisted'] as const;
@@ -60,6 +61,10 @@ const statusUpdateSchema = z.object({
 
 const visibilityUpdateSchema = z.object({
   visibility: z.enum(EVENT_VISIBILITIES),
+}).strict();
+
+const registrationFieldsUpdateSchema = z.object({
+  customQuestions: z.array(customQuestionSchema).default([]),
 }).strict();
 
 const addEventAdminSchema = z.object({
@@ -322,7 +327,7 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
           type: question.type,
           required: question.required ?? false,
         }))
-      : (event.customQuestions || []),
+      : getEventRegistrationQuestions(event),
   };
 };
 
@@ -356,12 +361,14 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
   }
 
   if (updates.customQuestions !== undefined) {
-    payload.customQuestions = updates.customQuestions.map((question) => ({
+    const normalizedQuestions = updates.customQuestions.map((question) => ({
       id: question.id.trim(),
       question: question.question.trim(),
       type: question.type,
       required: question.required ?? false,
     }));
+    payload.customQuestions = normalizedQuestions;
+    payload.registrationFields = { customQuestions: normalizedQuestions };
   }
 
   return payload;
@@ -711,6 +718,9 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
       hostAdminId: req.user!.id,
       adminIds: [],
       publicSlug,
+      registrationFields: {
+        customQuestions: eventInput.customQuestions,
+      },
       status: 'draft',
       moderationStatus: 'approved',
       isFlagged: false,
@@ -807,6 +817,7 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
     });
 
     const freeRegistrationOptions = ticketOptions.filter((ticket) => ticket.isFree);
+    const registrationQuestions = getEventRegistrationQuestions(event);
     const locationLabel = event.type === 'online'
       ? (event.meetingLink || 'Online')
       : venue
@@ -874,6 +885,15 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
         },
         tickets: ticketOptions,
         freeRegistrationOptions,
+        registrationFields: {
+          defaultFields: [
+            { key: 'name', label: 'Name', required: true },
+            { key: 'email', label: 'Email', required: true },
+            { key: 'mobile', label: 'Mobile', required: true },
+            { key: 'nic', label: 'NIC', required: true },
+          ],
+          customQuestions: registrationQuestions,
+        },
         visibilityInfo: {
           visibility: event.visibility,
           discoveryVisible: event.visibility === 'public',
@@ -1023,6 +1043,58 @@ export const updateEventVisibility = async (req: Request, res: Response, next: N
       status: 'success',
       data: {
         event: updatedEvent!.toJSON(),
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
+    }
+    next(error);
+  }
+};
+
+export const updateEventRegistrationFields = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { customQuestions } = registrationFieldsUpdateSchema.parse(req.body);
+
+    const event = await EventModel.findById(req.params.eventId as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (!canManageEvent(req.user!.id, event)) {
+      return next(new AppError('Not authorized to update event registration fields', 403));
+    }
+
+    const normalizedQuestions = customQuestions.map((question) => ({
+      id: question.id.trim(),
+      question: question.question.trim(),
+      type: question.type,
+      required: question.required ?? false,
+    }));
+
+    const seenQuestionIds = new Set<string>();
+    for (const question of normalizedQuestions) {
+      if (seenQuestionIds.has(question.id)) {
+        return next(new AppError('Custom question ids must be unique', 400));
+      }
+      seenQuestionIds.add(question.id);
+    }
+
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      {
+        customQuestions: normalizedQuestions,
+        registrationFields: { customQuestions: normalizedQuestions },
+      },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: updatedEvent!.toJSON(),
+        registrationFields: {
+          customQuestions: normalizedQuestions,
+        },
       },
     });
   } catch (error: any) {

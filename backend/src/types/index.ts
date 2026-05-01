@@ -15,6 +15,7 @@ export type CustomQuestionType = 'text' | 'number' | 'choice';
 export type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
 export type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
 export type NotificationStatus = 'sent' | 'scheduled' | 'failed';
+export type EventRegistrationStatus = 'pending' | 'going' | 'not_going' | 'declined' | 'checked_in';
 
 export interface EventCustomQuestion {
   id: string;
@@ -74,6 +75,9 @@ export interface Event {
   visibility: EventVisibility;
   requiresApproval?: boolean;
   customQuestions?: EventCustomQuestion[];
+  registrationFields?: {
+    customQuestions: EventCustomQuestion[];
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -183,6 +187,22 @@ export interface Session {
   hallOrRoom?: string;
   bannerImage?: string;
   status: SessionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Registration {
+  id: string;
+  eventId: string;
+  userId?: string | null;
+  name: string;
+  email: string;
+  mobile: string;
+  nic: string;
+  customAnswers: RegistrationAnswer[];
+  status: EventRegistrationStatus;
+  qrCodeValue?: string | null;
+  registeredAt: string;
   createdAt: string;
   updatedAt: string;
 }
