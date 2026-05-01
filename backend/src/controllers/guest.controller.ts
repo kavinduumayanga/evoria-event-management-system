@@ -211,6 +211,10 @@ export const markGuestCheckIn = async (req: Request, res: Response, next: NextFu
       return next(new AppError('Cancelled bookings cannot be checked in', 400));
     }
 
+    if (registration.bookingStatus !== 'confirmed' || registration.isWaitlisted) {
+      return next(new AppError('Only confirmed non-waitlisted bookings can be checked in', 400));
+    }
+
     if (registration.approvalStatus === 'rejected') {
       return next(new AppError('Rejected guests cannot be checked in', 400));
     }
@@ -262,7 +266,8 @@ export const runBulkGuestAction = async (req: Request, res: Response, next: Next
     } else {
       updatePayload = { checkInStatus: 'checked_in' };
       extraQuery = {
-        bookingStatus: { $ne: 'cancelled' },
+        bookingStatus: 'confirmed',
+        isWaitlisted: false,
         approvalStatus: { $ne: 'rejected' },
       };
     }

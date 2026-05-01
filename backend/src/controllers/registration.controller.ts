@@ -5,6 +5,13 @@ import { EventModel } from '../models/Event';
 import { TicketTypeModel } from '../models/TicketType';
 import { AppError } from '../utils/appError';
 import { ApprovalStatus, RsvpStatus } from '../types';
+import { createNotificationRecord } from '../utils/notification.helper';
+import { validateTicketAvailability } from '../utils/ticketPricing';
+import {
+  ensureNoActiveWaitlistEntry,
+  getNextWaitlistPosition,
+  isEventAtCapacityForQuantity,
+} from '../utils/waitlist.helper';
 
 const registrationSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
@@ -78,6 +85,10 @@ export const createRegistration = async (req: Request, res: Response, next: Next
     const event = await EventModel.findById(validatedData.eventId);
     if (!event) return next(new AppError('Event not found', 404));
 
+    if (event.moderationStatus && event.moderationStatus !== 'approved') {
+      return next(new AppError('This event is not approved for registrations', 400));
+    }
+
     if (event.status !== 'published') {
       return next(new AppError('Cannot register for an event that is not published', 400));
     }
@@ -97,10 +108,6 @@ export const createRegistration = async (req: Request, res: Response, next: Next
       return next(new AppError('Ticket is not active', 400));
     }
 
-    if (ticket.quantity < ticket.soldCount + validatedData.quantity) {
-      return next(new AppError('Not enough tickets available', 400));
-    }
-
     const eventQuestions = (event.customQuestions || []) as Array<{
       id: string;
       question: string;
@@ -110,9 +117,23 @@ export const createRegistration = async (req: Request, res: Response, next: Next
 
     validateCustomAnswers(eventQuestions, validatedData.customAnswers);
 
+    const eventAtCapacity = await isEventAtCapacityForQuantity(validatedData.eventId, validatedData.quantity);
+    if (!eventAtCapacity) {
+      validateTicketAvailability(ticket as any, validatedData.quantity);
+    } else {
+      if (validatedData.quantity > ticket.quantity) {
+        return next(new AppError('Requested quantity exceeds ticket capacity', 400));
+      }
+      await ensureNoActiveWaitlistEntry(req.user!.id, validatedData.eventId);
+    }
+
     const totalAmount = ticket.price * validatedData.quantity;
     const approvalStatus: ApprovalStatus = event.requiresApproval ? 'pending' : 'approved';
     const rsvpStatus: RsvpStatus = validatedData.rsvpStatus;
+
+    const waitlistPosition = eventAtCapacity
+      ? await getNextWaitlistPosition(validatedData.eventId)
+      : null;
 
     const newRegistrationDoc = await BookingModel.create({
       userId: req.user!.id,
@@ -120,10 +141,13 @@ export const createRegistration = async (req: Request, res: Response, next: Next
       ticketTypeId: validatedData.ticketTypeId,
       quantity: validatedData.quantity,
       totalAmount,
-      bookingStatus: 'confirmed',
+      bookingStatus: eventAtCapacity ? 'pending' : 'confirmed',
       bookingDate: new Date().toISOString(),
+      isWaitlisted: eventAtCapacity,
+      waitlistPosition,
+      wasWaitlisted: eventAtCapacity,
       rsvpStatus,
-      approvalStatus,
+      approvalStatus: eventAtCapacity ? 'pending' : approvalStatus,
       checkInStatus: 'not_checked_in',
       customAnswers: validatedData.customAnswers.map((answer) => ({
         questionId: answer.questionId.trim(),
@@ -132,14 +156,33 @@ export const createRegistration = async (req: Request, res: Response, next: Next
       registrationType: ticket.isFree ? 'free' : 'paid',
     });
 
-    await TicketTypeModel.findByIdAndUpdate(ticket._id, {
-      soldCount: ticket.soldCount + validatedData.quantity,
-    });
-    await EventModel.findByIdAndUpdate(validatedData.eventId, {
-      $inc: { bookingCount: validatedData.quantity },
-    });
+    if (!eventAtCapacity) {
+      await TicketTypeModel.findByIdAndUpdate(ticket._id, {
+        soldCount: ticket.soldCount + validatedData.quantity,
+      });
+      await EventModel.findByIdAndUpdate(validatedData.eventId, {
+        $inc: { bookingCount: validatedData.quantity },
+      });
+    } else {
+      await createNotificationRecord({
+        userId: req.user!.id,
+        eventId: validatedData.eventId,
+        title: 'Added to Waitlist',
+        message: `Event full. You were added to waitlist at position ${waitlistPosition}.`,
+        type: 'booking',
+        channel: 'in_app',
+        status: 'sent',
+        sentAt: new Date(),
+      });
+    }
 
-    res.status(201).json({ status: 'success', data: { registration: newRegistrationDoc.toJSON() } });
+    res.status(201).json({
+      status: 'success',
+      message: eventAtCapacity ? 'Event full - you have been added to the waitlist' : undefined,
+      data: {
+        registration: newRegistrationDoc.toJSON(),
+      },
+    });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));

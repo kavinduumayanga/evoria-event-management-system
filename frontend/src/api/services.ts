@@ -65,6 +65,12 @@ export interface CreateBookingPayload {
   unlockCode?: string;
 }
 
+export interface CreateReportPayload {
+  targetType: 'event' | 'user';
+  targetId: string;
+  reason: string;
+}
+
 export interface GuestRecord {
   id: string;
   userId: string;
@@ -182,6 +188,10 @@ export const EventService = {
   },
   updateEventStatus: async (id: string, status: string) => {
     const response = await apiClient.patch(`/events/${id}/status`, { status });
+    return response.data;
+  },
+  toggleFeature: async (id: string) => {
+    const response = await apiClient.patch(`/events/${id}/feature`);
     return response.data;
   }
 };
@@ -417,6 +427,62 @@ export const NotificationService = {
   },
   processScheduled: async () => {
     const response = await apiClient.post('/notifications/process-scheduled');
+    return response.data;
+  },
+};
+
+export const ReportService = {
+  createReport: async (payload: CreateReportPayload) => {
+    const response = await apiClient.post('/reports', payload);
+    return response.data;
+  },
+  getReports: async () => {
+    const response = await apiClient.get('/reports');
+    return response.data;
+  },
+  resolveReport: async (reportId: string) => {
+    const response = await apiClient.patch(`/reports/${reportId}/resolve`);
+    return response.data;
+  },
+};
+
+export const ModerationService = {
+  approveEvent: async (eventId: string) => {
+    const response = await apiClient.patch(`/moderation/event/${eventId}/approve`);
+    return response.data;
+  },
+  rejectEvent: async (eventId: string) => {
+    const response = await apiClient.patch(`/moderation/event/${eventId}/reject`);
+    return response.data;
+  },
+  suspendUser: async (userId: string) => {
+    const response = await apiClient.patch(`/moderation/user/${userId}/suspend`);
+    return response.data;
+  },
+  activateUser: async (userId: string) => {
+    const response = await apiClient.patch(`/moderation/user/${userId}/activate`);
+    return response.data;
+  },
+};
+
+export const WaitlistService = {
+  getEventWaitlist: async (eventId: string) => {
+    const response = await apiClient.get(`/waitlist/event/${eventId}`);
+    return response.data;
+  },
+  getMyWaitlist: async () => {
+    const response = await apiClient.get('/waitlist/my');
+    return response.data;
+  },
+  promoteBooking: async (bookingId: string) => {
+    const response = await apiClient.patch(`/waitlist/${bookingId}/promote`);
+    return response.data;
+  },
+};
+
+export const AdminService = {
+  getPlatformAnalytics: async () => {
+    const response = await apiClient.get('/admin/analytics');
     return response.data;
   },
 };

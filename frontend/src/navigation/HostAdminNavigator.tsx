@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HostAdminTabParamList } from '../types/navigation';
 import { theme } from '../constants/theme';
-import { LayoutDashboard, CalendarDays, Users, User, MapPin, QrCode, Megaphone, Bell } from 'lucide-react-native';
+import { LayoutDashboard, CalendarDays, Users, User, MapPin, QrCode, Megaphone, Bell, ShieldAlert } from 'lucide-react-native';
 
 import { DashboardScreen } from '../screens/hostAdmin/DashboardScreen';
 import { HostAdminEventStack } from './HostAdminEventStack';
@@ -12,6 +12,7 @@ import { ManageBookingsScreen } from '../screens/hostAdmin/ManageBookingsScreen'
 import { CheckInScannerScreen } from '../screens/hostAdmin/CheckInScannerScreen';
 import { AnnouncementScreen } from '../screens/hostAdmin/AnnouncementScreen';
 import { NotificationsScreen } from '../screens/common/NotificationsScreen';
+import { ModerationDashboardScreen } from '../screens/hostAdmin/ModerationDashboardScreen';
 
 const Tab = createBottomTabNavigator<HostAdminTabParamList>();
 
@@ -58,6 +59,14 @@ export const HostAdminNavigator = () => {
           tabBarLabel: 'Bookings',
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} /> 
         }} 
+      />
+      <Tab.Screen
+        name="Moderation"
+        component={ModerationDashboardScreen}
+        options={{
+          tabBarLabel: 'Moderation',
+          tabBarIcon: ({ color, size }) => <ShieldAlert color={color} size={size} />,
+        }}
       />
       <Tab.Screen
         name="CheckIns"

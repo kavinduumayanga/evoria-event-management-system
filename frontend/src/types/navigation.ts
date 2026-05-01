@@ -20,6 +20,7 @@ export type AttendeeHomeStackParamList = {
   EventList: undefined;
   EventDetails: { eventId: string };
   TicketSelection: { eventId: string };
+  MyWaitlist: undefined;
   PaymentSummary: {
     eventId: string;
     ticketTypeId: string;
@@ -39,6 +40,7 @@ export type HostAdminTabParamList = {
   EventsStack: NavigatorScreenParams<HostAdminEventStackParamList>;
   VenuesStack: NavigatorScreenParams<HostAdminVenueStackParamList>;
   ManageBookings: undefined;
+  Moderation: undefined;
   CheckIns: undefined;
   Announcements: undefined;
   Notifications: undefined;
@@ -52,6 +54,7 @@ export type HostAdminEventStackParamList = {
   ManageTickets: { eventId: string };
   TicketForm: { eventId: string; ticketId?: string };
   ManageRegistrations: { eventId: string };
+  ManageWaitlist: { eventId: string };
   ManageSessions: { eventId: string };
   SessionForm: { eventId: string; sessionId?: string };
 };

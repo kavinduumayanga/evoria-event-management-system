@@ -83,7 +83,13 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
         unlockCode,
       });
 
-      Alert.alert('Success', 'Payment Successful (Mock)');
+      const waitlisted = Boolean(bookingResponse.data.booking?.isWaitlisted);
+      Alert.alert(
+        'Success',
+        waitlisted
+          ? 'Event reached capacity while confirming. You were added to waitlist.'
+          : 'Payment Successful (Mock)',
+      );
       navigation.replace('BookingConfirmation', { bookingId: bookingResponse.data.booking.id });
     } catch (confirmError: any) {
       Alert.alert('Payment Failed', confirmError.response?.data?.message || 'Unable to complete mock payment');

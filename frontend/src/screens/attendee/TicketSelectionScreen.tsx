@@ -83,6 +83,8 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
     return Math.max(0, selectedTicket.quantity - selectedTicket.soldCount);
   }, [selectedTicket]);
 
+  const isEventFull = Boolean(event && event.bookingCount >= event.capacity);
+
   const applyPromoCode = async () => {
     if (!selectedTicket) return;
     if (!promoCode.trim()) {
@@ -116,13 +118,37 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       return;
     }
 
-    if (remainingForSelected <= 0) {
+    if (!isEventFull && remainingForSelected <= 0) {
       Alert.alert('Sold Out', 'This ticket is sold out.');
       return;
     }
 
     if (quantity > selectedTicket.maxPerUser) {
       Alert.alert('Limit Exceeded', `You can only book up to ${selectedTicket.maxPerUser} tickets.`);
+      return;
+    }
+
+    if (isEventFull) {
+      try {
+        setIsBooking(true);
+        const response = await BookingService.createBooking({
+          eventId,
+          ticketTypeId: selectedTicket.id,
+          quantity,
+          unlockCode: unlockCode.trim() || undefined,
+        });
+
+        const waitlistPosition = response.data?.booking?.waitlistPosition;
+        Alert.alert(
+          'Added to Waitlist',
+          waitlistPosition ? `Event full - you are now #${waitlistPosition} on the waitlist.` : 'Event full - you were added to waitlist.',
+        );
+        navigation.navigate('BookingConfirmation', { bookingId: response.data.booking.id });
+      } catch (waitlistError: any) {
+        Alert.alert('Waitlist Failed', waitlistError.response?.data?.message || 'Unable to join waitlist');
+      } finally {
+        setIsBooking(false);
+      }
       return;
     }
 
@@ -171,12 +197,12 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
         <ScrollView contentContainerStyle={styles.content}>
           {error && <Text style={styles.errorText}>{error}</Text>}
 
-          {tickets.map((ticket) => {
-            const available = Math.max(0, ticket.quantity - ticket.soldCount);
-            const isSelected = selectedTicket?.id === ticket.id;
+        {tickets.map((ticket) => {
+          const available = Math.max(0, ticket.quantity - ticket.soldCount);
+          const isSelected = selectedTicket?.id === ticket.id;
 
             return (
-              <TouchableOpacity key={ticket.id} onPress={() => setSelectedTicket(ticket)} disabled={available === 0}>
+              <TouchableOpacity key={ticket.id} onPress={() => setSelectedTicket(ticket)} disabled={available === 0 && !isEventFull}>
                 <GlassCard style={[styles.ticketCard, isSelected && styles.selectedCard]} variant={isSelected ? 'neon' : 'dark'}>
                   <View style={styles.ticketTopRow}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
@@ -191,11 +217,17 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
                   </Text>
                   <Text style={styles.ticketMeta}>Remaining: {available}</Text>
                   <Text style={styles.ticketMeta}>Max per user: {ticket.maxPerUser}</Text>
-                  {available === 0 && <Text style={styles.soldOutText}>Sold Out</Text>}
+                  {available === 0 && <Text style={styles.soldOutText}>{isEventFull ? 'Sold Out (waitlist available)' : 'Sold Out'}</Text>}
                 </GlassCard>
               </TouchableOpacity>
             );
           })}
+
+          {isEventFull && (
+            <Text style={styles.waitlistMessage}>
+              Event full - continue to join the waitlist. We will promote bookings in FIFO order when seats open.
+            </Text>
+          )}
 
           {selectedTicket && (
             <>
@@ -208,7 +240,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
                 />
               )}
 
-              {!selectedTicket.isFree && (
+              {!selectedTicket.isFree && !isEventFull && (
                 <>
                   <Input
                     label="Promo Code"
@@ -249,14 +281,19 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
                 title="+"
                 size="small"
                 variant="outline"
-                onPress={() => setQuantity(Math.min(selectedTicket.maxPerUser, remainingForSelected, quantity + 1))}
+                onPress={() => {
+                  const maxQuantity = isEventFull
+                    ? selectedTicket.maxPerUser
+                    : Math.min(selectedTicket.maxPerUser, remainingForSelected);
+                  setQuantity(Math.min(maxQuantity, quantity + 1));
+                }}
               />
             </View>
             <Button
-              title={selectedTicket.isFree ? 'Book Free Ticket' : 'Continue to Payment'}
+              title={isEventFull ? 'Join Waitlist' : (selectedTicket.isFree ? 'Book Free Ticket' : 'Continue to Payment')}
               onPress={handleContinue}
               isLoading={isBooking}
-              disabled={remainingForSelected === 0}
+              disabled={!isEventFull && remainingForSelected === 0}
             />
           </View>
         )}
@@ -318,6 +355,11 @@ const styles = StyleSheet.create({
   errorText: {
     ...theme.typography.body,
     color: theme.colors.error,
+    marginBottom: theme.spacing.m,
+  },
+  waitlistMessage: {
+    ...theme.typography.caption,
+    color: theme.colors.warning,
     marginBottom: theme.spacing.m,
   },
 });

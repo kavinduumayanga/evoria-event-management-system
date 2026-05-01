@@ -101,7 +101,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const validatedData = loginSchema.parse(req.body);
     const normalizedEmail = normalizeEmail(validatedData.email);
 
-    const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+password +isActive');
+    const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+password +isActive +isSuspended');
 
     if (!userDoc || !userDoc.password) {
       return next(new AppError('Invalid email or password', 401));
@@ -109,6 +109,10 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     if (!userDoc.isActive) {
       return next(new AppError('This account is deactivated.', 401));
+    }
+
+    if (userDoc.isSuspended) {
+      return next(new AppError('This account is suspended.', 403));
     }
 
     const isPasswordCorrect = await bcrypt.compare(validatedData.password, userDoc.password);
@@ -139,13 +143,17 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
       return next(new AppError('Unauthorized access. Please log in.', 401));
     }
 
-    const userDoc = await UserModel.findById(userId).select('+isActive');
+    const userDoc = await UserModel.findById(userId).select('+isActive +isSuspended');
     if (!userDoc) {
       return next(new AppError('User not found', 404));
     }
 
     if (!userDoc.isActive) {
       return next(new AppError('This account is deactivated.', 401));
+    }
+
+    if (userDoc.isSuspended) {
+      return next(new AppError('This account is suspended.', 403));
     }
 
     const safeUser = toSafeUser(userDoc);
@@ -166,11 +174,11 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     const validatedData = forgotPasswordSchema.parse(req.body);
     const normalizedEmail = normalizeEmail(validatedData.email);
 
-    const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+resetPasswordToken +resetPasswordExpires +isActive');
+    const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+resetPasswordToken +resetPasswordExpires +isActive +isSuspended');
 
     let resetToken: string | undefined;
 
-    if (userDoc && userDoc.isActive) {
+    if (userDoc && userDoc.isActive && !userDoc.isSuspended) {
       resetToken = crypto.randomBytes(32).toString('hex');
       const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
 
@@ -203,7 +211,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const userDoc = await UserModel.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: new Date() },
-    }).select('+password +resetPasswordToken +resetPasswordExpires +isActive');
+    }).select('+password +resetPasswordToken +resetPasswordExpires +isActive +isSuspended');
 
     if (!userDoc) {
       return next(new AppError('Invalid or expired reset token', 400));
@@ -211,6 +219,10 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
     if (!userDoc.isActive) {
       return next(new AppError('This account is deactivated.', 400));
+    }
+
+    if (userDoc.isSuspended) {
+      return next(new AppError('This account is suspended.', 403));
     }
 
     userDoc.password = await bcrypt.hash(validatedData.newPassword, 12);
