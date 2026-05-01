@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Ale
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard } from '../../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, SecondaryButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { EventService, WaitlistService } from '../../../api/services';
 import { Event, Booking } from '../../../types';
@@ -100,6 +100,7 @@ export const ManageWaitlistScreen: React.FC<Props> = ({ navigation, route }) => 
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <GlassCard style={styles.card}>
             <View style={styles.cardHeader}>
@@ -110,13 +111,14 @@ export const ManageWaitlistScreen: React.FC<Props> = ({ navigation, route }) => 
             <Text style={styles.metaText}>Quantity: {item.quantity}</Text>
             <Text style={styles.metaText}>Joined: {new Date(item.createdAt).toLocaleString()}</Text>
 
-            <TouchableOpacity
-              style={styles.promoteButton}
-              onPress={() => handlePromote(item.id, item.attendee?.name || 'this attendee')}
-            >
-              <UserCheck size={16} color={theme.colors.success} />
-              <Text style={styles.promoteText}>Promote</Text>
-            </TouchableOpacity>
+            <View style={styles.actionRow}>
+              <SecondaryButton
+                title="Promote"
+                icon={<UserCheck size={16} color={theme.colors.success} />}
+                onPress={() => handlePromote(item.id, item.attendee?.name || 'this attendee')}
+                style={styles.promoteButton}
+              />
+            </View>
           </GlassCard>
         )}
         ListEmptyComponent={<EmptyState title="Waitlist Empty" message="No attendees are waiting for this event right now." />}
@@ -173,7 +175,7 @@ const styles = StyleSheet.create({
     marginRight: theme.spacing.s,
   },
   positionText: {
-    ...theme.typography.h3,
+    ...theme.typography.h2,
     color: theme.colors.warning,
   },
   metaText: {
@@ -181,20 +183,10 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     marginBottom: 2,
   },
-  promoteButton: {
-    marginTop: theme.spacing.s,
-    borderWidth: 1,
-    borderColor: theme.colors.success,
-    borderRadius: theme.borderRadius.s,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.s,
-    backgroundColor: `${theme.colors.success}1A`,
-    gap: theme.spacing.xs,
+  actionRow: {
+    marginTop: theme.spacing.m,
   },
-  promoteText: {
-    ...theme.typography.button,
-    color: theme.colors.success,
+  promoteButton: {
+    borderColor: theme.colors.success,
   },
 });
