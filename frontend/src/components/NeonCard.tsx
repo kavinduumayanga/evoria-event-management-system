@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...theme.shadows.subtle,
+    ...theme.shadows.premium,
   },
   blurContainer: {
     padding: theme.spacing.m,

@@ -294,7 +294,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
 
             return (
               <TouchableOpacity key={ticket.id} onPress={() => setSelectedTicket(ticket)} disabled={available === 0 && !isEventFull}>
-                <GlassCard style={[styles.ticketCard, isSelected && styles.selectedCard]} variant={isSelected ? 'neon' : 'dark'}>
+                <GlassCard style={[styles.ticketCard, isSelected && styles.selectedCard]} variant={isSelected ? 'neonPurple' : 'dark'}>
                   <View style={styles.ticketTopRow}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
                     <View style={[styles.badge, { backgroundColor: ticket.isFree ? `${theme.colors.success}20` : `${theme.colors.secondary}20` }]}>

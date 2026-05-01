@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { ScreenContainer, NeonCard, LoadingState, ErrorState, Button } from '../../components';
+import { ScreenContainer, GlassCard, LoadingState, ErrorState, SecondaryButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { User, Mail, Phone, Shield, LogOut } from 'lucide-react-native';
 import { UserService } from '../../api/services';
@@ -113,7 +113,7 @@ export const ProfileScreen = () => {
         </View>
       </View>
 
-      <NeonCard style={styles.detailsCard}>
+      <GlassCard style={styles.detailsCard} variant="dark" animateEntrance>
         <View style={styles.detailRow}>
           <Mail size={20} color={theme.colors.textMuted} />
           <View style={styles.detailTextContainer}>
@@ -129,18 +129,16 @@ export const ProfileScreen = () => {
             <Text style={styles.detailValue}>{user?.phone || 'Not set'}</Text>
           </View>
         </View>
-      </NeonCard>
+      </GlassCard>
 
-      <Button
+      <SecondaryButton
         title="Edit Profile"
-        variant="outline"
         style={styles.actionButton}
         onPress={() => navigation.navigate('EditProfile')}
       />
 
-      <Button
+      <SecondaryButton
         title="Change Password"
-        variant="outline"
         style={styles.actionButton}
         onPress={() => navigation.navigate('ChangePassword')}
       />

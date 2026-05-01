@@ -12,11 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, Button, Input, GlassCard } from '../../components';
+import { GradientBackground, PrimaryButton, FormInput, GlassCard, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, Lock } from 'lucide-react-native';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
@@ -74,9 +74,11 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
-          </TouchableOpacity>
+          <IconButton 
+            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
+            onPress={() => navigation.goBack()} 
+            variant="solid" 
+          />
         </View>
 
         <KeyboardAvoidingView
@@ -91,32 +93,35 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Join Evoria to start your journey</Text>
 
-            <GlassCard style={styles.card}>
-              <Input
+            <GlassCard style={styles.card} variant="dark" animateEntrance>
+              <FormInput
                 label="Full Name"
                 placeholder="Enter your full name"
                 value={name}
                 onChangeText={setName}
+                leftIcon={<User size={20} color={theme.colors.textMuted} />}
               />
 
-              <Input
+              <FormInput
                 label="Email Address"
                 placeholder="Enter your email"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
+                leftIcon={<Mail size={20} color={theme.colors.textMuted} />}
               />
 
-              <Input
+              <FormInput
                 label="Password"
                 placeholder="Create a password"
                 isPassword
                 value={password}
                 onChangeText={setPassword}
+                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
               />
 
-              <Button
+              <PrimaryButton
                 title="Sign Up"
                 onPress={handleRegister}
                 isLoading={isLoading}
@@ -144,17 +149,10 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
+    alignItems: 'flex-start',
   },
   keyboardContainer: {
     flex: 1,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   scrollContent: {
     padding: theme.spacing.xl,
@@ -188,7 +186,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     ...theme.typography.body,
-    color: theme.colors.primaryLight,
+    color: theme.colors.primary,
     fontWeight: 'bold',
   },
 });
