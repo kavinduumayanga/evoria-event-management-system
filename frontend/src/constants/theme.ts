@@ -1,18 +1,18 @@
 export const theme = {
   colors: {
-    background: '#09090B', // Deepest dark
-    surface: '#121214', // Elevated dark
-    surfaceLight: '#1E1E20', // Higher elevation
-    primary: '#E5E5E5', // Premium Off-White for contrast
-    primaryLight: '#FFFFFF',
-    secondary: '#38BDF8', // Icy blue for subtle accents
-    accent: '#818CF8', // Muted violet
-    text: '#FAFAFA', // Soft white
+    background: '#09090E', // Deep dark blue-tinted
+    surface: '#15151E', // Slightly lighter
+    surfaceLight: '#232330', // Higher elevation
+    primary: '#8B5CF6', // Neon Purple
+    primaryLight: '#A78BFA',
+    secondary: '#06B6D4', // Neon Cyan
+    accent: '#F43F5E', // Neon Rose
+    text: '#FFFFFF', // Pure white
     textMuted: '#A1A1AA', // Zinc 400
-    border: 'rgba(255, 255, 255, 0.08)', // Ultra-subtle border
-    error: '#F87171', // Soft red
-    success: '#34D399', // Soft emerald
-    warning: '#FBBF24', // Soft amber
+    border: 'rgba(255, 255, 255, 0.1)',
+    error: '#EF4444',
+    success: '#10B981',
+    warning: '#F59E0B',
   },
   spacing: {
     xs: 4,
@@ -46,19 +46,19 @@ export const theme = {
       shadowRadius: 16,
       elevation: 10,
     },
-    subtle: {
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    glow: {
-      shadowColor: '#FFFFFF',
+    neonPurple: {
+      shadowColor: '#8B5CF6',
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.1,
-      shadowRadius: 12,
-      elevation: 4,
+      shadowOpacity: 0.5,
+      shadowRadius: 15,
+      elevation: 8,
+    },
+    neonCyan: {
+      shadowColor: '#06B6D4',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 15,
+      elevation: 8,
     },
   },
 };
