@@ -65,6 +65,24 @@ export interface CreateBookingPayload {
   unlockCode?: string;
 }
 
+export interface GuestRecord {
+  id: string;
+  userId: string;
+  eventId: string;
+  ticketTypeId: string;
+  quantity: number;
+  totalAmount: number;
+  bookingStatus: 'pending' | 'confirmed' | 'cancelled';
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  rsvpStatus: 'going' | 'not_going';
+  checkInStatus: 'not_checked_in' | 'checked_in';
+  createdAt: string;
+  updatedAt: string;
+  guestName: string;
+  guestEmail: string;
+  ticketName: string;
+}
+
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
@@ -200,6 +218,32 @@ export const RegistrationService = {
   rejectRegistration: async (registrationId: string) => {
     const response = await apiClient.patch(`/registrations/${registrationId}/reject`);
     return response.data;
+  },
+};
+
+export const GuestService = {
+  getEventGuests: async (eventId: string, params?: { status?: string; search?: string; date?: string }) => {
+    const response = await apiClient.get(`/guests/event/${eventId}`, { params });
+    return response.data;
+  },
+  updateGuestStatus: async (id: string, approvalStatus: 'pending' | 'approved' | 'rejected') => {
+    const response = await apiClient.patch(`/guests/${id}/status`, { approvalStatus });
+    return response.data;
+  },
+  checkInGuest: async (id: string) => {
+    const response = await apiClient.patch(`/guests/${id}/checkin`);
+    return response.data;
+  },
+  bulkAction: async (payload: { action: 'approve' | 'reject' | 'checkin'; ids: string[] }) => {
+    const response = await apiClient.post('/guests/bulk-action', payload);
+    return response.data;
+  },
+  exportEventGuests: async (eventId: string, params?: { status?: string; search?: string; date?: string }) => {
+    const response = await apiClient.get(`/guests/export/${eventId}`, {
+      params,
+      responseType: 'text',
+    });
+    return response.data as string;
   },
 };
 

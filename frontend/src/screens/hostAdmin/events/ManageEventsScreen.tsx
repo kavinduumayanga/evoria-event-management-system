@@ -124,7 +124,7 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageRegistrations', { eventId: item.id })}>
                     <Users size={16} color={theme.colors.accent} />
-                    <Text style={styles.actionText}>Registrations</Text>
+                    <Text style={styles.actionText}>Guests</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('EventForm', { eventId: item.id })}>
                     <Edit2 size={16} color={theme.colors.textMuted} />
