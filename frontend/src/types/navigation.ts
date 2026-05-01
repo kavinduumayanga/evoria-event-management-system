@@ -20,6 +20,10 @@ export type AttendeeHomeStackParamList = {
   EventList: undefined;
   EventDetails: { eventId: string; publicSlug?: string };
   PublicEventDetails: { slug: string };
+  EventForm: { eventId?: string };
+  ManageRegistrations: { eventId: string };
+  ManageTickets: { eventId: string };
+  TicketForm: { eventId: string; ticketId?: string };
   TicketSelection: { eventId: string };
   MyWaitlist: undefined;
   PaymentSummary: {

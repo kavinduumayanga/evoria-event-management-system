@@ -5,9 +5,7 @@ import { useAuthStore, initAuth } from '../store/auth.store';
 import { RootStackParamList } from '../types/navigation';
 import { AuthNavigator } from './AuthNavigator';
 import { AttendeeNavigator } from './AttendeeNavigator';
-import { HostAdminNavigator } from './HostAdminNavigator';
 import { theme } from '../constants/theme';
-import { EventService } from '../api/services';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -16,8 +14,7 @@ export const RootNavigator = () => {
   const token = useAuthStore((state) => state.token);
   const isAuthLoading = useAuthStore((state) => state.isAuthLoading);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [isStackResolving, setIsStackResolving] = useState(false);
-  const [activeStack, setActiveStack] = useState<'Auth' | 'HostAdmin' | 'Attendee'>('Auth');
+  const [activeStack, setActiveStack] = useState<'Auth' | 'Attendee'>('Auth');
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
 
@@ -50,55 +47,13 @@ export const RootNavigator = () => {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!token) {
+      setActiveStack('Auth');
+      return;
+    }
 
-    const resolveActiveStack = async () => {
-      if (!token) {
-        if (isMounted) {
-          setActiveStack('Auth');
-          setIsStackResolving(false);
-        }
-        return;
-      }
-
-      if (!user?.id) {
-        if (isMounted) {
-          setActiveStack('Attendee');
-          setIsStackResolving(false);
-        }
-        return;
-      }
-
-      if (isMounted) {
-        setIsStackResolving(true);
-      }
-
-      try {
-        const response = await EventService.getHostEvents(user.id);
-        const managedEvents = response?.data?.events;
-        const hasManagedEvents = Array.isArray(managedEvents) && managedEvents.length > 0;
-        const fallbackLegacyStack = user.role === 'host_admin' ? 'HostAdmin' : 'Attendee';
-
-        if (isMounted) {
-          setActiveStack(hasManagedEvents ? 'HostAdmin' : fallbackLegacyStack);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setActiveStack(user.role === 'host_admin' ? 'HostAdmin' : 'Attendee');
-        }
-      } finally {
-        if (isMounted) {
-          setIsStackResolving(false);
-        }
-      }
-    };
-
-    resolveActiveStack();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [token, user?.id, user?.role]);
+    setActiveStack('Attendee');
+  }, [token, user?.id]);
 
   if (__DEV__) {
     console.log('[RootNavigator] render', {
@@ -106,13 +61,12 @@ export const RootNavigator = () => {
       hasUser: Boolean(user),
       hasToken: Boolean(token),
       isAuthLoading,
-      isStackResolving,
       isAuthReady,
       activeStack,
     });
   }
 
-  if (!isAuthReady || isAuthLoading || isStackResolving) {
+  if (!isAuthReady || isAuthLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -124,8 +78,6 @@ export const RootNavigator = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {activeStack === 'Auth' ? (
         <Stack.Screen name="Auth" component={AuthNavigator} />
-      ) : activeStack === 'HostAdmin' ? (
-        <Stack.Screen name="HostAdmin" component={HostAdminNavigator} />
       ) : (
         <Stack.Screen name="Attendee" component={AttendeeNavigator} />
       )}
