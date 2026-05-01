@@ -24,6 +24,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
           <ScrollView 
             contentContainerStyle={[styles.container, style]}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             refreshControl={refreshControl}
           >
             {children}

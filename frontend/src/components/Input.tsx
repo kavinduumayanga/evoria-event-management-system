@@ -26,22 +26,15 @@ export const Input: React.FC<InputProps> = ({
   ...props
 }) => {
   const inputRef = useRef<TextInput>(null);
-  const [isFocused, setIsFocused] = useState(false);
   const [isSecure, setIsSecure] = useState(isPassword);
 
   const handleFocus: NonNullable<TextInputProps['onFocus']> = (event) => {
-    if (!isPassword) {
-      setIsFocused(true);
-    }
     if (onFocus) {
       onFocus(event);
     }
   };
 
   const handleBlur: NonNullable<TextInputProps['onBlur']> = (event) => {
-    if (!isPassword) {
-      setIsFocused(false);
-    }
     if (onBlur) {
       onBlur(event);
     }
@@ -63,7 +56,6 @@ export const Input: React.FC<InputProps> = ({
       <View 
         style={[
           styles.inputContainer,
-          isFocused && styles.inputFocused,
           error ? styles.inputError : null,
           style
         ]}
@@ -122,11 +114,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     paddingVertical: theme.spacing.m,
     ...theme.typography.body,
-  },
-  inputFocused: {
-    borderColor: theme.colors.primary,
-    ...theme.shadows.neon,
-    shadowOpacity: 0.1,
   },
   inputError: {
     borderColor: theme.colors.error,

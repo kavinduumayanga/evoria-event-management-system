@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -26,53 +26,10 @@ interface Props {
 }
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
-
-  if (__DEV__) {
-    console.log(`[LoginScreen] render #${renderCountRef.current}`);
-  }
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
-
-  useEffect(() => {
-    if (__DEV__) {
-      console.log('[LoginScreen] mounted');
-    }
-
-    return () => {
-      if (__DEV__) {
-        console.log('[LoginScreen] unmounted');
-      }
-    };
-  }, []);
-
-  const handleEmailFocus = () => {
-    if (__DEV__) {
-      console.log('[LoginScreen] email focused');
-    }
-  };
-
-  const handleEmailBlur = () => {
-    if (__DEV__) {
-      console.log('[LoginScreen] email blurred');
-    }
-  };
-
-  const handlePasswordFocus = () => {
-    if (__DEV__) {
-      console.log('[LoginScreen] password focused');
-    }
-  };
-
-  const handlePasswordBlur = () => {
-    if (__DEV__) {
-      console.log('[LoginScreen] password blurred');
-    }
-  };
 
   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -142,8 +99,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
-                onFocus={handleEmailFocus}
-                onBlur={handleEmailBlur}
               />
 
               <Input
@@ -157,8 +112,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 returnKeyType="done"
                 value={password}
                 onChangeText={setPassword}
-                onFocus={handlePasswordFocus}
-                onBlur={handlePasswordBlur}
               />
 
               <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>

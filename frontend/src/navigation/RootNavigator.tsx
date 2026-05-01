@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuthStore, initAuth } from '../store/auth.store';
@@ -10,13 +10,9 @@ import { theme } from '../constants/theme';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator = () => {
-  const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const isAuthLoading = useAuthStore((state) => state.isAuthLoading);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [activeStack, setActiveStack] = useState<'Auth' | 'Attendee'>('Auth');
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
 
   useEffect(() => {
     let isMounted = true;
@@ -34,38 +30,6 @@ export const RootNavigator = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (__DEV__) {
-      console.log('[RootNavigator] mounted');
-    }
-
-    return () => {
-      if (__DEV__) {
-        console.log('[RootNavigator] unmounted');
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!token) {
-      setActiveStack('Auth');
-      return;
-    }
-
-    setActiveStack('Attendee');
-  }, [token, user?.id]);
-
-  if (__DEV__) {
-    console.log('[RootNavigator] render', {
-      renderCount: renderCountRef.current,
-      hasUser: Boolean(user),
-      hasToken: Boolean(token),
-      isAuthLoading,
-      isAuthReady,
-      activeStack,
-    });
-  }
-
   if (!isAuthReady || isAuthLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
@@ -76,7 +40,7 @@ export const RootNavigator = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {activeStack === 'Auth' ? (
+      {!token ? (
         <Stack.Screen name="Auth" component={AuthNavigator} />
       ) : (
         <Stack.Screen name="Attendee" component={AttendeeNavigator} />
