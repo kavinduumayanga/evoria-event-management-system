@@ -12,6 +12,7 @@ import sessionRoutes from './session.routes';
 import uploadRoutes from './upload.routes';
 import checkinRoutes from './checkin.routes';
 import notificationRoutes from './notification.routes';
+import analyticsRoutes from './analytics.routes';
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use('/sessions', sessionRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/checkins', checkinRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;

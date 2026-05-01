@@ -52,6 +52,12 @@ export interface Event {
   hostAdminId: string;
   venueId?: string | null;
   type: EventType;
+  category: string;
+  city: string;
+  tags: string[];
+  viewsCount: number;
+  bookingCount: number;
+  meetingLink?: string;
   coverImage?: string;
   capacity: number;
   status: EventStatus;

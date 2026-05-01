@@ -1,54 +1,42 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, RefreshControl } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { CalendarDays, Users, DollarSign, UserCheck } from 'lucide-react-native';
 import { ScreenContainer, StatCard, EventCard, LoadingState, ErrorState, EmptyState } from '../../components';
 import { theme } from '../../constants/theme';
-import { CalendarDays, Users, MapPin, Layers } from 'lucide-react-native';
-import { EventService, BookingService, VenueService, SessionService, UserService } from '../../api/services';
-import { Event } from '../../types';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { AnalyticsService, EventService, UserService } from '../../api/services';
+import { Event, DashboardAnalytics } from '../../types';
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
   const [userName, setUserName] = useState('');
-  const [stats, setStats] = useState({ events: 0, bookings: 0, venues: 0, sessions: 0 });
+  const [analytics, setAnalytics] = useState<DashboardAnalytics>({
+    totalEvents: 0,
+    totalBookings: 0,
+    totalRevenue: 0,
+    totalAttendees: 0,
+  });
   const [recentEvents, setRecentEvents] = useState<Event[]>([]);
 
   const fetchData = async () => {
     try {
       setError(null);
-      
-      const userRes = await UserService.getMe();
-      setUserName(userRes.data.user.name);
-      
-      // Fetch all required data to compute stats
-      // Note: Ideally the backend should provide a /stats endpoint to prevent over-fetching
-      const [eventsRes, bookingsRes, venuesRes, sessionsRes] = await Promise.all([
+
+      const [userRes, analyticsRes, eventsRes] = await Promise.all([
+        UserService.getMe(),
+        AnalyticsService.getDashboardAnalytics(),
         EventService.getEvents(),
-        BookingService.getBookings(),
-        VenueService.getVenues(),
-        SessionService.getSessions()
       ]);
 
-      const myEvents = eventsRes.data.events.filter((e: any) => e.hostAdminId === userRes.data.user.id);
-      
-      setStats({
-        events: myEvents.length,
-        bookings: bookingsRes.data.bookings.length, // assuming getBookings returns host's bookings as per backend logic
-        venues: venuesRes.data.venues.length,
-        sessions: sessionsRes.data.sessions.length,
-      });
-
-      // Just take top 3 events for dashboard
-      setRecentEvents(myEvents.slice(0, 3));
-      
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load dashboard data');
+      setUserName(userRes.data.user.name);
+      setAnalytics(analyticsRes.data);
+      setRecentEvents((eventsRes.data.events || []).slice(0, 3));
+    } catch (fetchError) {
+      console.error(fetchError);
+      setError('Failed to load dashboard analytics');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -77,7 +65,6 @@ export const DashboardScreen = () => {
         <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
       }
     >
-      
       <View style={styles.header}>
         <Text style={styles.greeting}>Welcome back,</Text>
         <Text style={styles.name}>{userName}</Text>
@@ -85,54 +72,56 @@ export const DashboardScreen = () => {
 
       <View style={styles.statsGrid}>
         <View style={styles.statsRow}>
-          <StatCard 
-            title="Total Events" 
-            value={stats.events} 
-            icon={<CalendarDays size={24} color={theme.colors.primary} />} 
-            style={styles.statCard} 
+          <StatCard
+            title="Total Events"
+            value={analytics.totalEvents}
+            icon={<CalendarDays size={24} color={theme.colors.primary} />}
+            style={styles.statCard}
           />
-          <StatCard 
-            title="Total Bookings" 
-            value={stats.bookings} 
-            icon={<Users size={24} color={theme.colors.secondary} />} 
-            style={styles.statCard} 
+          <StatCard
+            title="Total Bookings"
+            value={analytics.totalBookings}
+            icon={<Users size={24} color={theme.colors.secondary} />}
+            style={styles.statCard}
             accentColor={theme.colors.secondary}
           />
         </View>
         <View style={styles.statsRow}>
-          <StatCard 
-            title="Venues" 
-            value={stats.venues} 
-            icon={<MapPin size={24} color={theme.colors.accent} />} 
-            style={styles.statCard} 
-            accentColor={theme.colors.accent}
-          />
-          <StatCard 
-            title="Sessions" 
-            value={stats.sessions} 
-            icon={<Layers size={24} color={theme.colors.success} />} 
-            style={styles.statCard} 
+          <StatCard
+            title="Revenue"
+            value={analytics.totalRevenue.toFixed(2)}
+            icon={<DollarSign size={24} color={theme.colors.success} />}
+            style={styles.statCard}
             accentColor={theme.colors.success}
+          />
+          <StatCard
+            title="Attendees"
+            value={analytics.totalAttendees}
+            icon={<UserCheck size={24} color={theme.colors.accent} />}
+            style={styles.statCard}
+            accentColor={theme.colors.accent}
           />
         </View>
       </View>
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Events</Text>
-        <Text style={styles.seeAll} onPress={() => navigation.navigate('EventsStack', { screen: 'ManageEvents' })}>See All</Text>
+        <Text style={styles.seeAll} onPress={() => navigation.navigate('EventsStack', { screen: 'ManageEvents' })}>
+          See All
+        </Text>
       </View>
 
       {recentEvents.length === 0 ? (
         <EmptyState title="No Events Yet" message="Create your first event to get started" />
       ) : (
-        recentEvents.map(event => (
-          <EventCard 
-            key={event.id} 
-            event={event} 
-            onPress={() => navigation.navigate('EventsStack', { 
-              screen: 'EventForm', 
-              params: { eventId: event.id } 
-            })} 
+        recentEvents.map((event) => (
+          <EventCard
+            key={event.id}
+            event={event}
+            onPress={() => navigation.navigate('EventsStack', {
+              screen: 'EventForm',
+              params: { eventId: event.id },
+            })}
           />
         ))
       )}

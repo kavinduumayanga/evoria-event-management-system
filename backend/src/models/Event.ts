@@ -11,6 +11,12 @@ const eventSchema = new Schema({
   hostAdminId: { type: String, required: true, index: true },
   venueId: { type: String, default: null },
   type: { type: String, enum: ['online', 'physical', 'hybrid'], required: true },
+  category: { type: String, trim: true, default: '' },
+  city: { type: String, trim: true, default: '' },
+  tags: { type: [String], default: [] },
+  viewsCount: { type: Number, default: 0 },
+  bookingCount: { type: Number, default: 0 },
+  meetingLink: { type: String, trim: true, default: '' },
   coverImage: { type: String, trim: true },
   capacity: { type: Number, required: true },
   status: { type: String, enum: ['draft', 'published', 'cancelled'], default: 'draft' },
@@ -36,5 +42,10 @@ const eventSchema = new Schema({
     }
   }
 });
+
+eventSchema.index({ title: 'text', description: 'text' });
+eventSchema.index({ category: 1, city: 1, date: 1 });
+eventSchema.index({ tags: 1 });
+eventSchema.index({ bookingCount: -1, viewsCount: -1 });
 
 export const EventModel = mongoose.model('Event', eventSchema);
