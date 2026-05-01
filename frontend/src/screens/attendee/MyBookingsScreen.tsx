@@ -48,6 +48,7 @@ export const MyBookingsScreen = () => {
       const response = await RegistrationService.updateRsvp(registrationId, rsvpStatus);
       const updated = response.data.registration as Booking;
       setBookings((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
+      await fetchBookings();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to update RSVP');
     }

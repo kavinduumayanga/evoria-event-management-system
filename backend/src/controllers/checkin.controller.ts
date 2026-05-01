@@ -27,7 +27,6 @@ const ensureCanManageEvent = async (eventId: string, userId: string) => {
 
 const shouldHaveRegistrationQr = (status: string) => (
   status === 'going'
-  || status === 'ongoing'
   || status === 'checked_in'
 );
 
@@ -37,7 +36,7 @@ const validateRegistrationCheckInEligibility = (registration: any) => {
   }
 
   if (registration.status === 'pending') {
-    throw new AppError('Guest must be marked going or ongoing before check-in', 400);
+    throw new AppError('Guest must be marked going before check-in', 400);
   }
 };
 
@@ -88,7 +87,7 @@ const ensureQrTokenForRegistration = async (registrationId: string) => {
   if (!registration) return null;
 
   if (!shouldHaveRegistrationQr(registration.status)) {
-    throw new AppError('QR is available only for going/ongoing/checked-in guests', 400);
+    throw new AppError('QR is available only for going/checked-in guests', 400);
   }
 
   if (registration.qrCodeValue) return registration;
@@ -150,7 +149,28 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     const registration = await RegistrationModel.findOne({ qrCodeValue });
     if (registration) {
       await ensureCanManageEvent(registration.eventId, req.user!.id);
-      validateRegistrationCheckInEligibility(registration);
+
+      if (registration.status === 'declined' || registration.status === 'not_going') {
+        return res.status(409).json({
+          status: 'declined',
+          message: 'Declined/Not-going guests cannot be checked in',
+          data: {
+            registrationId: registration.id,
+            guestStatus: registration.status,
+          },
+        });
+      }
+
+      if (registration.status === 'pending') {
+        return res.status(400).json({
+          status: 'invalid',
+          message: 'Guest must be marked going before check-in',
+          data: {
+            registrationId: registration.id,
+            guestStatus: registration.status,
+          },
+        });
+      }
 
       if (registration.status === 'checked_in') {
         return res.status(409).json({
@@ -205,7 +225,39 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     }
 
     await ensureCanManageEvent(booking.eventId, req.user!.id);
-    validateBookingCheckInEligibility(booking);
+
+    if (booking.bookingStatus === 'cancelled') {
+      return res.status(409).json({
+        status: 'cancelled',
+        message: 'Cancelled bookings cannot be checked in',
+        data: {
+          bookingId: booking.id,
+          bookingStatus: booking.bookingStatus,
+        },
+      });
+    }
+
+    if (booking.bookingStatus !== 'confirmed') {
+      return res.status(400).json({
+        status: 'invalid',
+        message: 'Only confirmed bookings can be checked in',
+        data: {
+          bookingId: booking.id,
+          bookingStatus: booking.bookingStatus,
+        },
+      });
+    }
+
+    if (booking.approvalStatus && booking.approvalStatus !== 'approved') {
+      return res.status(400).json({
+        status: 'invalid',
+        message: 'Booking approval is pending or rejected',
+        data: {
+          bookingId: booking.id,
+          approvalStatus: booking.approvalStatus,
+        },
+      });
+    }
 
     if (booking.checkInStatus === 'checked_in') {
       return res.status(409).json({
@@ -429,4 +481,3 @@ export const getEventAttendance = async (req: Request, res: Response, next: Next
     next(error);
   }
 };
-

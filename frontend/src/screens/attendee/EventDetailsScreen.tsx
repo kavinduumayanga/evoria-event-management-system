@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Image, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import * as Calendar from 'expo-calendar';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
@@ -49,11 +50,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isSendingBlast, setIsSendingBlast] = useState(false);
   const [isRegisteringFree, setIsRegisteringFree] = useState(false);
 
-  useEffect(() => {
-    fetchEventDetails();
-  }, [eventId]);
-
-  const fetchEventDetails = async () => {
+  const fetchEventDetails = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -98,7 +95,13 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [eventId, publicSlug]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEventDetails();
+    }, [fetchEventDetails]),
+  );
 
   const handleCalendarAction = () => {
     if (!event) return;
@@ -341,7 +344,12 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
       navigation.navigate('BookingConfirmation', { bookingId: booking.id });
     } catch (registrationError: any) {
-      Alert.alert('Registration Failed', registrationError?.response?.data?.message || 'Unable to register for this event.');
+      const message = registrationError?.response?.data?.message || 'Unable to register for this event.';
+      if (registrationError?.response?.status === 409) {
+        Alert.alert('Already Registered', message);
+      } else {
+        Alert.alert('Registration Failed', message);
+      }
     } finally {
       setIsRegisteringFree(false);
     }
@@ -413,7 +421,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {coverImage ? (
             <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
           ) : (
