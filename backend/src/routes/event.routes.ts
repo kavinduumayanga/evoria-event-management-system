@@ -20,6 +20,11 @@ import {
 } from '../controllers/event.controller';
 import { getEventRegistrationsForManagers } from '../controllers/eventRegistration.controller';
 import { getEventGuests } from '../controllers/guest.controller';
+import {
+  blastEventMessage,
+  getEventCommunications,
+  inviteGuestToEvent,
+} from '../controllers/eventCommunication.controller';
 import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -43,6 +48,9 @@ router.delete('/:id', deleteEvent);
 router.patch('/:id/status', updateEventStatus);
 router.patch('/:id/visibility', updateEventVisibility);
 router.patch('/:eventId/registration-fields', updateEventRegistrationFields);
+router.post('/:eventId/invite', inviteGuestToEvent);
+router.post('/:eventId/blast', blastEventMessage);
+router.get('/:eventId/communications', getEventCommunications);
 router.patch('/:id/feature', toggleEventFeatured);
 router.post('/:id/admins', addEventAdmin);
 router.delete('/:id/admins/:userId', removeEventAdmin);

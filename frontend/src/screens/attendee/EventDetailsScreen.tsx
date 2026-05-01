@@ -10,7 +10,7 @@ import { Event, Venue, Session, TicketType } from '../../types';
 import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { EventService, NotificationService, PublicEventDetails, ReportService } from '../../api/services';
+import { EventService, PublicEventDetails, ReportService } from '../../api/services';
 import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Share2, Mail, Phone, UserRound, Users2, Pencil, Ticket, Eye, Copy, Send } from 'lucide-react-native';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -296,11 +296,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       setIsSendingBlast(true);
-      const response = await NotificationService.eventBlast(event.id, {
-        title: blastTitle.trim(),
+      const response = await EventService.blastMessage(event.id, {
+        subject: blastTitle.trim(),
         message: blastMessage.trim(),
-        type: 'announcement',
-        channel: 'in_app',
       });
       setBlastTitle('');
       setBlastMessage('');

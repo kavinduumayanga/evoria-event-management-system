@@ -5,6 +5,7 @@ import { RegistrationModel } from '../models/Registration';
 import { EventModel } from '../models/Event';
 import { AppError } from '../utils/appError';
 import { canManageEvent } from '../utils/eventPermissions';
+import { sendRegistrationStatusCommunications } from '../utils/registrationCommunication.helper';
 
 const guestStatusValues = ['pending', 'going', 'ongoing', 'checked_in', 'not_going', 'declined'] as const;
 const bulkActionValues = ['going', 'ongoing', 'not_going', 'declined', 'checkin'] as const;
@@ -168,10 +169,22 @@ export const updateGuestStatus = async (req: Request, res: Response, next: NextF
       updatePayload,
       { new: true },
     );
+    if (!updatedRegistration) return next(new AppError('Guest registration not found after update', 404));
+
+    const event = await EventModel.findById(registration.eventId);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    await sendRegistrationStatusCommunications(
+      req,
+      event,
+      updatedRegistration,
+      status,
+      req.user!.id,
+    );
 
     res.status(200).json({
       status: 'success',
-      data: { guest: toGuestRecord(updatedRegistration!) },
+      data: { guest: toGuestRecord(updatedRegistration) },
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -335,4 +348,3 @@ export const exportEventGuestsCsv = async (req: Request, res: Response, next: Ne
 
 // Backward-compatible alias.
 export const updateGuestApprovalStatus = updateGuestStatus;
-

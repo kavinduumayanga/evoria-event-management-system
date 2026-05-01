@@ -16,6 +16,8 @@ export type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checki
 export type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
 export type NotificationStatus = 'sent' | 'scheduled' | 'failed';
 export type EventRegistrationStatus = 'pending' | 'going' | 'ongoing' | 'checked_in' | 'not_going' | 'declined';
+export type EmailLogType = 'registration_pending' | 'registration_confirmed' | 'registration_declined' | 'invite' | 'blast' | 'system';
+export type EmailLogStatus = 'queued' | 'sent' | 'failed';
 
 export interface EventCustomQuestion {
   id: string;
@@ -154,6 +156,21 @@ export interface Notification {
   isRead: boolean;
   scheduledAt?: string | null;
   sentAt?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailLog {
+  id: string;
+  recipientEmail: string;
+  recipientUserId?: string | null;
+  eventId?: string | null;
+  subject: string;
+  message: string;
+  type: EmailLogType;
+  status: EmailLogStatus;
+  metadata?: Record<string, unknown> | null;
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
