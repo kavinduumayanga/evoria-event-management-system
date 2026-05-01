@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { NeonCard } from './NeonCard';
+import { GlassCard } from './GlassCard';
 import { Booking } from '../types';
 import { theme } from '../constants/theme';
 import { Ticket, Calendar, DollarSign } from 'lucide-react-native';
@@ -38,7 +38,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
   };
 
   return (
-    <NeonCard style={[styles.container, style]} onPress={onPress}>
+    <GlassCard style={[styles.container, style]} variant="dark" animateEntrance>
       <View style={styles.headerRow}>
         <View style={styles.titleContainer}>
           <Ticket size={18} color={theme.colors.primary} />
@@ -89,7 +89,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
           {actions}
         </View>
       )}
-    </NeonCard>
+    </GlassCard>
   );
 };
 

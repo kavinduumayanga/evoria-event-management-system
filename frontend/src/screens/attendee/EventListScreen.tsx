@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { Search, Folder, MapPin, Tag } from 'lucide-react-native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Event } from '../../types';
-import { ScreenContainer, EventCard, LoadingState, EmptyState, ErrorState, Input, GlassCard } from '../../components';
+import { ScreenContainer, EventCard, LoadingState, EmptyState, ErrorState, FormInput, GlassCard } from '../../components';
 import { theme } from '../../constants/theme';
 import { EventService } from '../../api/services';
 
@@ -101,36 +102,40 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.headerSubtitle}>Find what is happening near you</Text>
             </View>
 
-            <GlassCard style={styles.filtersCard}>
-              <Input
+            <GlassCard style={styles.filtersCard} variant="dark" animateEntrance>
+              <FormInput
                 label="Search"
                 value={searchInput}
                 onChangeText={setSearchInput}
                 placeholder="Search title or description"
+                leftIcon={<Search size={20} color={theme.colors.textMuted} />}
               />
               <View style={styles.filterRow}>
                 <View style={styles.filterHalf}>
-                  <Input
+                  <FormInput
                     label="Category"
                     value={categoryFilter}
                     onChangeText={setCategoryFilter}
                     placeholder="Technology"
+                    leftIcon={<Folder size={20} color={theme.colors.textMuted} />}
                   />
                 </View>
                 <View style={styles.filterHalf}>
-                  <Input
+                  <FormInput
                     label="City"
                     value={cityFilter}
                     onChangeText={setCityFilter}
                     placeholder="Colombo"
+                    leftIcon={<MapPin size={20} color={theme.colors.textMuted} />}
                   />
                 </View>
               </View>
-              <Input
+              <FormInput
                 label="Tags"
                 value={tagsFilter}
                 onChangeText={setTagsFilter}
                 placeholder="ai,startup,design"
+                leftIcon={<Tag size={20} color={theme.colors.textMuted} />}
               />
             </GlassCard>
 
@@ -211,25 +216,25 @@ const styles = StyleSheet.create({
   },
   filtersCard: {
     padding: theme.spacing.m,
-    marginBottom: theme.spacing.m,
+    marginBottom: theme.spacing.xl,
   },
   filterRow: {
     flexDirection: 'row',
-    gap: theme.spacing.s,
+    gap: theme.spacing.m,
   },
   filterHalf: {
     flex: 1,
   },
   section: {
-    marginBottom: theme.spacing.m,
+    marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
     ...theme.typography.h3,
     color: theme.colors.text,
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.m,
   },
   horizontalCard: {
     width: 280,
-    marginRight: theme.spacing.s,
+    marginRight: theme.spacing.m,
   },
 });
