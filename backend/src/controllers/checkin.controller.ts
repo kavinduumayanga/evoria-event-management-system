@@ -7,6 +7,7 @@ import { TicketTypeModel } from '../models/TicketType';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
 import { createNotificationRecord } from '../utils/notification.helper';
+import { canManageEvent } from '../utils/eventPermissions';
 
 const scanSchema = z.object({
   qrCodeValue: z.string().min(1),
@@ -16,10 +17,10 @@ const manualCheckInSchema = z.object({
   attendanceNote: z.string().trim().max(500).optional(),
 });
 
-const ensureEventOwnership = async (eventId: string, hostAdminId: string) => {
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
   const event = await EventModel.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
-  if (event.hostAdminId !== hostAdminId) throw new AppError('Not authorized for this event', 403);
+  if (!canManageEvent(userId, event)) throw new AppError('Not authorized for this event', 403);
   return event;
 };
 
@@ -60,12 +61,8 @@ export const getBookingQr = async (req: Request, res: Response, next: NextFuncti
     let booking = await ensureQrTokenForBooking(bookingId);
     if (!booking) return next(new AppError('Booking not found', 404));
 
-    if (req.user!.role === 'attendee' && booking.userId !== req.user!.id) {
-      return next(new AppError('Not authorized to view this QR code', 403));
-    }
-
-    if (req.user!.role === 'host_admin') {
-      await ensureEventOwnership(booking.eventId, req.user!.id);
+    if (booking.userId !== req.user!.id) {
+      await ensureCanManageEvent(booking.eventId, req.user!.id);
       booking = await ensureQrTokenForBooking(bookingId);
       if (!booking) return next(new AppError('Booking not found', 404));
     }
@@ -97,7 +94,7 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    await ensureEventOwnership(booking.eventId, req.user!.id);
+    await ensureCanManageEvent(booking.eventId, req.user!.id);
     validateCheckInEligibility(booking);
 
     if (booking.checkInStatus === 'checked_in') {
@@ -156,7 +153,7 @@ export const manualCheckIn = async (req: Request, res: Response, next: NextFunct
     const booking = await BookingModel.findById(bookingId);
     if (!booking) return next(new AppError('Booking not found', 404));
 
-    await ensureEventOwnership(booking.eventId, req.user!.id);
+    await ensureCanManageEvent(booking.eventId, req.user!.id);
     validateCheckInEligibility(booking);
 
     if (booking.checkInStatus === 'checked_in') {
@@ -206,7 +203,7 @@ export const manualCheckIn = async (req: Request, res: Response, next: NextFunct
 export const getEventAttendance = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const eventId = String(req.params.eventId);
-    await ensureEventOwnership(eventId, req.user!.id);
+    await ensureCanManageEvent(eventId, req.user!.id);
 
     const bookings = await BookingModel.find({ eventId }).sort({ createdAt: -1 });
     const userIds = Array.from(new Set(bookings.map((b) => b.userId)));

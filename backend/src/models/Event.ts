@@ -9,6 +9,7 @@ const eventSchema = new Schema({
   startTime: { type: String, required: true },
   endTime: { type: String, required: true },
   hostAdminId: { type: String, required: true, index: true },
+  adminIds: { type: [String], default: [] },
   venueId: { type: String, default: null },
   type: { type: String, enum: ['online', 'physical', 'hybrid'], required: true },
   category: { type: String, trim: true, default: '' },

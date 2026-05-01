@@ -20,7 +20,9 @@ const userSchema = new Schema({
     minlength: [6, 'Password must be at least 6 characters long'],
     select: false,
   },
-  role: { type: String, enum: ['host_admin', 'attendee'], required: true },
+  // Legacy role is kept for backward compatibility only.
+  // New authorization logic is event-scoped and does not depend on this field.
+  role: { type: String, enum: ['user', 'host_admin', 'attendee'], default: 'user' },
   phone: { type: String, trim: true },
   profileImage: { type: String, trim: true },
   isActive: { type: Boolean, default: true },

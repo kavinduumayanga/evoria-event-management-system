@@ -15,7 +15,7 @@ import { AuthStackParamList } from '../../types/navigation';
 import { GradientBackground, Button, Input, GlassCard } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
-import { useAuthStore, Role } from '../../store/auth.store';
+import { useAuthStore } from '../../store/auth.store';
 import { ArrowLeft } from 'lucide-react-native';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -29,7 +29,6 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<Role>('attendee');
   const [isLoading, setIsLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
 
@@ -59,7 +58,6 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         name: normalizedName,
         email: normalizedEmail,
         password,
-        role,
       });
       
       const { token, data } = response;
@@ -94,24 +92,6 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.subtitle}>Join Evoria to start your journey</Text>
 
             <GlassCard style={styles.card}>
-              <View style={styles.roleContainer}>
-                <Text style={styles.roleLabel}>I am a:</Text>
-                <View style={styles.roleButtons}>
-                  <TouchableOpacity
-                    style={[styles.roleButton, role === 'attendee' && styles.roleButtonActive]}
-                    onPress={() => setRole('attendee')}
-                  >
-                    <Text style={[styles.roleText, role === 'attendee' && styles.roleTextActive]}>Attendee</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.roleButton, role === 'host_admin' && styles.roleButtonActive]}
-                    onPress={() => setRole('host_admin')}
-                  >
-                    <Text style={[styles.roleText, role === 'host_admin' && styles.roleTextActive]}>Host Admin</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
               <Input
                 label="Full Name"
                 placeholder="Enter your full name"
@@ -193,40 +173,6 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: theme.spacing.l,
-  },
-  roleContainer: {
-    marginBottom: theme.spacing.l,
-  },
-  roleLabel: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.s,
-    fontWeight: '600',
-  },
-  roleButtons: {
-    flexDirection: 'row',
-    gap: theme.spacing.s,
-  },
-  roleButton: {
-    flex: 1,
-    paddingVertical: theme.spacing.s,
-    alignItems: 'center',
-    borderRadius: theme.borderRadius.m,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceLight,
-  },
-  roleButtonActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-  },
-  roleText: {
-    ...theme.typography.body,
-    color: theme.colors.textMuted,
-  },
-  roleTextActive: {
-    color: theme.colors.primaryLight,
-    fontWeight: 'bold',
   },
   button: {
     marginTop: theme.spacing.l,

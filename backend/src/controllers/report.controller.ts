@@ -4,6 +4,7 @@ import { ReportModel } from '../models/Report';
 import { EventModel } from '../models/Event';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
+import { manageableEventQuery } from '../utils/eventPermissions';
 
 const createReportSchema = z.object({
   targetType: z.enum(['event', 'user']),
@@ -12,6 +13,13 @@ const createReportSchema = z.object({
 }).strict();
 
 const formatZodError = (error: z.ZodError) => error.issues.map((issue) => issue.message).join(', ');
+
+const ensureCanManageReports = async (userId: string) => {
+  const managedEventCount = await EventModel.countDocuments(manageableEventQuery(userId));
+  if (!managedEventCount) {
+    throw new AppError('You do not have permission to manage reports', 403);
+  }
+};
 
 export const createReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -63,6 +71,7 @@ export const createReport = async (req: Request, res: Response, next: NextFuncti
 
 export const getReports = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureCanManageReports(req.user!.id);
     const reports = await ReportModel.find().sort({ isResolved: 1, createdAt: -1 });
 
     const reporterIds = Array.from(new Set(reports.map((report) => report.reporterId)));
@@ -131,6 +140,7 @@ export const getReports = async (req: Request, res: Response, next: NextFunction
 
 export const resolveReport = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureCanManageReports(req.user!.id);
     const report = await ReportModel.findById(req.params.id as string);
     if (!report) {
       return next(new AppError('Report not found', 404));

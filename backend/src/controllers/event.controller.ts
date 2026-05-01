@@ -6,7 +6,8 @@ import { TicketTypeModel } from '../models/TicketType';
 import { UserModel } from '../models/User';
 import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
-import { EventCustomQuestion, EventStatus, EventType, EventVisibility, Role } from '../types';
+import { EventCustomQuestion, EventStatus, EventType, EventVisibility } from '../types';
+import { canManageEvent, isEventOwner, manageableEventQuery } from '../utils/eventPermissions';
 
 const EVENT_TYPES = ['online', 'physical', 'hybrid'] as const;
 const EVENT_VISIBILITIES = ['public', 'private', 'unlisted'] as const;
@@ -53,6 +54,10 @@ const updateEventSchema = createEventSchema.partial().strict();
 
 const statusUpdateSchema = z.object({
   status: z.enum(EVENT_STATUSES),
+}).strict();
+
+const eventAdminsSchema = z.object({
+  adminIds: z.array(z.string().trim().min(1, 'admin user id is required')).max(100, 'Maximum 100 admins allowed'),
 }).strict();
 
 interface EventInput {
@@ -142,7 +147,7 @@ const isIsoLikeDate = (value: string): boolean => {
   return /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(value.trim());
 };
 
-const resolveRequester = async (req: Request): Promise<{ id: string; role: Role } | null> => {
+const resolveRequester = async (req: Request): Promise<{ id: string } | null> => {
   if (req.user) return req.user;
 
   const authHeader = req.headers.authorization;
@@ -152,16 +157,13 @@ const resolveRequester = async (req: Request): Promise<{ id: string; role: Role 
   if (!token) return null;
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string; role: Role };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string; role?: string; tokenVersion?: number };
     const currentUser = await UserModel.findById(decoded.id).select('+isActive +isSuspended');
     if (!currentUser || !currentUser.isActive || currentUser.isSuspended) {
       throw new AppError('Unauthorized access. Please log in.', 401);
     }
 
-    return {
-      id: currentUser.id,
-      role: currentUser.role as Role,
-    };
+    return { id: currentUser.id };
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError('Invalid or expired token.', 401);
@@ -344,9 +346,8 @@ const ensurePublishable = async (event: any) => {
   await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId));
 };
 
-const ensureEventReadableByUser = (event: any, requester: { id: string; role: Role } | null) => {
-  const isOwner = requester?.role === 'host_admin' && requester.id === event.hostAdminId;
-  if (isOwner) return;
+const ensureEventReadableByUser = (event: any, requester: { id: string } | null) => {
+  if (requester && canManageEvent(requester.id, event)) return;
 
   if (event.moderationStatus && event.moderationStatus !== 'approved') {
     throw new AppError('Event is not available', 403);
@@ -358,6 +359,23 @@ const ensureEventReadableByUser = (event: any, requester: { id: string; role: Ro
 
   if (event.visibility === 'private') {
     throw new AppError('Event is private', 403);
+  }
+};
+
+const normalizeAdminIds = (adminIds: string[], ownerId: string): string[] => {
+  const owner = ownerId.trim();
+  return Array.from(new Set(
+    adminIds
+      .map((adminId) => adminId.trim())
+      .filter((adminId) => adminId.length > 0 && adminId !== owner),
+  ));
+};
+
+const ensureAdminsExist = async (adminIds: string[]) => {
+  if (!adminIds.length) return;
+  const users = await UserModel.find({ _id: { $in: adminIds } }).select('_id');
+  if (users.length !== adminIds.length) {
+    throw new AppError('One or more event admin users were not found', 404);
   }
 };
 
@@ -607,6 +625,7 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
 
     const newEventDoc = await EventModel.create({
       hostAdminId: req.user!.id,
+      adminIds: [],
       status: 'draft',
       moderationStatus: 'approved',
       isFlagged: false,
@@ -627,8 +646,14 @@ export const getEvents = async (req: Request, res: Response, next: NextFunction)
   try {
     const requester = await resolveRequester(req);
 
-    const query = requester?.role === 'host_admin'
-      ? { hostAdminId: requester.id }
+    const query = requester
+      ? {
+          $or: [
+            { status: 'published', visibility: 'public', ...approvedModerationFilter() },
+            { hostAdminId: requester.id },
+            { adminIds: requester.id },
+          ],
+        }
       : { status: 'published', visibility: 'public', ...approvedModerationFilter() };
 
     const events = await EventModel.find(query).sort({ isFeatured: -1, date: 1, startTime: 1 });
@@ -654,15 +679,15 @@ export const getEvent = async (req: Request, res: Response, next: NextFunction) 
 
 export const getHostEvents = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.user || req.user.role !== 'host_admin') {
-      return next(new AppError('Not authorized to view host events', 403));
+    if (!req.user) {
+      return next(new AppError('Unauthorized access. Please log in.', 401));
     }
 
     if (req.user.id !== req.params.hostAdminId) {
       return next(new AppError('Not authorized to view this host events list', 403));
     }
 
-    const events = await EventModel.find({ hostAdminId: req.params.hostAdminId }).sort({ createdAt: -1 });
+    const events = await EventModel.find(manageableEventQuery(req.params.hostAdminId)).sort({ createdAt: -1 });
     res.status(200).json({ status: 'success', results: events.length, data: { events: events.map(e => e.toJSON()) } });
   } catch (error) {
     next(error);
@@ -674,7 +699,7 @@ export const updateEvent = async (req: Request, res: Response, next: NextFunctio
     const event = await EventModel.findById(req.params.id as string);
     if (!event) return next(new AppError('Event not found', 404));
 
-    if (event.hostAdminId !== req.user!.id) {
+    if (!canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to update this event', 403));
     }
 
@@ -712,7 +737,7 @@ export const deleteEvent = async (req: Request, res: Response, next: NextFunctio
     const event = await EventModel.findById(req.params.id as string);
     if (!event) return next(new AppError('Event not found', 404));
 
-    if (event.hostAdminId !== req.user!.id) {
+    if (!isEventOwner(req.user!.id, event)) {
       return next(new AppError('Not authorized to delete this event', 403));
     }
 
@@ -730,7 +755,7 @@ export const updateEventStatus = async (req: Request, res: Response, next: NextF
     const event = await EventModel.findById(req.params.id as string);
     if (!event) return next(new AppError('Event not found', 404));
 
-    if (event.hostAdminId !== req.user!.id) {
+    if (!canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to update this event', 403));
     }
 
@@ -772,6 +797,10 @@ export const toggleEventFeatured = async (req: Request, res: Response, next: Nex
     const event = await EventModel.findById(req.params.id as string);
     if (!event) return next(new AppError('Event not found', 404));
 
+    if (!canManageEvent(req.user!.id, event)) {
+      return next(new AppError('Not authorized to update this event', 403));
+    }
+
     const updatedEvent = await EventModel.findByIdAndUpdate(
       event.id,
       { isFeatured: !Boolean(event.isFeatured) },
@@ -785,6 +814,39 @@ export const toggleEventFeatured = async (req: Request, res: Response, next: Nex
       },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const updateEventAdmins = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.id as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (!isEventOwner(req.user!.id, event)) {
+      return next(new AppError('Only the event owner can update event admins', 403));
+    }
+
+    const { adminIds } = eventAdminsSchema.parse(req.body);
+    const normalizedAdminIds = normalizeAdminIds(adminIds, req.user!.id);
+    await ensureAdminsExist(normalizedAdminIds);
+
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      { adminIds: normalizedAdminIds },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: updatedEvent!.toJSON(),
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
+    }
     next(error);
   }
 };

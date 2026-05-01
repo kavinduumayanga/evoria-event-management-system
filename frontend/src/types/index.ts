@@ -1,4 +1,4 @@
-export type Role = 'host_admin' | 'attendee';
+export type Role = 'user' | 'host_admin' | 'attendee';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
 export type ModerationStatus = 'pending' | 'approved' | 'rejected';
 export type EventVisibility = 'public' | 'private' | 'unlisted';
@@ -36,6 +36,7 @@ export interface Event {
   startTime: string;
   endTime: string;
   hostAdminId: string;
+  adminIds?: string[];
   venueId?: string | null;
   type: EventType;
   category: string;

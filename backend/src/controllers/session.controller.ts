@@ -4,6 +4,7 @@ import { EventModel } from '../models/Event';
 import { Session, Event } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
+import { canManageEvent } from '../utils/eventPermissions';
 
 const sessionSchema = z.object({
   eventId: z.string(),
@@ -25,7 +26,7 @@ export const createSession = async (req: Request, res: Response, next: NextFunct
     const event = await EventModel.findById(validatedData.eventId);
     if (!event) return next(new AppError('Event not found', 404));
 
-    if (event.hostAdminId !== req.user!.id) {
+    if (!canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to add sessions to this event', 403));
     }
 
@@ -72,7 +73,7 @@ export const updateSession = async (req: Request, res: Response, next: NextFunct
     if (!session) return next(new AppError('Session not found', 404));
 
     const event = await EventModel.findById(session.eventId);
-    if (event?.hostAdminId !== req.user!.id) {
+    if (!event || !canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to update this session', 403));
     }
 
@@ -89,7 +90,7 @@ export const deleteSession = async (req: Request, res: Response, next: NextFunct
     if (!session) return next(new AppError('Session not found', 404));
 
     const event = await EventModel.findById(session.eventId);
-    if (event?.hostAdminId !== req.user!.id) {
+    if (!event || !canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to delete this session', 403));
     }
 

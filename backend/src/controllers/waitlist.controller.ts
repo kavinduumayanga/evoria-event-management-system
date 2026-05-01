@@ -4,15 +4,25 @@ import { EventModel } from '../models/Event';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
 import { promoteSpecificWaitlistBooking } from '../utils/waitlist.helper';
+import { canManageEvent } from '../utils/eventPermissions';
+
+const ensureCanManageEvent = async (eventId: string, userId: string) => {
+  const event = await EventModel.findById(eventId);
+  if (!event) {
+    throw new AppError('Event not found', 404);
+  }
+
+  if (!canManageEvent(userId, event)) {
+    throw new AppError('Not authorized for this event', 403);
+  }
+
+  return event;
+};
 
 export const getEventWaitlist = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const eventId = String(req.params.eventId);
-    const event = await EventModel.findById(eventId);
-
-    if (!event) {
-      return next(new AppError('Event not found', 404));
-    }
+    await ensureCanManageEvent(eventId, req.user!.id);
 
     const waitlist = await BookingModel.find({
       eventId,
@@ -103,10 +113,7 @@ export const promoteWaitlistBooking = async (req: Request, res: Response, next: 
       return next(new AppError('Waitlist booking not found', 404));
     }
 
-    const event = await EventModel.findById(booking.eventId);
-    if (!event) {
-      return next(new AppError('Event not found', 404));
-    }
+    await ensureCanManageEvent(booking.eventId, req.user!.id);
 
     const promoted = await promoteSpecificWaitlistBooking(booking.id, req.user!.id);
 

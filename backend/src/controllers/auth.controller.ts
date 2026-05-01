@@ -10,8 +10,8 @@ import { z } from 'zod';
 const MIN_PASSWORD_LENGTH = 6;
 const RESET_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
 
-const signToken = (id: string, role: Role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
+const signToken = (id: string, role?: Role) => {
+  return jwt.sign({ id, role, tokenVersion: 2 }, process.env.JWT_SECRET as string, {
     expiresIn: (process.env.JWT_EXPIRES_IN as any) || '7d',
   });
 };
@@ -30,7 +30,6 @@ const registerSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   email: z.string().email('Please provide a valid email address'),
   password: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`),
-  role: z.enum(['host_admin', 'attendee']).default('attendee'),
   phone: z.string().trim().max(30, 'Phone number is too long').optional(),
 });
 
@@ -76,7 +75,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       name: validatedData.name,
       email: normalizedEmail,
       password: hashedPassword,
-      role: validatedData.role,
+      role: 'user',
       phone: validatedData.phone,
       isActive: true,
     });

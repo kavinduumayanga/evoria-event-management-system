@@ -1,12 +1,10 @@
 import apiClient from './client';
 import { Event, Booking, Venue, Session, TicketType, RegistrationAnswer, RsvpStatus } from '../types';
-import { Role } from '../store/auth.store';
 
 export interface RegisterPayload {
   name: string;
   email: string;
   password: string;
-  role: Role;
   phone?: string;
 }
 

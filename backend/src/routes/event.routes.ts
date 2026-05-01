@@ -13,8 +13,9 @@ import {
   getRecommendedEvents,
   getEventCalendar,
   toggleEventFeatured,
+  updateEventAdmins,
 } from '../controllers/event.controller';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -22,20 +23,18 @@ router.get('/', getEvents);
 router.get('/search', searchEvents);
 router.get('/trending', getTrendingEvents);
 router.get('/recommended', getRecommendedEvents);
-router.get('/host/:hostAdminId', protect, restrictTo('host_admin'), getHostEvents);
+router.get('/host/:hostAdminId', protect, getHostEvents);
 router.get('/:id/calendar', getEventCalendar);
 router.get('/:id', getEvent);
 
 // Protected routes
 router.use(protect);
 router.patch('/:id/view', incrementEventView);
-
-// Host Admin only
-router.use(restrictTo('host_admin'));
 router.post('/', createEvent);
 router.put('/:id', updateEvent);
 router.delete('/:id', deleteEvent);
 router.patch('/:id/status', updateEventStatus);
 router.patch('/:id/feature', toggleEventFeatured);
+router.patch('/:id/admins', updateEventAdmins);
 
 export default router;

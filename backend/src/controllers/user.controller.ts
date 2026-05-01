@@ -2,14 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/User';
+import { EventModel } from '../models/Event';
 import { Role } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
+import { manageableEventQuery } from '../utils/eventPermissions';
 
 const MIN_PASSWORD_LENGTH = 6;
 
-const signToken = (id: string, role: Role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
+const signToken = (id: string, role?: Role) => {
+  return jwt.sign({ id, role, tokenVersion: 2 }, process.env.JWT_SECRET as string, {
     expiresIn: (process.env.JWT_EXPIRES_IN as any) || '7d',
   });
 };
@@ -51,6 +53,11 @@ const handleValidationError = (error: unknown, next: NextFunction) => {
 
 export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const managedEventCount = await EventModel.countDocuments(manageableEventQuery(req.user!.id));
+    if (!managedEventCount) {
+      return next(new AppError('You do not have permission to view all users', 403));
+    }
+
     const userDocs = await UserModel.find();
     const safeUsers = userDocs.map((doc) => toSafeUser(doc));
     res.status(200).json({ status: 'success', results: safeUsers.length, data: { users: safeUsers } });
@@ -61,7 +68,7 @@ export const getUsers = async (req: Request, res: Response, next: NextFunction) 
 
 export const getUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.user!.id !== (req.params.id as string) && req.user!.role !== 'host_admin') {
+    if (req.user!.id !== (req.params.id as string)) {
       return next(new AppError('You do not have permission to view this user.', 403));
     }
 
@@ -78,7 +85,7 @@ export const getUser = async (req: Request, res: Response, next: NextFunction) =
 
 export const updateUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.user!.id !== (req.params.id as string) && req.user!.role !== 'host_admin') {
+    if (req.user!.id !== (req.params.id as string)) {
       return next(new AppError('Not authorized to update this user', 403));
     }
 
@@ -101,7 +108,7 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
 
 export const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.user!.id !== (req.params.id as string) && req.user!.role !== 'host_admin') {
+    if (req.user!.id !== (req.params.id as string)) {
       return next(new AppError('Not authorized to delete this user', 403));
     }
 

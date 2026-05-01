@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_URL } from '../constants/api';
 
-export type Role = 'host_admin' | 'attendee';
+export type Role = 'user' | 'host_admin' | 'attendee';
 
 export interface User {
   id: string;

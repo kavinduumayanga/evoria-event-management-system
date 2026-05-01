@@ -8,7 +8,7 @@ import {
   updatePassword,
   deactivateAccount,
 } from '../controllers/user.controller';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -22,7 +22,6 @@ router.get('/:id', getUser);
 router.put('/:id', updateUser);
 router.delete('/:id', deleteUser);
 
-router.use(restrictTo('host_admin'));
 router.get('/', getUsers);
 
 export default router;

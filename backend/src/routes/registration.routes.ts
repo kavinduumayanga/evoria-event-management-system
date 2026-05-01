@@ -7,18 +7,18 @@ import {
   rejectRegistration,
   updateRegistrationRsvp,
 } from '../controllers/registration.controller';
-import { protect, restrictTo } from '../middleware/auth.middleware';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
 router.use(protect);
 
-router.post('/', restrictTo('attendee'), createRegistration);
-router.get('/my', restrictTo('attendee'), getMyRegistrations);
-router.patch('/:id/rsvp', restrictTo('attendee'), updateRegistrationRsvp);
+router.post('/', createRegistration);
+router.get('/my', getMyRegistrations);
+router.patch('/:id/rsvp', updateRegistrationRsvp);
 
-router.get('/event/:eventId', restrictTo('host_admin'), getEventRegistrations);
-router.patch('/:id/approve', restrictTo('host_admin'), approveRegistration);
-router.patch('/:id/reject', restrictTo('host_admin'), rejectRegistration);
+router.get('/event/:eventId', getEventRegistrations);
+router.patch('/:id/approve', approveRegistration);
+router.patch('/:id/reject', rejectRegistration);
 
 export default router;
