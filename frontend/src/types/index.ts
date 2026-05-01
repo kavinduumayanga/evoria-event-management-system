@@ -37,6 +37,12 @@ export interface Event {
   hostAdminId: string;
   venueId?: string | null;
   type: EventType;
+  category: string;
+  city: string;
+  tags: string[];
+  viewsCount: number;
+  bookingCount: number;
+  meetingLink?: string;
   coverImage?: string;
   capacity: number;
   status: EventStatus;
@@ -138,4 +144,20 @@ export interface Notification {
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EventAnalytics {
+  totalRegistrations: number;
+  totalApproved: number;
+  totalAttended: number;
+  totalRevenue: number;
+  ticketsSold: number;
+  conversionRate: number;
+}
+
+export interface DashboardAnalytics {
+  totalEvents: number;
+  totalBookings: number;
+  totalRevenue: number;
+  totalAttendees: number;
 }
