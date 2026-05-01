@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminVenueStackParamList } from '../../../types/navigation';
-import { ScreenContainer, NeonCard, LoadingState, ErrorState, EmptyState } from '../../../components';
+import { ScreenContainer, GlassCard, LoadingState, ErrorState, EmptyState } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { Plus, Edit2, Trash2, MapPin } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
@@ -83,7 +83,7 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
         data={venues}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <NeonCard style={styles.venueCard}>
+          <GlassCard style={styles.venueCard}>
             <View style={styles.venueInfo}>
               <View style={styles.venueTitleRow}>
                 <MapPin size={20} color={theme.colors.primary} />
@@ -100,7 +100,7 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
                 <Trash2 size={18} color={theme.colors.error} />
               </TouchableOpacity>
             </View>
-          </NeonCard>
+          </GlassCard>
         )}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
@@ -143,6 +143,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: theme.spacing.m,
   },
   venueInfo: {
     flex: 1,

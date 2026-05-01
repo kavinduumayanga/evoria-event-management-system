@@ -60,7 +60,8 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
     fetchTicketQr();
   }, [bookingId]);
 
-  const checkInColor = booking?.checkInStatus === 'checked_in' ? theme.colors.success : theme.colors.warning;
+  const checkedIn = booking?.checkInStatus === 'checked_in';
+  const checkInColor = checkedIn ? theme.colors.success : theme.colors.warning;
 
   if (isLoading) return <LoadingState />;
   if (error) {
@@ -85,17 +86,17 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft color={theme.colors.text} size={20} />
         </TouchableOpacity>
-        <Text style={styles.title}>My Ticket QR</Text>
+        <Text style={styles.title}>My Ticket</Text>
       </View>
 
-      <GlassCard style={styles.card}>
+      <GlassCard style={styles.card} variant={checkedIn ? 'neonPurple' : 'dark'}>
         <Text style={styles.eventTitle}>{eventTitle}</Text>
         <Text style={styles.ticketName}>{ticketName}</Text>
 
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { borderColor: checkInColor, backgroundColor: `${checkInColor}20` }]}>
             <Text style={[styles.badgeText, { color: checkInColor }]}>
-              {booking.checkInStatus === 'checked_in' ? 'Checked In' : 'Not Checked In'}
+              {checkedIn ? 'Checked In' : 'Not Checked In'}
             </Text>
           </View>
         </View>
@@ -118,29 +119,23 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: theme.spacing.s,
-    marginBottom: theme.spacing.m,
+    paddingTop: theme.spacing.s,
+    marginBottom: theme.spacing.xl,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.borderRadius.round,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.s,
+    marginRight: theme.spacing.m,
   },
   title: {
-    ...theme.typography.h2,
+    ...theme.typography.h1,
     color: theme.colors.text,
   },
   card: {
-    padding: theme.spacing.l,
+    padding: theme.spacing.xl,
     alignItems: 'center',
+    marginHorizontal: theme.spacing.m,
   },
   eventTitle: {
-    ...theme.typography.h3,
+    ...theme.typography.h2,
     color: theme.colors.text,
     textAlign: 'center',
   },
@@ -151,23 +146,23 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.s,
   },
   badgeRow: {
-    marginBottom: theme.spacing.m,
+    marginBottom: theme.spacing.xl,
   },
   badge: {
     borderWidth: 1,
     borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: 6,
   },
   badgeText: {
-    ...theme.typography.caption,
-    fontWeight: '600',
+    ...theme.typography.small,
+    fontWeight: '700',
   },
   qrWrap: {
     padding: theme.spacing.s,
     borderRadius: theme.borderRadius.l,
     backgroundColor: theme.colors.text,
-    marginBottom: theme.spacing.m,
+    marginBottom: theme.spacing.xl,
   },
   meta: {
     ...theme.typography.caption,

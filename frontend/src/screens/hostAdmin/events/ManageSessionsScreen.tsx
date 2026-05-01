@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Ale
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, NeonCard, LoadingState, ErrorState, EmptyState } from '../../../components';
+import { ScreenContainer, GlassCard, LoadingState, ErrorState, EmptyState } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { Plus, Edit2, Trash2, ArrowLeft, Layers } from 'lucide-react-native';
 import { SessionService } from '../../../api/services';
@@ -92,7 +92,7 @@ export const ManageSessionsScreen: React.FC<Props> = ({ navigation, route }) => 
         data={sessions}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <NeonCard style={styles.sessionCard}>
+          <GlassCard style={styles.sessionCard}>
             <View style={styles.sessionInfo}>
               <View style={styles.sessionTitleRow}>
                 <Layers size={18} color={theme.colors.primaryLight} />
@@ -109,7 +109,7 @@ export const ManageSessionsScreen: React.FC<Props> = ({ navigation, route }) => 
                 <Trash2 size={18} color={theme.colors.error} />
               </TouchableOpacity>
             </View>
-          </NeonCard>
+          </GlassCard>
         )}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   title: { ...theme.typography.h1, color: theme.colors.text },
   createButton: { backgroundColor: theme.colors.primary, padding: theme.spacing.s, borderRadius: theme.borderRadius.round },
   listContainer: { padding: theme.spacing.m, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
-  sessionCard: { marginBottom: theme.spacing.m, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sessionCard: { marginBottom: theme.spacing.m, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: theme.spacing.m },
   sessionInfo: { flex: 1 },
   sessionTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   sessionName: { ...theme.typography.h3, color: theme.colors.text, marginLeft: theme.spacing.xs },

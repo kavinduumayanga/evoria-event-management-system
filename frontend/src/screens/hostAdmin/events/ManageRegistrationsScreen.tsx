@@ -3,11 +3,11 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Ale
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { EmptyState, ErrorState, Input, LoadingState, NeonCard, ScreenContainer } from '../../../components';
+import { EmptyState, ErrorState, FormInput, LoadingState, GlassCard, ScreenContainer, SecondaryButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { EventRegistrationStatus } from '../../../types';
 import { GuestRecord, GuestService } from '../../../api/services';
-import { ArrowLeft, UserCheck } from 'lucide-react-native';
+import { ArrowLeft, UserCheck, CheckCircle2, XCircle, Ban } from 'lucide-react-native';
 
 type ManageRegistrationsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
 type ManageRegistrationsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
@@ -43,6 +43,12 @@ const getStatusColor = (status: string) => {
     default:
       return theme.colors.textMuted;
   }
+};
+
+const getCardVariant = (status: string) => {
+  if (status === 'checked_in') return 'neonPurple';
+  if (status === 'declined' || status === 'not_going') return 'dark';
+  return 'dark';
 };
 
 export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -117,23 +123,25 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
       </View>
 
       <View style={styles.filterSection}>
-        <Input label="Search (name/email/mobile/NIC)" value={search} onChangeText={setSearch} placeholder="Search guest" />
-        <Input label="Date (YYYY-MM-DD)" value={dateFilter} onChangeText={setDateFilter} placeholder="2026-12-25" />
+        <FormInput label="Search (name/email/mobile/NIC)" value={search} onChangeText={setSearch} placeholder="Search guest" />
+        <FormInput label="Date (YYYY-MM-DD)" value={dateFilter} onChangeText={setDateFilter} placeholder="2026-12-25" />
 
         <Text style={styles.filterLabel}>Status Filter</Text>
-        <View style={styles.statusChipsRow}>
-          {statusOptions.map((statusOption) => (
-            <TouchableOpacity
-              key={statusOption}
-              style={[styles.statusChip, statusFilter === statusOption && styles.statusChipSelected]}
-              onPress={() => setStatusFilter(statusOption)}
-            >
-              <Text style={[styles.statusChipText, statusFilter === statusOption && styles.statusChipTextSelected]}>
-                {statusOption.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <GlassCard style={styles.statusChipsContainer}>
+          <View style={styles.statusChipsRow}>
+            {statusOptions.map((statusOption) => (
+              <TouchableOpacity
+                key={statusOption}
+                style={[styles.statusChip, statusFilter === statusOption && styles.statusChipSelected]}
+                onPress={() => setStatusFilter(statusOption)}
+              >
+                <Text style={[styles.statusChipText, statusFilter === statusOption && styles.statusChipTextSelected]}>
+                  {statusOption.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </GlassCard>
       </View>
 
       <FlatList
@@ -145,7 +153,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
         renderItem={({ item }) => {
           const statusColor = getStatusColor(item.status);
           return (
-            <NeonCard style={styles.guestCard}>
+            <GlassCard style={styles.guestCard} variant={getCardVariant(item.status)}>
               <View style={styles.cardTopRow}>
                 <Text style={styles.guestName}>{item.name}</Text>
                 <View style={[styles.badge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
@@ -166,23 +174,34 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
               ) : null}
 
               <View style={styles.actionsRow}>
-                <TouchableOpacity style={[styles.actionBtn, styles.goingAction]} onPress={() => setGuestStatus(item.id, 'going')}>
-                  <Text style={[styles.actionText, { color: theme.colors.primaryLight }]}>Going</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.notGoingAction]} onPress={() => setGuestStatus(item.id, 'not_going')}>
-                  <Text style={[styles.actionText, { color: theme.colors.textMuted }]}>Not Going</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.declineAction]} onPress={() => setGuestStatus(item.id, 'declined')}>
-                  <Text style={[styles.actionText, { color: theme.colors.error }]}>Decline</Text>
-                </TouchableOpacity>
+                <SecondaryButton
+                  title="Going"
+                  icon={<CheckCircle2 size={14} color={theme.colors.text} />}
+                  onPress={() => setGuestStatus(item.id, 'going')}
+                  style={styles.actionBtn}
+                />
+                <SecondaryButton
+                  title="Not Going"
+                  icon={<Ban size={14} color={theme.colors.text} />}
+                  onPress={() => setGuestStatus(item.id, 'not_going')}
+                  style={styles.actionBtn}
+                />
+                <SecondaryButton
+                  title="Decline"
+                  icon={<XCircle size={14} color={theme.colors.error} />}
+                  onPress={() => setGuestStatus(item.id, 'declined')}
+                  style={styles.actionBtn}
+                />
                 {item.status !== 'checked_in' ? (
-                  <TouchableOpacity style={[styles.actionBtn, styles.checkinAction]} onPress={() => runManualCheckIn(item.id)}>
-                    <UserCheck size={14} color={theme.colors.success} />
-                    <Text style={[styles.actionText, { color: theme.colors.success }]}>Manual Check-in</Text>
-                  </TouchableOpacity>
+                  <SecondaryButton
+                    title="Check-in"
+                    icon={<UserCheck size={14} color={theme.colors.success} />}
+                    onPress={() => runManualCheckIn(item.id)}
+                    style={styles.actionBtn}
+                  />
                 ) : null}
               </View>
-            </NeonCard>
+            </GlassCard>
           );
         }}
         ListEmptyComponent={<EmptyState title="No Guests Found" message="No guest registrations match current filters." />}
@@ -210,23 +229,24 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     marginBottom: theme.spacing.xs,
+    marginLeft: 4,
+  },
+  statusChipsContainer: {
+    padding: 4,
+    borderRadius: theme.borderRadius.m,
   },
   statusChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.spacing.s,
-    marginBottom: theme.spacing.s,
+    gap: 4,
   },
   statusChip: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.s,
   },
   statusChipSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: `${theme.colors.primary}20`,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
   },
   statusChipText: {
     ...theme.typography.small,
@@ -234,7 +254,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusChipTextSelected: {
-    color: theme.colors.primary,
+    color: theme.colors.primaryLight,
   },
   listContainer: {
     padding: theme.spacing.m,
@@ -279,32 +299,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.s,
   },
   actionBtn: {
-    borderRadius: theme.borderRadius.m,
-    paddingVertical: theme.spacing.s,
-    paddingHorizontal: theme.spacing.s,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  goingAction: {
-    borderColor: theme.colors.primaryLight,
-    backgroundColor: `${theme.colors.primaryLight}1A`,
-  },
-  notGoingAction: {
-    borderColor: theme.colors.border,
-    backgroundColor: `${theme.colors.surfaceLight}66`,
-  },
-  declineAction: {
-    borderColor: theme.colors.error,
-    backgroundColor: `${theme.colors.error}1A`,
-  },
-  checkinAction: {
-    borderColor: theme.colors.success,
-    backgroundColor: `${theme.colors.success}1A`,
-  },
-  actionText: {
-    ...theme.typography.small,
-    marginLeft: theme.spacing.xs,
-    fontWeight: '700',
+    flexGrow: 1,
+    minWidth: '40%',
   },
 });

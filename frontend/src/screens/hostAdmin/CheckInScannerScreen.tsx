@@ -7,13 +7,12 @@ import {
   FlatList,
   RefreshControl,
   Alert,
-  TextInput,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { Camera, RefreshCw, QrCode, UserCheck } from 'lucide-react-native';
 import { theme } from '../../constants/theme';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, Button } from '../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, PrimaryButton, SecondaryButton, FormInput } from '../../components';
 import { CheckInService, EventService, UserService } from '../../api/services';
 import { Event } from '../../types';
 
@@ -242,26 +241,26 @@ export const CheckInScannerScreen = () => {
         />
       </View>
 
-      <GlassCard style={styles.summaryCard}>
+      <GlassCard style={styles.summaryCard} variant="neonPurple">
         <Text style={styles.summaryLabel}>Attendance Summary</Text>
         <Text style={styles.summaryValue}>{summary.checkedIn}/{summary.total} checked in</Text>
         <Text style={styles.summaryMeta}>{summary.notCheckedIn} pending check-in</Text>
       </GlassCard>
 
       <View style={styles.scannerActions}>
-        <Button
+        <PrimaryButton
           title={isScannerOpen ? 'Close Scanner' : 'Open QR Scanner'}
           onPress={() => (isScannerOpen ? setIsScannerOpen(false) : openScanner())}
-          icon={<Camera size={16} color={theme.colors.text} />}
+          icon={<Camera size={18} color={theme.colors.surface} />}
         />
       </View>
 
       {isScannerOpen && (
-        <GlassCard style={styles.cameraWrap}>
+        <GlassCard style={styles.cameraWrap} variant="dark">
           {!permission?.granted || hasCameraPermission === false ? (
             <View style={styles.permissionFallback}>
               <Text style={styles.permissionText}>Camera access is required to scan QR codes.</Text>
-              <Button title="Grant Camera Access" onPress={openScanner} />
+              <PrimaryButton title="Grant Camera Access" onPress={openScanner} />
             </View>
           ) : (
             <>
@@ -286,12 +285,13 @@ export const CheckInScannerScreen = () => {
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={<EmptyState title="No Guests Yet" message="Guest records appear here after registrations." />}
         renderItem={({ item }) => {
           const checkedIn = item.checkInStatus === 'checked_in';
           const statusColor = checkedIn ? theme.colors.success : theme.colors.warning;
           return (
-            <GlassCard style={styles.recordCard}>
+            <GlassCard style={styles.recordCard} variant={checkedIn ? 'neonPurple' : 'dark'}>
               <View style={styles.recordHeader}>
                 <Text style={styles.recordName}>{item.attendeeName}</Text>
                 <View style={[styles.statusBadge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
@@ -312,23 +312,20 @@ export const CheckInScannerScreen = () => {
 
               {!checkedIn && (
                 <View style={styles.manualRow}>
-                  <TextInput
+                  <FormInput
                     value={manualRegistrationId === item.id ? manualNote : ''}
                     onChangeText={(text) => {
                       setManualRegistrationId(item.id);
                       setManualNote(text);
                     }}
                     placeholder="Optional attendance note"
-                    placeholderTextColor={theme.colors.textMuted}
-                    style={styles.manualInput}
                   />
-                  <TouchableOpacity
-                    style={styles.manualBtn}
+                  <SecondaryButton
+                    title="Manual Check-in"
                     onPress={() => handleManualCheckIn(item.id, manualRegistrationId === item.id ? manualNote : '')}
-                  >
-                    <UserCheck size={14} color={theme.colors.success} />
-                    <Text style={styles.manualText}>Manual Check-in</Text>
-                  </TouchableOpacity>
+                    icon={<UserCheck size={16} color={theme.colors.success} />}
+                    style={{ borderColor: theme.colors.success }}
+                  />
                 </View>
               )}
             </GlassCard>
@@ -347,10 +344,12 @@ export const CheckInScannerScreen = () => {
                       ? theme.colors.secondary
                       : theme.colors.error;
                 return (
-                  <View key={scan.id} style={styles.recentRow}>
-                    <Text style={[styles.recentStatus, { color }]}>{scan.status.toUpperCase()}</Text>
-                    <Text style={styles.recentMessage}>{scan.message}</Text>
-                  </View>
+                  <GlassCard key={scan.id} style={styles.recentCard}>
+                    <View style={styles.recentRow}>
+                      <Text style={[styles.recentStatus, { color }]}>{scan.status.toUpperCase()}</Text>
+                      <Text style={styles.recentMessage}>{scan.message}</Text>
+                    </View>
+                  </GlassCard>
                 );
               })}
             </View>
@@ -388,27 +387,29 @@ const styles = StyleSheet.create({
   },
   eventSwitchRow: {
     paddingHorizontal: theme.spacing.m,
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.m,
   },
   eventChip: {
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.round,
-    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.m,
+    paddingVertical: theme.spacing.s,
     paddingHorizontal: theme.spacing.m,
     marginRight: theme.spacing.s,
     maxWidth: 220,
+    justifyContent: 'center',
   },
   eventChipSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: `${theme.colors.primary}20`,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
   },
   eventChipText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
+    fontWeight: '600',
   },
   eventChipTextSelected: {
-    color: theme.colors.text,
+    color: theme.colors.primaryLight,
   },
   noEventsWrap: {
     paddingVertical: theme.spacing.s,
@@ -490,6 +491,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: theme.spacing.s,
+    marginBottom: theme.spacing.xs,
   },
   recordName: {
     ...theme.typography.h3,
@@ -500,7 +502,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: theme.borderRadius.s,
     paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   statusText: {
     ...theme.typography.small,
@@ -512,42 +514,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   manualRow: {
-    marginTop: theme.spacing.s,
+    marginTop: theme.spacing.m,
     gap: theme.spacing.s,
-  },
-  manualInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    color: theme.colors.text,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.s,
-    backgroundColor: theme.colors.surfaceLight,
-  },
-  manualBtn: {
-    borderWidth: 1,
-    borderColor: theme.colors.success,
-    borderRadius: theme.borderRadius.s,
-    paddingVertical: theme.spacing.s,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: `${theme.colors.success}1A`,
-    gap: theme.spacing.xs,
-  },
-  manualText: {
-    ...theme.typography.button,
-    color: theme.colors.success,
   },
   recentWrap: {
     marginBottom: theme.spacing.xl,
+  },
+  recentCard: {
+    marginBottom: theme.spacing.xs,
+    padding: theme.spacing.s,
   },
   recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.s,
-    marginHorizontal: theme.spacing.m,
-    marginBottom: theme.spacing.xs,
   },
   recentStatus: {
     ...theme.typography.small,

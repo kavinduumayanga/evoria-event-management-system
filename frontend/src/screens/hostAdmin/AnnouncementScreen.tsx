@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Megaphone, MailPlus, Send, History } from 'lucide-react-native';
 import { Event } from '../../types';
 import { theme } from '../../constants/theme';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, Input, Button } from '../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, FormInput, PrimaryButton } from '../../components';
 import { EventCommunicationEntry, EventService, UserService } from '../../api/services';
 
 export const AnnouncementScreen = () => {
@@ -182,30 +182,29 @@ export const AnnouncementScreen = () => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <GlassCard style={styles.formCard}>
+        <GlassCard style={styles.formCard} variant="neonPurple">
           <View style={styles.formHeader}>
-            <Send size={16} color={theme.colors.primaryLight} />
+            <Send size={18} color={theme.colors.primaryLight} />
             <Text style={styles.formTitle}>Blast Message</Text>
           </View>
-          <Input label="Subject (Optional)" value={blastSubject} onChangeText={setBlastSubject} placeholder="Event update" />
-          <Input
+          <FormInput label="Subject (Optional)" value={blastSubject} onChangeText={setBlastSubject} placeholder="Event update" />
+          <FormInput
             label="Message"
             value={blastMessage}
             onChangeText={setBlastMessage}
             placeholder="Write one message for all registered users"
             multiline
             numberOfLines={4}
-            style={styles.messageInput}
           />
-          <Button title="Send Blast" onPress={handleSendBlast} isLoading={isSubmittingBlast} />
+          <PrimaryButton title="Send Blast" onPress={handleSendBlast} isLoading={isSubmittingBlast} icon={<Send size={16} color={theme.colors.surface} />} />
         </GlassCard>
 
-        <GlassCard style={styles.formCard}>
+        <GlassCard style={styles.formCard} variant="dark">
           <View style={styles.formHeader}>
-            <MailPlus size={16} color={theme.colors.secondary} />
+            <MailPlus size={18} color={theme.colors.secondary} />
             <Text style={styles.formTitle}>Invite Guest</Text>
           </View>
-          <Input
+          <FormInput
             label="Guest Email"
             value={inviteEmail}
             onChangeText={setInviteEmail}
@@ -213,21 +212,20 @@ export const AnnouncementScreen = () => {
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          <Input
+          <FormInput
             label="Message (Optional)"
             value={inviteMessage}
             onChangeText={setInviteMessage}
             placeholder="Add a personal invitation note"
             multiline
             numberOfLines={3}
-            style={styles.messageInput}
           />
-          <Button title="Send Invite" onPress={handleInviteGuest} isLoading={isSubmittingInvite} />
+          <PrimaryButton title="Send Invite" onPress={handleInviteGuest} isLoading={isSubmittingInvite} icon={<MailPlus size={16} color={theme.colors.surface} />} />
         </GlassCard>
 
         <GlassCard style={styles.historyCard}>
           <View style={styles.formHeader}>
-            <History size={16} color={theme.colors.accent} />
+            <History size={18} color={theme.colors.accent} />
             <Text style={styles.formTitle}>Communication History</Text>
           </View>
 
@@ -237,7 +235,7 @@ export const AnnouncementScreen = () => {
             <EmptyState title="No History Yet" message="Invites, blasts, and in-app alerts will appear here." />
           ) : (
             communications.slice(0, 40).map((item) => (
-              <View key={item.id} style={styles.historyItem}>
+              <GlassCard key={item.id} style={styles.historyItem} variant="dark">
                 <View style={styles.historyMetaRow}>
                   <Text style={styles.historyType}>{item.source === 'email_log' ? 'EMAIL_MOCK' : 'IN_APP'}</Text>
                   <Text style={styles.historyTime}>{new Date(item.createdAt).toLocaleString()}</Text>
@@ -247,7 +245,7 @@ export const AnnouncementScreen = () => {
                   To: {item.recipientEmail || item.recipientUserId || 'Unknown recipient'}
                 </Text>
                 <Text style={styles.historyMessage}>{item.message}</Text>
-              </View>
+              </GlassCard>
             ))
           )}
         </GlassCard>
@@ -279,22 +277,24 @@ const styles = StyleSheet.create({
   eventChip: {
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.round,
-    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.m,
+    paddingVertical: theme.spacing.s,
     paddingHorizontal: theme.spacing.m,
     marginRight: theme.spacing.s,
     maxWidth: 220,
+    justifyContent: 'center',
   },
   eventChipSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: `${theme.colors.primary}20`,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
   },
   eventChipText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
+    fontWeight: '600',
   },
   eventChipTextSelected: {
-    color: theme.colors.text,
+    color: theme.colors.primaryLight,
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.m,
@@ -308,15 +308,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.s,
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.m,
   },
   formTitle: {
-    ...theme.typography.h3,
+    ...theme.typography.h2,
     color: theme.colors.text,
-  },
-  messageInput: {
-    minHeight: 88,
-    alignItems: 'flex-start',
   },
   historyCard: {
     marginBottom: theme.spacing.m,
@@ -327,17 +323,13 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   historyItem: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    padding: theme.spacing.s,
-    marginBottom: theme.spacing.s,
-    backgroundColor: `${theme.colors.surfaceLight}55`,
+    padding: theme.spacing.m,
+    marginBottom: theme.spacing.m,
   },
   historyMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   historyType: {
     ...theme.typography.small,
@@ -349,15 +341,15 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   historySubject: {
-    ...theme.typography.caption,
+    ...theme.typography.body,
     color: theme.colors.text,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   historyRecipient: {
-    ...theme.typography.small,
+    ...theme.typography.caption,
     color: theme.colors.secondary,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   historyMessage: {
     ...theme.typography.caption,

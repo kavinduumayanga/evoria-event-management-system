@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginRight: theme.spacing.m,
     padding: theme.spacing.s,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: theme.colors.surfaceLight,
     borderRadius: theme.borderRadius.m,
   },
   textContainer: {

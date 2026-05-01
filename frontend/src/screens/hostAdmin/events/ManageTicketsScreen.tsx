@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Ale
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, NeonCard, LoadingState, ErrorState, EmptyState } from '../../../components';
+import { ScreenContainer, GlassCard, LoadingState, ErrorState, EmptyState, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { Plus, Edit2, Trash2, ArrowLeft, Ticket as TicketIcon } from 'lucide-react-native';
 import { TicketService } from '../../../api/services';
@@ -80,19 +80,18 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
           <Text style={styles.title}>Tickets</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.createButton}
+        <IconButton
+          icon={<Plus size={20} color={theme.colors.text} />}
           onPress={() => navigation.navigate('TicketForm', { eventId })}
-        >
-          <Plus size={20} color={theme.colors.text} />
-        </TouchableOpacity>
+          variant="solid"
+        />
       </View>
 
       <FlatList
         data={tickets}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <NeonCard style={styles.ticketCard}>
+          <GlassCard style={styles.ticketCard} variant={item.isActive ? 'dark' : 'neonPurple'}>
             <View style={styles.ticketInfo}>
               <View style={styles.ticketTitleRow}>
                 <TicketIcon size={18} color={theme.colors.secondary} />
@@ -102,6 +101,11 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
                     {item.isFree ? 'FREE' : 'PAID'}
                   </Text>
                 </View>
+                {!item.isActive && (
+                  <View style={[styles.ticketBadge, { backgroundColor: `${theme.colors.warning}20`, marginLeft: 4 }]}>
+                    <Text style={[styles.ticketBadgeText, { color: theme.colors.warning }]}>HIDDEN</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.ticketPrice}>
                 {item.isFree ? 'Free' : `${item.currency || 'LKR'} ${item.price.toFixed(2)}`}
@@ -112,14 +116,19 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.ticketDetail}>Max per user: {item.maxPerUser}</Text>
             </View>
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('TicketForm', { eventId, ticketId: item.id })}>
-                <Edit2 size={18} color={theme.colors.secondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item.id)}>
-                <Trash2 size={18} color={theme.colors.error} />
-              </TouchableOpacity>
+              <IconButton
+                icon={<Edit2 size={16} color={theme.colors.text} />}
+                onPress={() => navigation.navigate('TicketForm', { eventId, ticketId: item.id })}
+                variant="outline"
+                style={{ marginRight: 8 }}
+              />
+              <IconButton
+                icon={<Trash2 size={16} color={theme.colors.error} />}
+                onPress={() => handleDelete(item.id)}
+                variant="outline"
+              />
             </View>
-          </NeonCard>
+          </GlassCard>
         )}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
@@ -138,11 +147,10 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   backButton: { marginRight: theme.spacing.m },
   title: { ...theme.typography.h1, color: theme.colors.text },
-  createButton: { backgroundColor: theme.colors.primary, padding: theme.spacing.s, borderRadius: theme.borderRadius.round },
   listContainer: { padding: theme.spacing.m, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
   ticketCard: { marginBottom: theme.spacing.m, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   ticketInfo: { flex: 1 },
-  ticketTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  ticketTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' },
   ticketName: { ...theme.typography.h3, color: theme.colors.text, marginLeft: theme.spacing.xs },
   ticketBadge: {
     marginLeft: theme.spacing.s,
@@ -156,6 +164,5 @@ const styles = StyleSheet.create({
   },
   ticketPrice: { ...theme.typography.body, color: theme.colors.primaryLight, marginBottom: 2, fontWeight: 'bold' },
   ticketDetail: { ...theme.typography.caption, color: theme.colors.textMuted },
-  actions: { flexDirection: 'row' },
-  actionBtn: { padding: theme.spacing.s, marginLeft: theme.spacing.xs, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: theme.borderRadius.m },
+  actions: { flexDirection: 'row', alignItems: 'center' },
 });

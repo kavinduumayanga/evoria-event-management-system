@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft } from 'lucide-react-native';
-import { ScreenContainer, Input, Button, NeonCard, LoadingState } from '../../components';
+import { ArrowLeft, User, Phone, Image as ImageIcon } from 'lucide-react-native';
+import { ScreenContainer, FormInput, PrimaryButton, GlassCard, LoadingState, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
@@ -88,39 +88,57 @@ export const EditProfileScreen = () => {
   }
 
   return (
-    <ScreenContainer scrollable>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft color={theme.colors.text} size={22} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Edit Profile</Text>
-      </View>
+    <ScreenContainer scrollable={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.header}>
+          <IconButton 
+            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
+            onPress={() => navigation.goBack()} 
+            variant="solid" 
+          />
+          <Text style={styles.title}>Edit Profile</Text>
+        </View>
 
-      <NeonCard style={styles.card}>
-        <Input label="Full Name" placeholder="Enter your full name" value={name} onChangeText={setName} />
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <GlassCard style={styles.card} variant="dark" animateEntrance>
+            <FormInput 
+              label="Full Name" 
+              placeholder="Enter your full name" 
+              value={name} 
+              onChangeText={setName} 
+              leftIcon={<User size={20} color={theme.colors.textMuted} />}
+            />
 
-        <Input
-          label="Phone"
-          placeholder="Enter your phone number"
-          keyboardType="phone-pad"
-          value={phone}
-          onChangeText={setPhone}
-        />
+            <FormInput
+              label="Phone"
+              placeholder="Enter your phone number"
+              keyboardType="phone-pad"
+              value={phone}
+              onChangeText={setPhone}
+              leftIcon={<Phone size={20} color={theme.colors.textMuted} />}
+            />
 
-        <Input
-          label="Profile Image URL or Upload Path"
-          placeholder="/uploads/your-image.jpg"
-          autoCapitalize="none"
-          value={profileImage}
-          onChangeText={setProfileImage}
-        />
+            <FormInput
+              label="Profile Image URL or Upload Path"
+              placeholder="/uploads/your-image.jpg"
+              autoCapitalize="none"
+              value={profileImage}
+              onChangeText={setProfileImage}
+              leftIcon={<ImageIcon size={20} color={theme.colors.textMuted} />}
+            />
 
-        <Text style={styles.helperText}>
-          Use the existing upload endpoint first, then paste the returned path here.
-        </Text>
+            <Text style={styles.helperText}>
+              Use the existing upload endpoint first, then paste the returned path here.
+            </Text>
 
-        <Button title="Save Changes" onPress={handleSave} isLoading={isLoading} style={styles.saveButton} />
-      </NeonCard>
+            <PrimaryButton title="Save Changes" onPress={handleSave} isLoading={isLoading} style={styles.saveButton} />
+          </GlassCard>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 };
@@ -130,16 +148,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.m,
-    marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.xl,
   },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+  content: {
+    flexGrow: 1,
+    paddingBottom: theme.spacing.xxl,
   },
   title: {
     ...theme.typography.h2,
@@ -151,7 +164,7 @@ const styles = StyleSheet.create({
   helperText: {
     ...theme.typography.small,
     color: theme.colors.textMuted,
-    marginTop: theme.spacing.s,
+    marginTop: theme.spacing.xs,
   },
   saveButton: {
     marginTop: theme.spacing.l,

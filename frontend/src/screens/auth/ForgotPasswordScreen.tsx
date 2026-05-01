@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -12,9 +11,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, Button, Input, GlassCard } from '../../components';
+import { GradientBackground, PrimaryButton, SecondaryButton, FormInput, GlassCard, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Mail } from 'lucide-react-native';
 import { AuthService } from '../../api/services';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -69,9 +68,11 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
-          </TouchableOpacity>
+          <IconButton 
+            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
+            onPress={() => navigation.goBack()} 
+            variant="solid" 
+          />
         </View>
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -83,26 +84,26 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.title}>Forgot Password</Text>
             <Text style={styles.subtitle}>Enter your email to generate a reset token.</Text>
 
-            <GlassCard style={styles.card}>
-              <Input
+            <GlassCard style={styles.card} variant="dark" animateEntrance>
+              <FormInput
                 label="Email Address"
                 placeholder="Enter your email"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
+                leftIcon={<Mail size={20} color={theme.colors.textMuted} />}
               />
 
-              <Button
+              <PrimaryButton
                 title="Generate Reset Token"
                 onPress={handleForgotPassword}
                 isLoading={isLoading}
                 style={styles.button}
               />
 
-              <Button
+              <SecondaryButton
                 title="Go to Reset Password"
-                variant="outline"
                 onPress={() => navigation.navigate('ResetPassword', { email: email.trim().toLowerCase() || undefined })}
                 style={styles.secondaryButton}
               />
@@ -111,7 +112,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             {message ? <Text style={styles.infoText}>{message}</Text> : null}
 
             {devResetToken ? (
-              <GlassCard style={styles.tokenCard}>
+              <GlassCard style={styles.tokenCard} variant="neonPurple" animateEntrance>
                 <Text style={styles.tokenLabel}>Development Reset Token</Text>
                 <Text style={styles.tokenValue}>{devResetToken}</Text>
               </GlassCard>
@@ -130,14 +131,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   content: {
     flexGrow: 1,
@@ -175,7 +169,7 @@ const styles = StyleSheet.create({
   },
   tokenLabel: {
     ...theme.typography.caption,
-    color: theme.colors.secondary,
+    color: theme.colors.primaryLight,
     fontWeight: '600',
     marginBottom: theme.spacing.s,
   },

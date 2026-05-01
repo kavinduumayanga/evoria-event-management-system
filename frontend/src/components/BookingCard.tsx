@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { NeonCard } from './NeonCard';
+import { GlassCard } from './GlassCard';
 import { Booking } from '../types';
 import { theme } from '../constants/theme';
 import { Ticket, Calendar, DollarSign } from 'lucide-react-native';
@@ -38,7 +38,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
   };
 
   return (
-    <NeonCard style={[styles.container, style]} onPress={onPress}>
+    <GlassCard style={[styles.container, style]} variant="dark" animateEntrance>
       <View style={styles.headerRow}>
         <View style={styles.titleContainer}>
           <Ticket size={18} color={theme.colors.primary} />
@@ -89,7 +89,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
           {actions}
         </View>
       )}
-    </NeonCard>
+    </GlassCard>
   );
 };
 
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.m,
     paddingBottom: theme.spacing.s,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: theme.colors.border,
   },
   titleContainer: {
     flexDirection: 'row',
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.m,
     paddingTop: theme.spacing.m,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: theme.colors.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: theme.spacing.s,

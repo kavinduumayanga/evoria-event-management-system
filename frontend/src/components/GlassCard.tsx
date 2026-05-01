@@ -1,50 +1,79 @@
-import React from 'react';
-import { View, StyleSheet, ViewProps, ViewStyle, StyleProp } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, ViewProps, ViewStyle, StyleProp, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../constants/theme';
 
 interface GlassCardProps extends ViewProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  variant?: 'dark' | 'light' | 'neon';
+  variant?: 'dark' | 'light' | 'neonPurple' | 'neonCyan';
+  animateEntrance?: boolean;
 }
 
 export const GlassCard: React.FC<GlassCardProps> = ({
   children,
   style,
   variant = 'dark',
+  animateEntrance = false,
   ...props
 }) => {
-  const getBackgroundColor = () => {
+  const fadeAnim = useRef(new Animated.Value(animateEntrance ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (animateEntrance) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [animateEntrance]);
+
+  const getGradientColors = () => {
     switch (variant) {
-      case 'light': return 'rgba(39, 39, 42, 0.7)'; // surfaceLight with opacity
-      case 'neon': return 'rgba(139, 92, 246, 0.15)'; // primary with opacity
+      case 'light': return ['rgba(35, 35, 48, 0.8)', 'rgba(25, 25, 35, 0.6)'];
+      case 'neonPurple': return ['rgba(139, 92, 246, 0.15)', 'rgba(139, 92, 246, 0.05)'];
+      case 'neonCyan': return ['rgba(6, 182, 212, 0.15)', 'rgba(6, 182, 212, 0.05)'];
       case 'dark':
-      default: return 'rgba(24, 24, 27, 0.7)'; // surface with opacity
+      default: return ['rgba(21, 21, 30, 0.8)', 'rgba(15, 15, 20, 0.6)'];
     }
   };
 
   const getBorderColor = () => {
     switch (variant) {
-      case 'neon': return 'rgba(139, 92, 246, 0.3)';
-      default: return 'rgba(255, 255, 255, 0.05)';
+      case 'neonPurple': return 'rgba(139, 92, 246, 0.4)';
+      case 'neonCyan': return 'rgba(6, 182, 212, 0.4)';
+      default: return theme.colors.border;
     }
   };
 
+  const getGlow = () => {
+    if (variant === 'neonPurple') return theme.shadows.neonPurple;
+    if (variant === 'neonCyan') return theme.shadows.neonCyan;
+    return {};
+  };
+
   return (
-    <View
+    <Animated.View
       style={[
         styles.container,
         {
-          backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
+          opacity: fadeAnim,
         },
-        variant === 'neon' ? theme.shadows.neon : {},
+        getGlow(),
         style,
       ]}
       {...props}
     >
+      <LinearGradient
+        colors={getGradientColors() as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
       {children}
-    </View>
+    </Animated.View>
   );
 };
 
