@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { RegistrationModel } from '../models/Registration';
@@ -23,10 +24,20 @@ const publicRegistrationSchema = z.object({
 }).strict();
 
 const registrationStatusSchema = z.object({
-  status: z.enum(['pending', 'going', 'not_going', 'declined', 'checked_in']),
+  status: z.enum(['pending', 'going', 'ongoing', 'checked_in', 'not_going', 'declined']),
 }).strict();
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
+const generateUniqueQrCodeValue = async (): Promise<string> => {
+  for (let i = 0; i < 10; i += 1) {
+    const token = `qr_${crypto.randomBytes(16).toString('hex')}`;
+    const exists = await RegistrationModel.exists({ qrCodeValue: token });
+    if (!exists) return token;
+  }
+
+  throw new AppError('Failed to generate a unique QR code token', 500);
+};
 
 const resolveOwnerId = (event: any): string => {
   const ownerId = typeof event?.ownerId === 'string' ? event.ownerId.trim() : '';
@@ -223,9 +234,27 @@ export const updateRegistrationStatus = async (req: Request, res: Response, next
       return next(new AppError(`Registration already ${status}`, 400));
     }
 
+    const updatePayload: Record<string, unknown> = { status };
+
+    if ((status === 'going' || status === 'ongoing' || status === 'checked_in') && !registration.qrCodeValue) {
+      updatePayload.qrCodeValue = await generateUniqueQrCodeValue();
+    }
+
+    if (status === 'checked_in') {
+      updatePayload.checkedInAt = new Date();
+      updatePayload.checkedInBy = req.user!.id;
+      updatePayload.checkInMethod = 'manual';
+    } else if (status === 'pending' || status === 'not_going' || status === 'declined') {
+      updatePayload.checkedInAt = null;
+      updatePayload.checkedInBy = null;
+      updatePayload.checkInMethod = null;
+      updatePayload.attendanceNote = null;
+      updatePayload.qrCodeValue = null;
+    }
+
     const updatedRegistration = await RegistrationModel.findByIdAndUpdate(
       registration.id,
-      { status },
+      updatePayload,
       { new: true },
     );
 

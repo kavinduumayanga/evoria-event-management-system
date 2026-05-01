@@ -19,10 +19,14 @@ const registrationSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'going', 'not_going', 'declined', 'checked_in'],
+    enum: ['pending', 'going', 'ongoing', 'checked_in', 'not_going', 'declined'],
     default: 'pending',
   },
   qrCodeValue: { type: String, trim: true, default: null },
+  checkedInAt: { type: Date, default: null },
+  checkedInBy: { type: String, default: null },
+  checkInMethod: { type: String, enum: ['qr', 'manual', null], default: null },
+  attendanceNote: { type: String, trim: true, default: null },
   registeredAt: { type: Date, default: Date.now },
 }, {
   timestamps: true,
@@ -40,5 +44,6 @@ const registrationSchema = new Schema({
 registrationSchema.index({ eventId: 1, emailLower: 1 }, { unique: true });
 registrationSchema.index({ eventId: 1, status: 1, registeredAt: -1 });
 registrationSchema.index({ userId: 1, registeredAt: -1 });
+registrationSchema.index({ qrCodeValue: 1 }, { unique: true, sparse: true });
 
 export const RegistrationModel = mongoose.model('Registration', registrationSchema);

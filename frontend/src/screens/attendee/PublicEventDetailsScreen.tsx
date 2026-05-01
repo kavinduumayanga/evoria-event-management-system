@@ -88,9 +88,9 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   };
 
   const handleContact = async () => {
-    if (!event?.host) return;
+    if (!event) return;
 
-    const phone = event.host.phone?.trim();
+    const phone = (event.contactDetails?.phone || event.host?.phone || '').trim();
     if (phone) {
       const telUrl = `tel:${phone}`;
       const canDial = await Linking.canOpenURL(telUrl);
@@ -100,7 +100,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
       }
     }
 
-    const email = event.host.email?.trim();
+    const email = (event.contactDetails?.email || event.host?.email || '').trim();
     if (email) {
       const mailUrl = `mailto:${email}`;
       const canEmail = await Linking.canOpenURL(mailUrl);
@@ -226,7 +226,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
               <Button
                 title="Contact Host"
                 variant="outline"
-                icon={event.host?.phone ? <Phone size={16} color={theme.colors.primary} /> : <Mail size={16} color={theme.colors.primary} />}
+                icon={event.contactDetails?.phone || event.host?.phone ? <Phone size={16} color={theme.colors.primary} /> : <Mail size={16} color={theme.colors.primary} />}
                 onPress={handleContact}
               />
             </View>

@@ -205,12 +205,13 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleContactHost = async () => {
     const host = publicData?.event.host;
-    if (!host) {
+    const contact = publicData?.event.contactDetails;
+    if (!host && !contact) {
       Alert.alert('Contact Unavailable', 'Host contact details are not available.');
       return;
     }
 
-    const phone = host.phone?.trim();
+    const phone = (contact?.phone || host?.phone || '').trim();
     if (phone) {
       const telUrl = `tel:${phone}`;
       const canDial = await Linking.canOpenURL(telUrl);
@@ -220,7 +221,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     }
 
-    const email = host.email?.trim();
+    const email = (contact?.email || host?.email || '').trim();
     if (email) {
       const mailUrl = `mailto:${email}`;
       const canEmail = await Linking.canOpenURL(mailUrl);

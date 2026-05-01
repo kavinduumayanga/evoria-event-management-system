@@ -29,6 +29,21 @@ const eventSchema = new Schema({
   bookingCount: { type: Number, default: 0 },
   meetingLink: { type: String, trim: true, default: '' },
   coverImage: { type: String, trim: true },
+  contactDetails: {
+    type: new Schema({
+      name: { type: String, trim: true, default: '' },
+      email: { type: String, trim: true, lowercase: true, default: '' },
+      phone: { type: String, trim: true, default: '' },
+    }, { _id: false }),
+    default: () => ({ name: '', email: '', phone: '' }),
+  },
+  branding: {
+    type: new Schema({
+      primaryColor: { type: String, trim: true, default: '' },
+      accentColor: { type: String, trim: true, default: '' },
+    }, { _id: false }),
+    default: () => ({ primaryColor: '', accentColor: '' }),
+  },
   capacity: { type: Number, required: true },
   isFlagged: { type: Boolean, default: false },
   isFeatured: { type: Boolean, default: false },

@@ -18,25 +18,40 @@ import { CheckInService, EventService, UserService } from '../../api/services';
 import { Event } from '../../types';
 
 interface AttendanceRecord {
-  bookingId: string;
+  id: string;
   attendeeName: string;
   attendeeEmail: string;
-  ticketName: string;
-  bookingStatus: string;
-  approvalStatus: string;
-  rsvpStatus: string;
+  mobile?: string;
+  nic?: string;
+  guestStatus?: string;
   checkInStatus: 'not_checked_in' | 'checked_in';
   checkedInAt?: string | null;
   checkInMethod?: 'qr' | 'manual' | null;
   attendanceNote?: string | null;
+  qrCodeValue?: string | null;
 }
 
 interface RecentScanRecord {
   id: string;
   status: 'success' | 'duplicate' | 'invalid';
   message: string;
-  at: string;
 }
+
+const normalizeAttendance = (rawItems: any[]): AttendanceRecord[] => {
+  return rawItems.map((item) => ({
+    id: String(item.registrationId || item.bookingId || item.id),
+    attendeeName: item.attendeeName || item.name || 'Unknown attendee',
+    attendeeEmail: item.attendeeEmail || item.email || 'Unknown email',
+    mobile: item.mobile || '',
+    nic: item.nic || '',
+    guestStatus: item.guestStatus || item.status || '',
+    checkInStatus: item.checkInStatus === 'checked_in' ? 'checked_in' : 'not_checked_in',
+    checkedInAt: item.checkedInAt || null,
+    checkInMethod: item.checkInMethod || null,
+    attendanceNote: item.attendanceNote || null,
+    qrCodeValue: item.qrCodeValue || null,
+  }));
+};
 
 export const CheckInScannerScreen = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -49,50 +64,51 @@ export const CheckInScannerScreen = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [manualNote, setManualNote] = useState('');
-  const [manualBookingId, setManualBookingId] = useState('');
-
+  const [manualRegistrationId, setManualRegistrationId] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
 
-  const fetchScreenData = async () => {
+  const fetchAttendance = useCallback(async (eventId: string) => {
+    if (!eventId) return;
+    const attendanceRes = await CheckInService.getEventAttendance(eventId);
+    const normalized = normalizeAttendance(attendanceRes?.data?.attendance || []);
+    setAttendance(normalized);
+  }, []);
+
+  const fetchScreenData = useCallback(async () => {
     try {
       setError(null);
-      const [userRes, eventsRes] = await Promise.all([UserService.getMe(), EventService.getEvents()]);
-      const hostEvents = eventsRes.data.events.filter((item: Event) => item.hostAdminId === userRes.data.user.id);
-      setEvents(hostEvents);
+      const userRes = await UserService.getMe();
+      const managedEventsRes = await EventService.getHostEvents(userRes.data.user.id);
+      const managedEvents = managedEventsRes?.data?.events || [];
+      setEvents(managedEvents);
 
-      const resolvedEventId = selectedEventId || hostEvents[0]?.id || '';
+      const hasSelectedEvent = managedEvents.some((event: Event) => event.id === selectedEventId);
+      const resolvedEventId = hasSelectedEvent ? selectedEventId : (managedEvents[0]?.id || '');
       setSelectedEventId(resolvedEventId);
 
       if (resolvedEventId) {
-        const attendanceRes = await CheckInService.getEventAttendance(resolvedEventId);
-        setAttendance(attendanceRes.data.attendance || []);
+        await fetchAttendance(resolvedEventId);
       } else {
         setAttendance([]);
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load check-in data');
+    } catch (fetchError: any) {
+      setError(fetchError?.response?.data?.message || 'Failed to load check-in data');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
-
-  const fetchAttendance = async (eventId: string) => {
-    if (!eventId) return;
-    const attendanceRes = await CheckInService.getEventAttendance(eventId);
-    setAttendance(attendanceRes.data.attendance || []);
-  };
+  }, [fetchAttendance, selectedEventId]);
 
   useFocusEffect(
     useCallback(() => {
       fetchScreenData();
-    }, [])
+    }, [fetchScreenData]),
   );
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
     fetchScreenData();
-  }, []);
+  }, [fetchScreenData]);
 
   const openScanner = async () => {
     if (!selectedEventId) {
@@ -112,13 +128,10 @@ export const CheckInScannerScreen = () => {
   };
 
   const pushRecentScan = (status: RecentScanRecord['status'], message: string) => {
-    const record: RecentScanRecord = {
-      id: `${Date.now()}_${Math.random()}`,
-      status,
-      message,
-      at: new Date().toISOString(),
-    };
-    setRecentScans((prev) => [record, ...prev].slice(0, 8));
+    setRecentScans((previous) => [
+      { id: `${Date.now()}_${Math.random()}`, status, message },
+      ...previous,
+    ].slice(0, 8));
   };
 
   const handleScan = async (result: BarcodeScanningResult) => {
@@ -126,15 +139,15 @@ export const CheckInScannerScreen = () => {
 
     try {
       setIsProcessingScan(true);
-      const res = await CheckInService.scanQr(result.data);
-      pushRecentScan('success', res.message || 'Check-in successful');
-      Alert.alert('Success', res.message || 'Check-in successful');
+      const response = await CheckInService.scanQr(result.data);
+      pushRecentScan('success', response.message || 'Check-in successful');
+      Alert.alert('Success', response.message || 'Check-in successful');
       await fetchAttendance(selectedEventId);
-    } catch (err: any) {
-      const statusCode = err?.response?.status;
-      const message = err?.response?.data?.message || 'Invalid QR code';
+    } catch (scanError: any) {
+      const statusCode = scanError?.response?.status;
+      const message = scanError?.response?.data?.message || 'Invalid QR code';
 
-      if (statusCode === 409 || err?.response?.data?.status === 'duplicate') {
+      if (statusCode === 409 || scanError?.response?.data?.status === 'duplicate') {
         pushRecentScan('duplicate', message);
         Alert.alert('Duplicate', message);
       } else {
@@ -148,15 +161,15 @@ export const CheckInScannerScreen = () => {
     }
   };
 
-  const handleManualCheckIn = async (bookingId: string, presetNote?: string) => {
+  const handleManualCheckIn = async (registrationId: string, attendanceNote?: string) => {
     try {
-      await CheckInService.manualCheckIn(bookingId, presetNote || undefined);
+      await CheckInService.manualCheckIn(registrationId, attendanceNote || undefined);
       Alert.alert('Success', 'Manual check-in successful');
-      setManualBookingId('');
+      setManualRegistrationId('');
       setManualNote('');
       await fetchAttendance(selectedEventId);
-    } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.message || 'Failed to complete manual check-in');
+    } catch (manualError: any) {
+      Alert.alert('Error', manualError?.response?.data?.message || 'Failed to complete manual check-in');
     }
   };
 
@@ -170,13 +183,7 @@ export const CheckInScannerScreen = () => {
   }, [attendance]);
 
   if (isLoading && !isRefreshing) return <LoadingState />;
-  if (error) {
-    return (
-      <ScreenContainer>
-        <ErrorState message={error} onRetry={fetchScreenData} />
-      </ScreenContainer>
-    );
-  }
+  if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchScreenData} /></ScreenContainer>;
 
   return (
     <ScreenContainer style={styles.container}>
@@ -200,11 +207,7 @@ export const CheckInScannerScreen = () => {
                 style={[styles.eventChip, isSelected && styles.eventChipSelected]}
                 onPress={async () => {
                   setSelectedEventId(item.id);
-                  try {
-                    await fetchAttendance(item.id);
-                  } catch (err: any) {
-                    Alert.alert('Error', err?.response?.data?.message || 'Failed to fetch attendance');
-                  }
+                  await fetchAttendance(item.id);
                 }}
               >
                 <Text style={[styles.eventChipText, isSelected && styles.eventChipTextSelected]} numberOfLines={1}>
@@ -213,20 +216,14 @@ export const CheckInScannerScreen = () => {
               </TouchableOpacity>
             );
           }}
-          ListEmptyComponent={
-            <View style={styles.noEventsWrap}>
-              <Text style={styles.noEventsText}>No host events found.</Text>
-            </View>
-          }
+          ListEmptyComponent={<View style={styles.noEventsWrap}><Text style={styles.noEventsText}>No managed events found.</Text></View>}
         />
       </View>
 
       <GlassCard style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>Attendance Summary</Text>
-        <Text style={styles.summaryValue}>
-          {summary.checkedIn}/{summary.total} checked in
-        </Text>
-        <Text style={styles.summaryMeta}>{summary.notCheckedIn} pending</Text>
+        <Text style={styles.summaryValue}>{summary.checkedIn}/{summary.total} checked in</Text>
+        <Text style={styles.summaryMeta}>{summary.notCheckedIn} pending check-in</Text>
       </GlassCard>
 
       <View style={styles.scannerActions}>
@@ -247,22 +244,18 @@ export const CheckInScannerScreen = () => {
           />
           <View style={styles.scanHint}>
             <QrCode size={14} color={theme.colors.primaryLight} />
-            <Text style={styles.scanHintText}>Align attendee QR code inside camera view</Text>
+            <Text style={styles.scanHintText}>Align guest QR code inside camera view</Text>
           </View>
         </GlassCard>
       )}
 
-      <Text style={styles.sectionTitle}>Attendance Records</Text>
+      <Text style={styles.sectionTitle}>Guest Check-in Queue</Text>
       <FlatList
         data={attendance}
-        keyExtractor={(item) => item.bookingId}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
-        }
+        keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <EmptyState title="No Attendance Yet" message="Attendees will appear here after registrations." />
-        }
+        ListEmptyComponent={<EmptyState title="No Guests Yet" message="Guest records appear here after registrations." />}
         renderItem={({ item }) => {
           const checkedIn = item.checkInStatus === 'checked_in';
           const statusColor = checkedIn ? theme.colors.success : theme.colors.warning;
@@ -277,20 +270,21 @@ export const CheckInScannerScreen = () => {
                 </View>
               </View>
               <Text style={styles.recordMeta}>{item.attendeeEmail}</Text>
-              <Text style={styles.recordMeta}>Ticket: {item.ticketName}</Text>
-              <Text style={styles.recordMeta}>Booking: {item.bookingStatus}</Text>
-              {item.checkedInAt && (
+              {item.mobile ? <Text style={styles.recordMeta}>Mobile: {item.mobile}</Text> : null}
+              {item.nic ? <Text style={styles.recordMeta}>NIC: {item.nic}</Text> : null}
+              {item.guestStatus ? <Text style={styles.recordMeta}>Status: {item.guestStatus.toUpperCase()}</Text> : null}
+              {item.checkedInAt ? (
                 <Text style={styles.recordMeta}>
                   At: {new Date(item.checkedInAt).toLocaleString()} ({item.checkInMethod || 'manual'})
                 </Text>
-              )}
+              ) : null}
 
               {!checkedIn && (
                 <View style={styles.manualRow}>
                   <TextInput
-                    value={manualBookingId === item.bookingId ? manualNote : ''}
+                    value={manualRegistrationId === item.id ? manualNote : ''}
                     onChangeText={(text) => {
-                      setManualBookingId(item.bookingId);
+                      setManualRegistrationId(item.id);
                       setManualNote(text);
                     }}
                     placeholder="Optional attendance note"
@@ -299,7 +293,7 @@ export const CheckInScannerScreen = () => {
                   />
                   <TouchableOpacity
                     style={styles.manualBtn}
-                    onPress={() => handleManualCheckIn(item.bookingId, manualBookingId === item.bookingId ? manualNote : '')}
+                    onPress={() => handleManualCheckIn(item.id, manualRegistrationId === item.id ? manualNote : '')}
                   >
                     <UserCheck size={14} color={theme.colors.success} />
                     <Text style={styles.manualText}>Manual Check-in</Text>
@@ -314,10 +308,9 @@ export const CheckInScannerScreen = () => {
             <View style={styles.recentWrap}>
               <Text style={styles.sectionTitle}>Recent Scans</Text>
               {recentScans.map((scan) => {
-                const color =
-                  scan.status === 'success'
-                    ? theme.colors.success
-                    : scan.status === 'duplicate'
+                const color = scan.status === 'success'
+                  ? theme.colors.success
+                  : scan.status === 'duplicate'
                     ? theme.colors.warning
                     : theme.colors.error;
                 return (
@@ -466,7 +459,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: theme.borderRadius.s,
     paddingHorizontal: theme.spacing.s,
-    paddingVertical: 3,
+    paddingVertical: 2,
   },
   statusText: {
     ...theme.typography.small,
@@ -475,7 +468,7 @@ const styles = StyleSheet.create({
   recordMeta: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    marginTop: 4,
+    marginTop: 2,
   },
   manualRow: {
     marginTop: theme.spacing.s,
@@ -485,41 +478,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.m,
+    color: theme.colors.text,
     paddingHorizontal: theme.spacing.s,
     paddingVertical: theme.spacing.s,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceLight,
   },
   manualBtn: {
     borderWidth: 1,
     borderColor: theme.colors.success,
-    borderRadius: theme.borderRadius.m,
+    borderRadius: theme.borderRadius.s,
     paddingVertical: theme.spacing.s,
-    alignItems: 'center',
-    justifyContent: 'center',
     flexDirection: 'row',
-    gap: theme.spacing.s,
-    backgroundColor: `${theme.colors.success}10`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: `${theme.colors.success}1A`,
+    gap: theme.spacing.xs,
   },
   manualText: {
-    ...theme.typography.caption,
+    ...theme.typography.button,
     color: theme.colors.success,
-    fontWeight: '700',
   },
   recentWrap: {
-    marginTop: theme.spacing.s,
     marginBottom: theme.spacing.xl,
   },
   recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.s,
+    marginHorizontal: theme.spacing.m,
     marginBottom: theme.spacing.xs,
   },
   recentStatus: {
     ...theme.typography.small,
     fontWeight: '700',
-    width: 76,
+    minWidth: 80,
   },
   recentMessage: {
     ...theme.typography.caption,

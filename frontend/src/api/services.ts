@@ -91,20 +91,22 @@ export interface CreateReportPayload {
 
 export interface GuestRecord {
   id: string;
-  userId: string;
+  registrationId: string;
   eventId: string;
-  ticketTypeId: string;
-  quantity: number;
-  totalAmount: number;
-  bookingStatus: 'pending' | 'confirmed' | 'cancelled';
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  rsvpStatus: 'going' | 'not_going';
-  checkInStatus: 'not_checked_in' | 'checked_in';
+  userId: string | null;
+  name: string;
+  email: string;
+  mobile: string;
+  nic: string;
+  status: EventRegistrationStatus;
+  qrCodeValue: string | null;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
+  checkInMethod: 'qr' | 'manual' | null;
+  attendanceNote: string | null;
+  registeredAt: string;
   createdAt: string;
   updatedAt: string;
-  guestName: string;
-  guestEmail: string;
-  ticketName: string;
 }
 
 export interface CreateNotificationPayload {
@@ -145,6 +147,10 @@ export interface PublicEventDetails {
     title: string;
     topic: string;
     image: string | null;
+    branding: {
+      primaryColor: string;
+      accentColor: string;
+    };
     host: {
       id: string;
       name: string;
@@ -152,6 +158,11 @@ export interface PublicEventDetails {
       phone: string | null;
       profileImage: string | null;
     } | null;
+    contactDetails: {
+      name: string;
+      email: string;
+      phone: string;
+    };
     date: string;
     startTime: string;
     endTime: string;
@@ -230,6 +241,15 @@ export interface PublicEventDetails {
   };
 }
 
+const inferImageMimeType = (uri: string): string => {
+  const extension = (uri.split('.').pop() || '').toLowerCase();
+  if (extension === 'png') return 'image/png';
+  if (extension === 'webp') return 'image/webp';
+  if (extension === 'heic') return 'image/heic';
+  if (extension === 'gif') return 'image/gif';
+  return 'image/jpeg';
+};
+
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
@@ -250,6 +270,28 @@ export const AuthService = {
   googleLogin: async () => {
     const response = await apiClient.post('/auth/google');
     return response.data;
+  },
+};
+
+export const UploadService = {
+  uploadEventImage: async (uri: string) => {
+    const formData = new FormData();
+    const extension = (uri.split('.').pop() || 'jpg').toLowerCase();
+    const safeExt = extension.replace(/[^a-z0-9]/g, '') || 'jpg';
+
+    formData.append('image', {
+      uri,
+      name: `event-image-${Date.now()}.${safeExt}`,
+      type: inferImageMimeType(uri),
+    } as any);
+
+    const response = await apiClient.post('/uploads/event-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data as { status: string; data: { url: string } };
   },
 };
 
@@ -441,18 +483,22 @@ export const RegistrationService = {
 
 export const GuestService = {
   getEventGuests: async (eventId: string, params?: { status?: string; search?: string; date?: string }) => {
-    const response = await apiClient.get(`/guests/event/${eventId}`, { params });
+    const response = await apiClient.get(`/events/${eventId}/guests`, { params });
     return response.data;
   },
-  updateGuestStatus: async (id: string, approvalStatus: 'pending' | 'approved' | 'rejected') => {
-    const response = await apiClient.patch(`/guests/${id}/status`, { approvalStatus });
+  updateGuestStatus: async (registrationId: string, status: EventRegistrationStatus) => {
+    const response = await apiClient.patch(`/guests/${registrationId}/status`, { status });
+    return response.data;
+  },
+  getGuestQr: async (registrationId: string) => {
+    const response = await apiClient.get(`/guests/${registrationId}/qr`);
     return response.data;
   },
   checkInGuest: async (id: string) => {
     const response = await apiClient.patch(`/guests/${id}/checkin`);
     return response.data;
   },
-  bulkAction: async (payload: { action: 'approve' | 'reject' | 'checkin'; ids: string[] }) => {
+  bulkAction: async (payload: { action: 'going' | 'ongoing' | 'not_going' | 'declined' | 'checkin'; ids: string[] }) => {
     const response = await apiClient.post('/guests/bulk-action', payload);
     return response.data;
   },
@@ -466,6 +512,10 @@ export const GuestService = {
 };
 
 export const CheckInService = {
+  getRegistrationQr: async (registrationId: string) => {
+    const response = await apiClient.get(`/checkins/qr/${registrationId}`);
+    return response.data;
+  },
   getBookingQr: async (bookingId: string) => {
     const response = await apiClient.get(`/checkins/qr/${bookingId}`);
     return response.data;
@@ -474,8 +524,8 @@ export const CheckInService = {
     const response = await apiClient.post('/checkins/scan', { qrCodeValue });
     return response.data;
   },
-  manualCheckIn: async (bookingId: string, attendanceNote?: string) => {
-    const response = await apiClient.patch(`/checkins/${bookingId}/manual`, {
+  manualCheckIn: async (registrationId: string, attendanceNote?: string) => {
+    const response = await apiClient.patch(`/checkins/${registrationId}/manual`, {
       attendanceNote,
     });
     return response.data;

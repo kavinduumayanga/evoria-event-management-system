@@ -16,6 +16,7 @@ const EVENT_TYPES = ['online', 'physical', 'hybrid'] as const;
 const EVENT_VISIBILITIES = ['public', 'private', 'unlisted'] as const;
 const EVENT_STATUSES = ['draft', 'published', 'cancelled'] as const;
 const CUSTOM_QUESTION_TYPES = ['text', 'number', 'choice'] as const;
+const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 const STATUS_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
   draft: ['published'],
@@ -28,6 +29,26 @@ const customQuestionSchema = z.object({
   question: z.string().trim().min(1, 'Custom question text is required'),
   type: z.enum(CUSTOM_QUESTION_TYPES),
   required: z.boolean().optional(),
+});
+
+const contactDetailsSchema = z.object({
+  name: z.string().trim().max(120, 'contactDetails.name is too long').optional().default(''),
+  email: z.union([
+    z.string().trim().email('contactDetails.email must be a valid email'),
+    z.literal(''),
+  ]).optional().default(''),
+  phone: z.string().trim().max(40, 'contactDetails.phone is too long').optional().default(''),
+});
+
+const brandingSchema = z.object({
+  primaryColor: z.union([
+    z.string().trim().regex(HEX_COLOR_REGEX, 'branding.primaryColor must be a valid HEX color'),
+    z.literal(''),
+  ]).optional().default(''),
+  accentColor: z.union([
+    z.string().trim().regex(HEX_COLOR_REGEX, 'branding.accentColor must be a valid HEX color'),
+    z.literal(''),
+  ]).optional().default(''),
 });
 
 const createEventSchema = z.object({
@@ -47,6 +68,8 @@ const createEventSchema = z.object({
     z.literal(''),
   ]).optional(),
   coverImage: z.string().trim().optional(),
+  contactDetails: contactDetailsSchema.optional().default({ name: '', email: '', phone: '' }),
+  branding: brandingSchema.optional().default({ primaryColor: '', accentColor: '' }),
   capacity: z.number().int().positive('Capacity must be greater than 0'),
   priorityAccessEnabled: z.boolean().default(false),
   requiresApproval: z.boolean().default(false),
@@ -85,6 +108,15 @@ interface EventInput {
   visibility: EventVisibility;
   meetingLink?: string;
   coverImage?: string;
+  contactDetails: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  branding: {
+    primaryColor: string;
+    accentColor: string;
+  };
   capacity: number;
   priorityAccessEnabled: boolean;
   requiresApproval: boolean;
@@ -126,6 +158,33 @@ const normalizeCoverImage = (coverImage: string | undefined): string | undefined
   if (coverImage === undefined) return undefined;
   const trimmed = coverImage.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const normalizeContactDetails = (
+  contactDetails: { name?: string; email?: string; phone?: string } | undefined,
+) => {
+  if (!contactDetails) {
+    return { name: '', email: '', phone: '' };
+  }
+
+  return {
+    name: (contactDetails.name || '').trim(),
+    email: (contactDetails.email || '').trim().toLowerCase(),
+    phone: (contactDetails.phone || '').trim(),
+  };
+};
+
+const normalizeBranding = (
+  branding: { primaryColor?: string; accentColor?: string } | undefined,
+) => {
+  if (!branding) {
+    return { primaryColor: '', accentColor: '' };
+  }
+
+  return {
+    primaryColor: (branding.primaryColor || '').trim(),
+    accentColor: (branding.accentColor || '').trim(),
+  };
 };
 
 const normalizeOptionalText = (value: string | undefined): string => {
@@ -255,6 +314,30 @@ const validateEventData = async (eventInput: EventInput) => {
     throw new AppError('Capacity must be greater than 0', 400);
   }
 
+  if (eventInput.type === 'online' || eventInput.type === 'hybrid') {
+    const meetingLink = (eventInput.meetingLink || '').trim();
+    if (!meetingLink) {
+      throw new AppError('Meeting link is required for online and hybrid events', 400);
+    }
+  }
+
+  const meetingLink = (eventInput.meetingLink || '').trim();
+  if (meetingLink) {
+    try {
+      // Validates absolute URL format for meeting links.
+      // eslint-disable-next-line no-new
+      new URL(meetingLink);
+    } catch {
+      throw new AppError('meetingLink must be a valid URL', 400);
+    }
+  }
+
+  for (const color of [eventInput.branding.primaryColor, eventInput.branding.accentColor]) {
+    if (color && !HEX_COLOR_REGEX.test(color)) {
+      throw new AppError('Branding colors must be valid HEX colors', 400);
+    }
+  }
+
   const duplicateQuestionIds = new Set<string>();
   for (const customQuestion of eventInput.customQuestions) {
     const normalizedId = customQuestion.id.trim();
@@ -282,6 +365,8 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
     visibility: validatedData.visibility,
     meetingLink: normalizeMeetingLink(validatedData.meetingLink),
     coverImage: normalizeCoverImage(validatedData.coverImage),
+    contactDetails: normalizeContactDetails(validatedData.contactDetails),
+    branding: normalizeBranding(validatedData.branding),
     capacity: validatedData.capacity,
     priorityAccessEnabled: validatedData.priorityAccessEnabled,
     requiresApproval: validatedData.requiresApproval,
@@ -315,6 +400,12 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
     coverImage: Object.prototype.hasOwnProperty.call(updates, 'coverImage')
       ? normalizeCoverImage(updates.coverImage)
       : normalizeCoverImage(event.coverImage),
+    contactDetails: Object.prototype.hasOwnProperty.call(updates, 'contactDetails')
+      ? normalizeContactDetails(updates.contactDetails)
+      : normalizeContactDetails(event.contactDetails),
+    branding: Object.prototype.hasOwnProperty.call(updates, 'branding')
+      ? normalizeBranding(updates.branding)
+      : normalizeBranding(event.branding),
     capacity: updates.capacity !== undefined ? updates.capacity : event.capacity,
     priorityAccessEnabled: updates.priorityAccessEnabled !== undefined
       ? updates.priorityAccessEnabled
@@ -360,6 +451,14 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
     payload.coverImage = normalizeCoverImage(updates.coverImage) || null;
   }
 
+  if (Object.prototype.hasOwnProperty.call(updates, 'contactDetails')) {
+    payload.contactDetails = normalizeContactDetails(updates.contactDetails);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'branding')) {
+    payload.branding = normalizeBranding(updates.branding);
+  }
+
   if (updates.customQuestions !== undefined) {
     const normalizedQuestions = updates.customQuestions.map((question) => ({
       id: question.id.trim(),
@@ -385,6 +484,13 @@ const ensurePublishable = async (event: any) => {
   }
 
   await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId));
+
+  if (event.type === 'online' || event.type === 'hybrid') {
+    const meetingLink = normalizeMeetingLink(event.meetingLink);
+    if (!meetingLink) {
+      throw new AppError('Meeting link is required before publishing online or hybrid events', 400);
+    }
+  }
 };
 
 const ensureEventReadableByUser = (event: any, requester: { id: string } | null) => {
@@ -834,6 +940,10 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
           title: event.title,
           topic: event.category || '',
           image: event.coverImage || null,
+          branding: {
+            primaryColor: event.branding?.primaryColor || '',
+            accentColor: event.branding?.accentColor || '',
+          },
           host: host
             ? {
                 id: host.id,
@@ -843,6 +953,11 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
                 profileImage: host.profileImage || null,
               }
             : null,
+          contactDetails: {
+            name: event.contactDetails?.name || host?.name || '',
+            email: event.contactDetails?.email || host?.email || '',
+            phone: event.contactDetails?.phone || host?.phone || '',
+          },
           date: event.date,
           startTime: event.startTime,
           endTime: event.endTime,
