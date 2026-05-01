@@ -87,8 +87,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="always"
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.title}>Create Account</Text>

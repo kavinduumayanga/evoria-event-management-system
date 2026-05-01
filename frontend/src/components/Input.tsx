@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   View, 
   TextInput, 
   Text, 
   StyleSheet, 
   TextInputProps, 
-  TouchableOpacity 
+  TouchableOpacity
 } from 'react-native';
 import { theme } from '../constants/theme';
 import { Eye, EyeOff } from 'lucide-react-native';
@@ -21,10 +21,40 @@ export const Input: React.FC<InputProps> = ({
   error,
   isPassword,
   style,
+  onFocus,
+  onBlur,
   ...props
 }) => {
+  const inputRef = useRef<TextInput>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isSecure, setIsSecure] = useState(isPassword);
+
+  const handleFocus: NonNullable<TextInputProps['onFocus']> = (event) => {
+    if (!isPassword) {
+      setIsFocused(true);
+    }
+    if (onFocus) {
+      onFocus(event);
+    }
+  };
+
+  const handleBlur: NonNullable<TextInputProps['onBlur']> = (event) => {
+    if (!isPassword) {
+      setIsFocused(false);
+    }
+    if (onBlur) {
+      onBlur(event);
+    }
+  };
+
+  const handleToggleSecure = () => {
+    setIsSecure((current) => !current);
+
+    // Keep focus on password field after toggling visibility.
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -39,17 +69,19 @@ export const Input: React.FC<InputProps> = ({
         ]}
       >
         <TextInput
+          ref={inputRef}
           style={styles.input}
           placeholderTextColor={theme.colors.textMuted}
           secureTextEntry={isSecure || false}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
           {...props}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
         />
         
         {isPassword && (
           <TouchableOpacity 
-            onPress={() => setIsSecure(!isSecure)}
+            onPress={handleToggleSecure}
+            onPressIn={() => inputRef.current?.focus()}
             style={styles.eyeIcon}
           >
             {isSecure ? (
