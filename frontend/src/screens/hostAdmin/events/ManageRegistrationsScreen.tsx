@@ -1,12 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { EmptyState, ErrorState, Input, LoadingState, NeonCard, ScreenContainer, Button } from '../../../components';
+import { EmptyState, ErrorState, Input, LoadingState, NeonCard, ScreenContainer } from '../../../components';
 import { theme } from '../../../constants/theme';
+import { EventRegistrationStatus } from '../../../types';
 import { GuestRecord, GuestService } from '../../../api/services';
-import { ArrowLeft, Check, X, Download, UserCheck, Square, CheckSquare } from 'lucide-react-native';
+import { ArrowLeft, UserCheck } from 'lucide-react-native';
 
 type ManageRegistrationsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
 type ManageRegistrationsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
@@ -16,27 +17,32 @@ interface Props {
   route: ManageRegistrationsRouteProp;
 }
 
-type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected' | 'checked_in' | 'not_checked_in' | 'confirmed' | 'cancelled';
+type FilterStatus = 'all' | EventRegistrationStatus;
 
 const statusOptions: FilterStatus[] = [
   'all',
   'pending',
-  'approved',
-  'rejected',
+  'going',
+  'ongoing',
   'checked_in',
-  'not_checked_in',
-  'confirmed',
-  'cancelled',
+  'not_going',
+  'declined',
 ];
 
-const getApprovalColor = (status: string) => {
+const getStatusColor = (status: string) => {
   switch (status) {
-    case 'approved':
+    case 'checked_in':
       return theme.colors.success;
+    case 'going':
+      return theme.colors.primaryLight;
+    case 'ongoing':
+      return theme.colors.secondary;
     case 'pending':
       return theme.colors.warning;
-    case 'rejected':
+    case 'declined':
       return theme.colors.error;
+    case 'not_going':
+      return theme.colors.textMuted;
     default:
       return theme.colors.textMuted;
   }
@@ -49,12 +55,9 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isBulkApplying, setIsBulkApplying] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [dateFilter, setDateFilter] = useState('');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const queryParams = useMemo(() => ({
     status: statusFilter === 'all' ? undefined : statusFilter,
@@ -66,11 +69,9 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
     try {
       setError(null);
       const response = await GuestService.getEventGuests(eventId, queryParams);
-      setGuests(response.data.guests);
-      setSelectedIds((previousSelected) => previousSelected.filter((id) => response.data.guests.some((guest: GuestRecord) => guest.id === id)));
-    } catch (fetchError) {
-      console.error(fetchError);
-      setError('Failed to load guests');
+      setGuests(response.data.guests || []);
+    } catch (fetchError: any) {
+      setError(fetchError?.response?.data?.message || 'Failed to load guests');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -88,71 +89,21 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
     fetchGuests();
   }, [eventId, queryParams.status, queryParams.search, queryParams.date]);
 
-  const toggleSelection = (id: string) => {
-    setSelectedIds((current) => (
-      current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
-    ));
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.length === guests.length) {
-      setSelectedIds([]);
-      return;
-    }
-    setSelectedIds(guests.map((guest) => guest.id));
-  };
-
-  const runSingleStatusAction = async (guestId: string, status: 'approved' | 'rejected') => {
+  const setGuestStatus = async (guestId: string, status: EventRegistrationStatus) => {
     try {
       await GuestService.updateGuestStatus(guestId, status);
       fetchGuests();
-    } catch (actionError: any) {
-      Alert.alert('Error', actionError.response?.data?.message || `Failed to set status to ${status}`);
+    } catch (statusError: any) {
+      Alert.alert('Error', statusError?.response?.data?.message || `Failed to set status to ${status}`);
     }
   };
 
-  const runSingleCheckIn = async (guestId: string) => {
+  const runManualCheckIn = async (guestId: string) => {
     try {
       await GuestService.checkInGuest(guestId);
       fetchGuests();
-    } catch (actionError: any) {
-      Alert.alert('Error', actionError.response?.data?.message || 'Failed to check in guest');
-    }
-  };
-
-  const runBulkAction = async (action: 'approve' | 'reject' | 'checkin') => {
-    if (selectedIds.length === 0) {
-      Alert.alert('No Selection', 'Select at least one guest.');
-      return;
-    }
-
-    try {
-      setIsBulkApplying(true);
-      await GuestService.bulkAction({ action, ids: selectedIds });
-      setSelectedIds([]);
-      fetchGuests();
-    } catch (bulkError: any) {
-      Alert.alert('Error', bulkError.response?.data?.message || `Failed to run bulk ${action}`);
-    } finally {
-      setIsBulkApplying(false);
-    }
-  };
-
-  const exportCsv = async () => {
-    try {
-      setIsExporting(true);
-      const csvData = await GuestService.exportEventGuests(eventId, queryParams);
-      const dataUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvData)}`;
-      const canOpen = await Linking.canOpenURL(dataUrl);
-      if (canOpen) {
-        await Linking.openURL(dataUrl);
-      } else {
-        Alert.alert('Export Ready', 'CSV generated successfully. Copy from preview:\n\n' + csvData.slice(0, 500));
-      }
-    } catch (exportError: any) {
-      Alert.alert('Export Error', exportError.response?.data?.message || 'Failed to export guest CSV');
-    } finally {
-      setIsExporting(false);
+    } catch (checkInError: any) {
+      Alert.alert('Error', checkInError?.response?.data?.message || 'Failed to check in guest');
     }
   };
 
@@ -165,11 +116,11 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft size={20} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Guest Management</Text>
+        <Text style={styles.title}>Guest List</Text>
       </View>
 
       <View style={styles.filterSection}>
-        <Input label="Search (name/email)" value={search} onChangeText={setSearch} placeholder="Search attendee" />
+        <Input label="Search (name/email/mobile/NIC)" value={search} onChangeText={setSearch} placeholder="Search guest" />
         <Input label="Date (YYYY-MM-DD)" value={dateFilter} onChangeText={setDateFilter} placeholder="2026-12-25" />
 
         <Text style={styles.filterLabel}>Status Filter</Text>
@@ -186,28 +137,6 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
             </TouchableOpacity>
           ))}
         </View>
-
-        <View style={styles.topActionsRow}>
-          <TouchableOpacity style={styles.selectAllButton} onPress={toggleSelectAll}>
-            {selectedIds.length === guests.length && guests.length > 0 ? (
-              <CheckSquare size={16} color={theme.colors.primary} />
-            ) : (
-              <Square size={16} color={theme.colors.textMuted} />
-            )}
-            <Text style={styles.selectAllText}>Select All</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.exportButton} onPress={exportCsv} disabled={isExporting}>
-            <Download size={16} color={theme.colors.text} />
-            <Text style={styles.exportText}>{isExporting ? 'Exporting...' : 'Export CSV'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.bulkActionsRow}>
-          <Button title="Bulk Approve" onPress={() => runBulkAction('approve')} disabled={isBulkApplying} size="small" />
-          <Button title="Bulk Reject" onPress={() => runBulkAction('reject')} disabled={isBulkApplying} size="small" variant="secondary" />
-          <Button title="Bulk Check-in" onPress={() => runBulkAction('checkin')} disabled={isBulkApplying} size="small" variant="outline" />
-        </View>
       </View>
 
       <FlatList
@@ -216,47 +145,53 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-        renderItem={({ item }) => (
-          <NeonCard style={styles.guestCard}>
-            <View style={styles.cardTopRow}>
-              <TouchableOpacity style={styles.checkboxRow} onPress={() => toggleSelection(item.id)}>
-                {selectedIds.includes(item.id) ? (
-                  <CheckSquare size={16} color={theme.colors.primary} />
-                ) : (
-                  <Square size={16} color={theme.colors.textMuted} />
-                )}
-                <Text style={styles.guestName}>{item.guestName}</Text>
-              </TouchableOpacity>
-              <View style={[styles.badge, { borderColor: getApprovalColor(item.approvalStatus), backgroundColor: `${getApprovalColor(item.approvalStatus)}20` }]}>
-                <Text style={[styles.badgeText, { color: getApprovalColor(item.approvalStatus) }]}>
-                  {item.approvalStatus.toUpperCase()}
-                </Text>
+        renderItem={({ item }) => {
+          const statusColor = getStatusColor(item.status);
+          return (
+            <NeonCard style={styles.guestCard}>
+              <View style={styles.cardTopRow}>
+                <Text style={styles.guestName}>{item.name}</Text>
+                <View style={[styles.badge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
+                  <Text style={[styles.badgeText, { color: statusColor }]}>
+                    {item.status.toUpperCase()}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            <Text style={styles.metaText}>{item.guestEmail}</Text>
-            <Text style={styles.metaText}>Ticket: {item.ticketName}</Text>
-            <Text style={styles.metaText}>Booking: {item.bookingStatus.toUpperCase()}</Text>
-            <Text style={styles.metaText}>RSVP: {item.rsvpStatus.toUpperCase()}</Text>
-            <Text style={styles.metaText}>Check-in: {item.checkInStatus.toUpperCase()}</Text>
+              <Text style={styles.metaText}>{item.email}</Text>
+              <Text style={styles.metaText}>Mobile: {item.mobile}</Text>
+              <Text style={styles.metaText}>NIC: {item.nic}</Text>
+              <Text style={styles.metaText}>Registered: {new Date(item.registeredAt).toLocaleString()}</Text>
+              {item.checkedInAt ? (
+                <Text style={styles.metaText}>
+                  Checked-in: {new Date(item.checkedInAt).toLocaleString()} ({item.checkInMethod || 'manual'})
+                </Text>
+              ) : null}
 
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={[styles.actionBtn, styles.approveAction]} onPress={() => runSingleStatusAction(item.id, 'approved')}>
-                <Check size={14} color={theme.colors.success} />
-                <Text style={[styles.actionText, { color: theme.colors.success }]}>Approve</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, styles.rejectAction]} onPress={() => runSingleStatusAction(item.id, 'rejected')}>
-                <X size={14} color={theme.colors.error} />
-                <Text style={[styles.actionText, { color: theme.colors.error }]}>Reject</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, styles.checkinAction]} onPress={() => runSingleCheckIn(item.id)}>
-                <UserCheck size={14} color={theme.colors.primary} />
-                <Text style={[styles.actionText, { color: theme.colors.primary }]}>Check-in</Text>
-              </TouchableOpacity>
-            </View>
-          </NeonCard>
-        )}
-        ListEmptyComponent={<EmptyState title="No Guests Found" message="No attendee records match current filters." />}
+              <View style={styles.actionsRow}>
+                <TouchableOpacity style={[styles.actionBtn, styles.goingAction]} onPress={() => setGuestStatus(item.id, 'going')}>
+                  <Text style={[styles.actionText, { color: theme.colors.primaryLight }]}>Going</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, styles.ongoingAction]} onPress={() => setGuestStatus(item.id, 'ongoing')}>
+                  <Text style={[styles.actionText, { color: theme.colors.secondary }]}>Ongoing</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, styles.notGoingAction]} onPress={() => setGuestStatus(item.id, 'not_going')}>
+                  <Text style={[styles.actionText, { color: theme.colors.textMuted }]}>Not Going</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, styles.declineAction]} onPress={() => setGuestStatus(item.id, 'declined')}>
+                  <Text style={[styles.actionText, { color: theme.colors.error }]}>Decline</Text>
+                </TouchableOpacity>
+                {item.status !== 'checked_in' ? (
+                  <TouchableOpacity style={[styles.actionBtn, styles.checkinAction]} onPress={() => runManualCheckIn(item.id)}>
+                    <UserCheck size={14} color={theme.colors.success} />
+                    <Text style={[styles.actionText, { color: theme.colors.success }]}>Manual Check-in</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </NeonCard>
+          );
+        }}
+        ListEmptyComponent={<EmptyState title="No Guests Found" message="No guest registrations match current filters." />}
       />
     </ScreenContainer>
   );
@@ -307,47 +242,6 @@ const styles = StyleSheet.create({
   statusChipTextSelected: {
     color: theme.colors.primary,
   },
-  topActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.s,
-  },
-  selectAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.s,
-  },
-  selectAllText: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.s,
-  },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.m,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: theme.spacing.s,
-    backgroundColor: `${theme.colors.primary}20`,
-  },
-  exportText: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.s,
-    fontWeight: '600',
-  },
-  bulkActionsRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.s,
-    marginBottom: theme.spacing.s,
-  },
   listContainer: {
     padding: theme.spacing.m,
     paddingTop: theme.spacing.s,
@@ -363,15 +257,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: theme.spacing.s,
   },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
   guestName: {
     ...theme.typography.h3,
     color: theme.colors.text,
-    marginLeft: theme.spacing.s,
+    flex: 1,
+    marginRight: theme.spacing.s,
   },
   badge: {
     borderWidth: 1,
@@ -390,29 +280,37 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginTop: theme.spacing.m,
     gap: theme.spacing.s,
   },
   actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     borderRadius: theme.borderRadius.m,
     paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.s,
     borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  approveAction: {
-    borderColor: theme.colors.success,
-    backgroundColor: `${theme.colors.success}1A`,
+  goingAction: {
+    borderColor: theme.colors.primaryLight,
+    backgroundColor: `${theme.colors.primaryLight}1A`,
   },
-  rejectAction: {
+  ongoingAction: {
+    borderColor: theme.colors.secondary,
+    backgroundColor: `${theme.colors.secondary}1A`,
+  },
+  notGoingAction: {
+    borderColor: theme.colors.border,
+    backgroundColor: `${theme.colors.surfaceLight}66`,
+  },
+  declineAction: {
     borderColor: theme.colors.error,
     backgroundColor: `${theme.colors.error}1A`,
   },
   checkinAction: {
-    borderColor: theme.colors.primary,
-    backgroundColor: `${theme.colors.primary}1A`,
+    borderColor: theme.colors.success,
+    backgroundColor: `${theme.colors.success}1A`,
   },
   actionText: {
     ...theme.typography.small,
@@ -420,3 +318,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

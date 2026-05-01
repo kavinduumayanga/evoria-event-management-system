@@ -11,10 +11,10 @@ const router = Router();
 
 router.use(protect);
 
-router.get('/qr/:bookingId', getBookingQr);
+router.get('/qr/:registrationId', getBookingQr);
 
 router.post('/scan', scanCheckIn);
-router.patch('/:bookingId/manual', manualCheckIn);
+router.patch('/:registrationId/manual', manualCheckIn);
 router.get('/event/:eventId', getEventAttendance);
 
 export default router;

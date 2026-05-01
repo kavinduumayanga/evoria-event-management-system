@@ -19,6 +19,7 @@ import {
   updateEventRegistrationFields,
 } from '../controllers/event.controller';
 import { getEventRegistrationsForManagers } from '../controllers/eventRegistration.controller';
+import { getEventGuests } from '../controllers/guest.controller';
 import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -29,6 +30,7 @@ router.get('/trending', getTrendingEvents);
 router.get('/recommended', getRecommendedEvents);
 router.get('/host/:hostAdminId', protect, getHostEvents);
 router.get('/:eventId/registrations', protect, getEventRegistrationsForManagers);
+router.get('/:eventId/guests', protect, getEventGuests);
 router.get('/:id/calendar', getEventCalendar);
 router.get('/:id', getEvent);
 
