@@ -17,6 +17,7 @@ import reportRoutes from './report.routes';
 import moderationRoutes from './moderation.routes';
 import waitlistRoutes from './waitlist.routes';
 import adminRoutes from './admin.routes';
+import publicRoutes from './public.routes';
 
 const router = Router();
 
@@ -38,5 +39,6 @@ router.use('/reports', reportRoutes);
 router.use('/moderation', moderationRoutes);
 router.use('/waitlist', waitlistRoutes);
 router.use('/admin', adminRoutes);
+router.use('/public', publicRoutes);
 
 export default router;

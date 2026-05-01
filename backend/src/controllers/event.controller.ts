@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { EventModel } from '../models/Event';
 import { TicketTypeModel } from '../models/TicketType';
+import { SessionModel } from '../models/Session';
+import { BookingModel } from '../models/Booking';
 import { UserModel } from '../models/User';
 import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
@@ -441,6 +443,58 @@ const escapeIcsText = (value: string): string => {
     .replace(/;/g, '\\;');
 };
 
+const resolvePublicApiBaseUrl = (req: Request): string => {
+  const envBase = (process.env.PUBLIC_API_BASE_URL || '').trim();
+  if (envBase.length > 0) {
+    return envBase.replace(/\/+$/, '');
+  }
+
+  const forwardedProto = req.get('x-forwarded-proto');
+  const forwardedHost = req.get('x-forwarded-host');
+  const protocol = forwardedProto || req.protocol;
+  const host = forwardedHost || req.get('host');
+  if (!host) return '/api';
+
+  return `${protocol}://${host}/api`;
+};
+
+const isInvitedUserForPrivateEvent = async (userId: string, eventId: string): Promise<boolean> => {
+  const inviteExists = await BookingModel.exists({
+    userId,
+    eventId,
+    bookingStatus: { $ne: 'cancelled' },
+  });
+
+  return Boolean(inviteExists);
+};
+
+const ensurePublicSlugAccess = async (event: any, requester: { id: string } | null) => {
+  if (requester && canManageEvent(requester.id, event)) {
+    return;
+  }
+
+  if (event.visibility === 'private') {
+    if (!requester) {
+      throw new AppError('This event is private', 403);
+    }
+
+    const invited = await isInvitedUserForPrivateEvent(requester.id, event.id);
+    if (!invited) {
+      throw new AppError('This event is private', 403);
+    }
+
+    return;
+  }
+
+  if (event.moderationStatus && event.moderationStatus !== 'approved') {
+    throw new AppError('Event is not available', 403);
+  }
+
+  if (event.status !== 'published') {
+    throw new AppError('Event is not available', 403);
+  }
+};
+
 export const searchEvents = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
@@ -704,6 +758,130 @@ export const getEvent = async (req: Request, res: Response, next: NextFunction) 
     ensureEventReadableByUser(event, requester);
 
     res.status(200).json({ status: 'success', data: { event: event.toJSON() } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPublicEventBySlug = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const slug = String(req.params.slug || '').trim().toLowerCase();
+    if (!slug) {
+      return next(new AppError('Event slug is required', 400));
+    }
+
+    const event = await EventModel.findOne({ publicSlug: slug });
+    if (!event) {
+      return next(new AppError('Event not found', 404));
+    }
+
+    const requester = await resolveRequester(req);
+    await ensurePublicSlugAccess(event, requester);
+
+    const ownerId = resolveEventOwnerId(event);
+    const [host, sessions, tickets, venue] = await Promise.all([
+      ownerId ? UserModel.findById(ownerId).select('_id name email phone profileImage') : null,
+      SessionModel.find({ eventId: event.id }).sort({ sessionDate: 1, startTime: 1 }),
+      TicketTypeModel.find({ eventId: event.id, isActive: true }).sort({ price: 1, createdAt: 1 }),
+      event.venueId ? VenueModel.findById(event.venueId) : null,
+    ]);
+
+    const publicApiBase = resolvePublicApiBaseUrl(req);
+    const publicUrl = `${publicApiBase}/public/events/${event.publicSlug}`;
+    const isManageableByCurrentUser = requester ? canManageEvent(requester.id, event) : false;
+
+    const ticketOptions = tickets.map((ticket) => {
+      const remaining = Math.max(0, Number(ticket.quantity || 0) - Number(ticket.soldCount || 0));
+      return {
+        id: ticket.id,
+        name: ticket.name,
+        description: ticket.description || '',
+        isFree: Boolean(ticket.isFree),
+        price: Number(ticket.price || 0),
+        currency: ticket.currency || 'LKR',
+        remaining,
+        quantity: Number(ticket.quantity || 0),
+        soldCount: Number(ticket.soldCount || 0),
+        maxPerUser: Number(ticket.maxPerUser || 0),
+      };
+    });
+
+    const freeRegistrationOptions = ticketOptions.filter((ticket) => ticket.isFree);
+    const locationLabel = event.type === 'online'
+      ? (event.meetingLink || 'Online')
+      : venue
+        ? `${venue.name}, ${venue.city}`
+        : (event.city || 'Venue');
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: {
+          id: event.id,
+          publicSlug: event.publicSlug,
+          publicUrl,
+          title: event.title,
+          topic: event.category || '',
+          image: event.coverImage || null,
+          host: host
+            ? {
+                id: host.id,
+                name: host.name,
+                email: host.email,
+                phone: host.phone || null,
+                profileImage: host.profileImage || null,
+              }
+            : null,
+          date: event.date,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          capacity: Number(event.capacity || 0),
+          bookingCount: Number(event.bookingCount || 0),
+          type: event.type,
+          visibility: event.visibility,
+          about: event.description,
+          description: event.description,
+          location: {
+            label: locationLabel,
+            city: event.city || '',
+            venue: venue
+              ? {
+                  id: venue.id,
+                  name: venue.name,
+                  address: venue.address,
+                  city: venue.city,
+                  type: venue.type,
+                  contactInfo: venue.contactInfo || '',
+                }
+              : null,
+            meetingLink: event.meetingLink || '',
+          },
+          isManageableByCurrentUser,
+        },
+        agenda: {
+          sessions: sessions.map((session) => ({
+            id: session.id,
+            title: session.title,
+            description: session.description || '',
+            speakerName: session.speakerName || '',
+            sessionDate: session.sessionDate,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            hallOrRoom: session.hallOrRoom || '',
+            bannerImage: session.bannerImage || '',
+            status: session.status,
+          })),
+        },
+        tickets: ticketOptions,
+        freeRegistrationOptions,
+        visibilityInfo: {
+          visibility: event.visibility,
+          discoveryVisible: event.visibility === 'public',
+          accessibleByUrl: event.visibility === 'public' || event.visibility === 'unlisted',
+          privateAccess: event.visibility === 'private',
+        },
+      },
+    });
   } catch (error) {
     next(error);
   }

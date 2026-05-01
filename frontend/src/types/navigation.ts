@@ -18,7 +18,8 @@ export type AttendeeTabParamList = {
 
 export type AttendeeHomeStackParamList = {
   EventList: undefined;
-  EventDetails: { eventId: string };
+  EventDetails: { eventId: string; publicSlug?: string };
+  PublicEventDetails: { slug: string };
   TicketSelection: { eventId: string };
   MyWaitlist: undefined;
   PaymentSummary: {

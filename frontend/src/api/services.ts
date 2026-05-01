@@ -1,5 +1,6 @@
 import apiClient from './client';
 import { Event, Booking, Venue, Session, TicketType, RegistrationAnswer, RsvpStatus } from '../types';
+import { API_URL } from '../constants/api';
 
 export interface RegisterPayload {
   name: string;
@@ -117,6 +118,91 @@ export interface AddEventAdminPayload {
   email: string;
 }
 
+export interface PublicEventDetails {
+  event: {
+    id: string;
+    publicSlug: string;
+    publicUrl: string;
+    title: string;
+    topic: string;
+    image: string | null;
+    host: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string | null;
+      profileImage: string | null;
+    } | null;
+    date: string;
+    startTime: string;
+    endTime: string;
+    capacity: number;
+    bookingCount: number;
+    type: 'online' | 'physical' | 'hybrid';
+    visibility: 'public' | 'private' | 'unlisted';
+    about: string;
+    description: string;
+    location: {
+      label: string;
+      city: string;
+      venue: {
+        id: string;
+        name: string;
+        address: string;
+        city: string;
+        type: 'physical' | 'online' | 'hybrid';
+        contactInfo: string;
+      } | null;
+      meetingLink: string;
+    };
+    isManageableByCurrentUser: boolean;
+  };
+  agenda: {
+    sessions: Array<{
+      id: string;
+      title: string;
+      description: string;
+      speakerName: string;
+      sessionDate: string;
+      startTime: string;
+      endTime: string;
+      hallOrRoom: string;
+      bannerImage: string;
+      status: 'scheduled' | 'cancelled' | 'completed';
+    }>;
+  };
+  tickets: Array<{
+    id: string;
+    name: string;
+    description: string;
+    isFree: boolean;
+    price: number;
+    currency: string;
+    remaining: number;
+    quantity: number;
+    soldCount: number;
+    maxPerUser: number;
+  }>;
+  freeRegistrationOptions: Array<{
+    id: string;
+    name: string;
+    description: string;
+    isFree: boolean;
+    price: number;
+    currency: string;
+    remaining: number;
+    quantity: number;
+    soldCount: number;
+    maxPerUser: number;
+  }>;
+  visibilityInfo: {
+    visibility: 'public' | 'private' | 'unlisted';
+    discoveryVisible: boolean;
+    accessibleByUrl: boolean;
+    privateAccess: boolean;
+  };
+}
+
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
@@ -171,6 +257,14 @@ export const EventService = {
   getEvent: async (id: string) => {
     const response = await apiClient.get(`/events/${id}`);
     return response.data;
+  },
+  getPublicEventBySlug: async (slug: string) => {
+    const response = await apiClient.get(`/public/events/${slug}`);
+    return response.data as { status: string; data: PublicEventDetails };
+  },
+  buildPublicEventUrl: (slug: string) => {
+    const trimmedBase = API_URL.replace(/\/+$/, '');
+    return `${trimmedBase}/public/events/${slug}`;
   },
   getHostEvents: async (hostId: string) => {
     const response = await apiClient.get(`/events/host/${hostId}`);
