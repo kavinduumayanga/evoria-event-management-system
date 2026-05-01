@@ -101,6 +101,14 @@ export interface EventBlastPayload {
   scheduledAt?: string;
 }
 
+export interface EventSearchParams {
+  q?: string;
+  category?: string;
+  city?: string;
+  tags?: string;
+  date?: string;
+}
+
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
@@ -127,6 +135,29 @@ export const AuthService = {
 export const EventService = {
   getEvents: async () => {
     const response = await apiClient.get('/events');
+    return response.data;
+  },
+  searchEvents: async (params: EventSearchParams) => {
+    const response = await apiClient.get('/events/search', { params });
+    return response.data;
+  },
+  getTrendingEvents: async (limit = 10) => {
+    const response = await apiClient.get('/events/trending', { params: { limit } });
+    return response.data;
+  },
+  getRecommendedEvents: async (params: { eventId?: string; category?: string; city?: string; tags?: string; limit?: number }) => {
+    const response = await apiClient.get('/events/recommended', { params });
+    return response.data;
+  },
+  incrementView: async (id: string) => {
+    const response = await apiClient.patch(`/events/${id}/view`);
+    return response.data;
+  },
+  getEventCalendar: async (id: string, download = false) => {
+    const response = await apiClient.get(`/events/${id}/calendar`, {
+      params: { download },
+      responseType: download ? 'text' : 'json',
+    });
     return response.data;
   },
   getEvent: async (id: string) => {
@@ -386,6 +417,17 @@ export const NotificationService = {
   },
   processScheduled: async () => {
     const response = await apiClient.post('/notifications/process-scheduled');
+    return response.data;
+  },
+};
+
+export const AnalyticsService = {
+  getEventAnalytics: async (eventId: string) => {
+    const response = await apiClient.get(`/analytics/event/${eventId}`);
+    return response.data;
+  },
+  getDashboardAnalytics: async () => {
+    const response = await apiClient.get('/analytics/dashboard');
     return response.data;
   },
 };

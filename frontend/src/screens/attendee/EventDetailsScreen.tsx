@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import * as Calendar from 'expo-calendar';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Event, Venue, Session, TicketType } from '../../types';
-import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer } from '../../components';
+import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { ArrowLeft, Calendar, MapPin, Clock, Wifi } from 'lucide-react-native';
+import { EventService } from '../../api/services';
+import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Link as LinkIcon } from 'lucide-react-native';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -18,12 +20,19 @@ interface Props {
   route: EventDetailsScreenRouteProp;
 }
 
+const parseEventDateTime = (dateValue: string, timeValue: string) => {
+  const [year, month, day] = dateValue.slice(0, 10).split('-').map((item) => Number(item));
+  const [hours, minutes] = timeValue.split(':').map((item) => Number(item));
+  return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, 0);
+};
+
 export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { eventId } = route.params;
   const [event, setEvent] = useState<Event | null>(null);
   const [venue, setVenue] = useState<Venue | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [tickets, setTickets] = useState<TicketType[]>([]);
+  const [recommendedEvents, setRecommendedEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,16 +44,17 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setIsLoading(true);
       setError(null);
+
       const [eventRes, sessionsRes, ticketsRes] = await Promise.all([
         apiClient.get(`/events/${eventId}`),
         apiClient.get(`/sessions/event/${eventId}`),
-        apiClient.get(`/tickets/event/${eventId}`)
+        apiClient.get(`/tickets/event/${eventId}`),
       ]);
 
-      const eventData = eventRes.data.data.event;
+      const eventData = eventRes.data.data.event as Event;
       setEvent(eventData);
-      setSessions(sessionsRes.data.data.sessions);
-      setTickets(ticketsRes.data.data.tickets);
+      setSessions(sessionsRes.data.data.sessions || []);
+      setTickets(ticketsRes.data.data.tickets || []);
 
       if (eventData.venueId) {
         const venueRes = await apiClient.get(`/venues/${eventData.venueId}`);
@@ -52,12 +62,73 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       } else {
         setVenue(null);
       }
-    } catch (error: any) {
-      console.error('Failed to fetch event details', error);
-      setError(error.response?.data?.message || 'Failed to load event details');
+
+      const recommendedRes = await EventService.getRecommendedEvents({ eventId: eventData.id, limit: 6 });
+      setRecommendedEvents(recommendedRes.data.events || []);
+
+      EventService.incrementView(eventId).catch(() => undefined);
+    } catch (fetchError: any) {
+      console.error('Failed to fetch event details', fetchError);
+      setError(fetchError.response?.data?.message || 'Failed to load event details');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCalendarAction = () => {
+    if (!event) return;
+
+    Alert.alert('Add to Calendar', 'Choose an option', [
+      {
+        text: 'Download ICS',
+        onPress: async () => {
+          try {
+            const icsContent = await EventService.getEventCalendar(event.id, true);
+            const dataUrl = `data:text/calendar;charset=utf-8,${encodeURIComponent(String(icsContent))}`;
+            const canOpen = await Linking.canOpenURL(dataUrl);
+            if (canOpen) {
+              await Linking.openURL(dataUrl);
+            } else {
+              Alert.alert('ICS Ready', 'Calendar file generated. Copy from preview:\n\n' + String(icsContent).slice(0, 500));
+            }
+          } catch (calendarError: any) {
+            Alert.alert('Calendar Error', calendarError.response?.data?.message || 'Failed to generate ICS file');
+          }
+        },
+      },
+      {
+        text: 'Open Device Calendar',
+        onPress: async () => {
+          try {
+            const startDate = parseEventDateTime(event.date, event.startTime);
+            const endDate = parseEventDateTime(event.date, event.endTime);
+            const location = event.type === 'online' ? (event.meetingLink || 'Online') : (venue ? `${venue.name}, ${venue.city}` : event.city);
+
+            await Calendar.createEventInCalendarAsync({
+              title: event.title,
+              startDate,
+              endDate,
+              location,
+              notes: event.description,
+              url: event.meetingLink || undefined,
+            });
+          } catch (calendarError) {
+            Alert.alert('Calendar Error', 'Unable to open device calendar on this device.');
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleOpenMeetingLink = async () => {
+    if (!event?.meetingLink) return;
+    const supported = await Linking.canOpenURL(event.meetingLink);
+    if (!supported) {
+      Alert.alert('Invalid Link', 'Meeting link is invalid or unsupported on this device.');
+      return;
+    }
+    await Linking.openURL(event.meetingLink);
   };
 
   if (isLoading) return <LoadingState />;
@@ -73,15 +144,12 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (!event) {
     return (
       <ScreenContainer>
-        <ErrorState 
-          message="Event not found" 
-          onRetry={() => navigation.goBack()} 
-        />
+        <ErrorState message="Event not found" onRetry={() => navigation.goBack()} />
       </ScreenContainer>
     );
   }
 
-  const isAvailable = tickets.some(t => t.isActive && t.quantity > t.soldCount);
+  const isAvailable = tickets.some((ticket) => ticket.isActive && ticket.quantity > ticket.soldCount);
 
   return (
     <GradientBackground>
@@ -94,15 +162,15 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.imagePlaceholder}>
-            <Text style={{color: theme.colors.textMuted}}>Event Cover Image</Text>
+            <Text style={{ color: theme.colors.textMuted }}>Event Cover Image</Text>
           </View>
 
           <View style={styles.infoContainer}>
             <Text style={styles.title}>{event.title}</Text>
-            
+
             <View style={styles.metaContainer}>
               <View style={styles.metaRow}>
-                <Calendar size={16} color={theme.colors.primaryLight} />
+                <CalendarIcon size={16} color={theme.colors.primaryLight} />
                 <Text style={styles.metaText}>{event.date}</Text>
               </View>
               <View style={styles.metaRow}>
@@ -113,6 +181,18 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Wifi size={16} color={theme.colors.primary} />
                 <Text style={styles.metaText}>Type: {event.type ? event.type.toUpperCase() : 'PHYSICAL'}</Text>
               </View>
+              {event.category ? (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Category:</Text>
+                  <Text style={styles.metaText}>{event.category}</Text>
+                </View>
+              ) : null}
+              {event.tags && event.tags.length > 0 ? (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Tags:</Text>
+                  <Text style={styles.metaText}>{event.tags.join(', ')}</Text>
+                </View>
+              ) : null}
               {venue && (
                 <View style={styles.metaRow}>
                   <MapPin size={16} color={theme.colors.accent} />
@@ -127,6 +207,17 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               )}
             </View>
 
+            <View style={styles.inlineActions}>
+              <Button title="Add to Calendar" variant="outline" onPress={handleCalendarAction} />
+              {event.type === 'online' && event.meetingLink ? (
+                <Button
+                  title="Open Meeting Link"
+                  onPress={handleOpenMeetingLink}
+                  icon={<LinkIcon size={16} color={theme.colors.text} />}
+                />
+              ) : null}
+            </View>
+
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About</Text>
               <Text style={styles.description}>{event.description}</Text>
@@ -135,7 +226,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             {sessions.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Agenda</Text>
-                {sessions.map(session => (
+                {sessions.map((session) => (
                   <GlassCard key={session.id} style={styles.sessionCard}>
                     <Text style={styles.sessionTitle}>{session.title}</Text>
                     <Text style={styles.sessionTime}>{session.startTime} - {session.endTime}</Text>
@@ -148,11 +239,13 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tickets</Text>
               {tickets.length > 0 ? (
-                tickets.map(ticket => (
+                tickets.map((ticket) => (
                   <GlassCard key={ticket.id} style={styles.ticketCard} variant="light">
                     <View style={styles.ticketInfo}>
                       <Text style={styles.ticketName}>{ticket.name}</Text>
-                      <Text style={styles.ticketPrice}>${ticket.price.toFixed(2)}</Text>
+                      <Text style={styles.ticketPrice}>
+                        {ticket.isFree ? 'Free' : `${ticket.currency || 'LKR'} ${ticket.price.toFixed(2)}`}
+                      </Text>
                     </View>
                     <Text style={styles.ticketRemaining}>
                       {ticket.quantity - ticket.soldCount} left
@@ -163,12 +256,25 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Text style={styles.description}>No tickets available.</Text>
               )}
             </View>
+
+            {recommendedEvents.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Recommended Events</Text>
+                {recommendedEvents.slice(0, 4).map((recommended) => (
+                  <EventCard
+                    key={recommended.id}
+                    event={recommended}
+                    onPress={() => navigation.push('EventDetails', { eventId: recommended.id })}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button 
-            title={isAvailable ? "Book Tickets" : "Sold Out"}
+          <Button
+            title={isAvailable ? 'Book Tickets' : 'Sold Out'}
             disabled={!isAvailable || event.status !== 'published'}
             onPress={() => navigation.navigate('TicketSelection', { eventId })}
             style={styles.bookButton}
@@ -182,11 +288,6 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   header: {
     position: 'absolute',
@@ -227,10 +328,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  metaLabel: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
+    marginRight: theme.spacing.s,
+  },
   metaText: {
     ...theme.typography.body,
     color: theme.colors.textMuted,
     marginLeft: theme.spacing.s,
+  },
+  inlineActions: {
+    marginBottom: theme.spacing.m,
+    gap: theme.spacing.s,
   },
   section: {
     marginBottom: theme.spacing.xl,
@@ -298,9 +408,5 @@ const styles = StyleSheet.create({
   },
   bookButton: {
     width: '100%',
-  },
-  errorText: {
-    ...theme.typography.body,
-    color: theme.colors.error,
   },
 });

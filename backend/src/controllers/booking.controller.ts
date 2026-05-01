@@ -80,6 +80,15 @@ const generateUniqueQrCodeValue = async () => {
   throw new AppError('Failed to generate a unique QR code token', 500);
 };
 
+const adjustEventBookingCount = async (eventId: string, delta: number) => {
+  const event = await EventModel.findById(eventId);
+  if (!event) return;
+
+  const current = typeof event.bookingCount === 'number' ? event.bookingCount : 0;
+  const nextCount = Math.max(0, current + delta);
+  await EventModel.findByIdAndUpdate(eventId, { bookingCount: nextCount });
+};
+
 const createConfirmedBooking = async (
   userId: string,
   eventId: string,
@@ -116,6 +125,7 @@ const createConfirmedBooking = async (
   await TicketTypeModel.findByIdAndUpdate(ticket.id, {
     soldCount: ticket.soldCount + quantity,
   });
+  await adjustEventBookingCount(eventId, quantity);
 
   return newBookingDoc;
 };
@@ -272,6 +282,8 @@ const cancelAndRestoreInventory = async (bookingId: string) => {
       soldCount: Math.max(0, ticket.soldCount - booking.quantity),
     });
   }
+
+  await adjustEventBookingCount(booking.eventId, -booking.quantity);
 
   return { booking, updatedBooking };
 };

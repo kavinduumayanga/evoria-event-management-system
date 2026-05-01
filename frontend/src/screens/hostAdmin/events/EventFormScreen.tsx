@@ -35,6 +35,10 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [category, setCategory] = useState('');
+  const [city, setCity] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
   const [venueId, setVenueId] = useState('');
   const [type, setType] = useState<EventType>('physical');
   const [visibility, setVisibility] = useState<EventVisibility>('public');
@@ -66,6 +70,10 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setStartTime(event.startTime);
         setEndTime(event.endTime);
         setCapacity(event.capacity.toString());
+        setCategory(event.category || '');
+        setCity(event.city || '');
+        setTagsInput((event.tags || []).join(', '));
+        setMeetingLink(event.meetingLink || '');
         setVenueId(event.venueId || '');
         setType(event.type || 'physical');
         setVisibility(event.visibility);
@@ -109,6 +117,13 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         startTime: startTime.trim(),
         endTime: endTime.trim(),
         capacity: parsedCapacity,
+        category: category.trim(),
+        city: city.trim(),
+        tags: tagsInput
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        meetingLink: meetingLink.trim() || undefined,
         venueId: venueId || null,
         type,
         visibility,
@@ -204,6 +219,15 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
+            <Input label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
+          </View>
+          <View style={styles.flexHalf}>
+            <Input label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.flexHalf}>
             <Input label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" />
           </View>
           <View style={styles.flexHalf}>
@@ -278,6 +302,20 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           onChangeText={setCoverImage}
           placeholder="https://example.com/image.jpg"
         />
+        <Input
+          label="Tags (comma-separated)"
+          value={tagsInput}
+          onChangeText={setTagsInput}
+          placeholder="conference, startup, ai"
+        />
+        {type === 'online' && (
+          <Input
+            label="Meeting Link (Online)"
+            value={meetingLink}
+            onChangeText={setMeetingLink}
+            placeholder="https://meet.google.com/..."
+          />
+        )}
 
         <Text style={styles.label}>Requires Host Approval *</Text>
         <View style={styles.selectorContainer}>

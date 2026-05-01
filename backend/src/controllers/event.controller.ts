@@ -32,9 +32,16 @@ const createEventSchema = z.object({
   date: z.string().trim().min(1, 'Date is required'),
   startTime: z.string().trim().min(1, 'Start time is required'),
   endTime: z.string().trim().min(1, 'End time is required'),
+  category: z.string().trim().optional().default(''),
+  city: z.string().trim().optional().default(''),
+  tags: z.array(z.string().trim()).optional().default([]),
   venueId: z.union([z.string().trim(), z.null()]).optional(),
   type: z.enum(EVENT_TYPES),
   visibility: z.enum(EVENT_VISIBILITIES).default('public'),
+  meetingLink: z.union([
+    z.string().trim().url('meetingLink must be a valid URL'),
+    z.literal(''),
+  ]).optional(),
   coverImage: z.string().trim().optional(),
   capacity: z.number().int().positive('Capacity must be greater than 0'),
   requiresApproval: z.boolean().default(false),
@@ -53,9 +60,13 @@ interface EventInput {
   date: string;
   startTime: string;
   endTime: string;
+  category: string;
+  city: string;
+  tags: string[];
   venueId: string | null;
   type: EventType;
   visibility: EventVisibility;
+  meetingLink?: string;
   coverImage?: string;
   capacity: number;
   requiresApproval: boolean;
@@ -96,6 +107,28 @@ const normalizeVenueId = (venueId: string | null | undefined): string | null => 
 const normalizeCoverImage = (coverImage: string | undefined): string | undefined => {
   if (coverImage === undefined) return undefined;
   const trimmed = coverImage.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const normalizeOptionalText = (value: string | undefined): string => {
+  if (value === undefined) return '';
+  return value.trim();
+};
+
+const normalizeTags = (tags: string[] | undefined): string[] => {
+  if (!tags) return [];
+
+  return Array.from(new Set(
+    tags
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0)
+      .map((tag) => tag.toLowerCase())
+  ));
+};
+
+const normalizeMeetingLink = (meetingLink: string | undefined): string | undefined => {
+  if (meetingLink === undefined) return undefined;
+  const trimmed = meetingLink.trim();
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
@@ -194,9 +227,13 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
     date: validatedData.date.trim(),
     startTime: validatedData.startTime.trim(),
     endTime: validatedData.endTime.trim(),
+    category: normalizeOptionalText(validatedData.category),
+    city: normalizeOptionalText(validatedData.city),
+    tags: normalizeTags(validatedData.tags),
     venueId: normalizeVenueId(validatedData.venueId),
     type: validatedData.type,
     visibility: validatedData.visibility,
+    meetingLink: normalizeMeetingLink(validatedData.meetingLink),
     coverImage: normalizeCoverImage(validatedData.coverImage),
     capacity: validatedData.capacity,
     requiresApproval: validatedData.requiresApproval,
@@ -216,11 +253,17 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
     date: updates.date !== undefined ? updates.date.trim() : event.date,
     startTime: updates.startTime !== undefined ? updates.startTime.trim() : event.startTime,
     endTime: updates.endTime !== undefined ? updates.endTime.trim() : event.endTime,
+    category: updates.category !== undefined ? normalizeOptionalText(updates.category) : (event.category || ''),
+    city: updates.city !== undefined ? normalizeOptionalText(updates.city) : (event.city || ''),
+    tags: updates.tags !== undefined ? normalizeTags(updates.tags) : normalizeTags(event.tags || []),
     venueId: Object.prototype.hasOwnProperty.call(updates, 'venueId')
       ? normalizeVenueId(updates.venueId)
       : normalizeVenueId(event.venueId),
     type: updates.type !== undefined ? updates.type : event.type,
     visibility: updates.visibility !== undefined ? updates.visibility : event.visibility,
+    meetingLink: Object.prototype.hasOwnProperty.call(updates, 'meetingLink')
+      ? normalizeMeetingLink(updates.meetingLink)
+      : normalizeMeetingLink(event.meetingLink),
     coverImage: Object.prototype.hasOwnProperty.call(updates, 'coverImage')
       ? normalizeCoverImage(updates.coverImage)
       : normalizeCoverImage(event.coverImage),
@@ -245,10 +288,17 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
   if (updates.date !== undefined) payload.date = updates.date.trim();
   if (updates.startTime !== undefined) payload.startTime = updates.startTime.trim();
   if (updates.endTime !== undefined) payload.endTime = updates.endTime.trim();
+  if (updates.category !== undefined) payload.category = normalizeOptionalText(updates.category);
+  if (updates.city !== undefined) payload.city = normalizeOptionalText(updates.city);
+  if (updates.tags !== undefined) payload.tags = normalizeTags(updates.tags);
   if (updates.capacity !== undefined) payload.capacity = updates.capacity;
   if (updates.type !== undefined) payload.type = updates.type;
   if (updates.visibility !== undefined) payload.visibility = updates.visibility;
   if (updates.requiresApproval !== undefined) payload.requiresApproval = updates.requiresApproval;
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'meetingLink')) {
+    payload.meetingLink = normalizeMeetingLink(updates.meetingLink) || '';
+  }
 
   if (Object.prototype.hasOwnProperty.call(updates, 'venueId')) {
     payload.venueId = normalizeVenueId(updates.venueId);
@@ -277,6 +327,253 @@ const ensurePublishable = async (event: any) => {
   }
 
   await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId));
+};
+
+const ensureEventReadableByUser = (event: any, requester: { id: string; role: Role } | null) => {
+  const isOwner = requester?.role === 'host_admin' && requester.id === event.hostAdminId;
+  if (isOwner) return;
+
+  if (event.status !== 'published') {
+    throw new AppError('Event is not available', 403);
+  }
+
+  if (event.visibility === 'private') {
+    throw new AppError('Event is private', 403);
+  }
+};
+
+const parseTagsParam = (rawTags: string | string[] | undefined): string[] => {
+  if (!rawTags) return [];
+
+  if (Array.isArray(rawTags)) {
+    return normalizeTags(rawTags);
+  }
+
+  const commaSplit = rawTags.split(',').map((tag) => tag.trim()).filter(Boolean);
+  return normalizeTags(commaSplit);
+};
+
+const combineDateAndTime = (date: string, time: string): Date => {
+  const datePart = date.trim().slice(0, 10);
+  const minutes = parseTimeToMinutes(time);
+  const baseDate = new Date(`${datePart}T00:00:00.000Z`);
+  if (minutes === null || Number.isNaN(baseDate.getTime())) {
+    return new Date();
+  }
+
+  baseDate.setUTCMinutes(minutes);
+  return baseDate;
+};
+
+const toIcsDateTime = (value: Date): string => {
+  return value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+};
+
+const escapeIcsText = (value: string): string => {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+};
+
+export const searchEvents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+    const city = typeof req.query.city === 'string' ? req.query.city.trim() : '';
+    const date = typeof req.query.date === 'string' ? req.query.date.trim() : '';
+    const tags = parseTagsParam(req.query.tags as string | string[] | undefined);
+
+    const query: Record<string, any> = {
+      status: 'published',
+      visibility: 'public',
+    };
+
+    if (q) {
+      const regex = new RegExp(q, 'i');
+      query.$or = [{ title: regex }, { description: regex }];
+    }
+
+    if (category) {
+      query.category = new RegExp(`^${category}$`, 'i');
+    }
+
+    if (city) {
+      query.city = new RegExp(`^${city}$`, 'i');
+    }
+
+    if (tags.length > 0) {
+      query.tags = { $in: tags };
+    }
+
+    if (date) {
+      query.date = { $regex: `^${date}` };
+    }
+
+    const events = await EventModel.find(query).sort({ date: 1, startTime: 1 });
+    res.status(200).json({
+      status: 'success',
+      results: events.length,
+      data: { events: events.map((event) => event.toJSON()) },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTrendingEvents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limitParam = typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : 10;
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 50) : 10;
+
+    const events = await EventModel.find({
+      status: 'published',
+      visibility: 'public',
+    })
+      .sort({ bookingCount: -1, viewsCount: -1, date: 1 })
+      .limit(limit);
+
+    res.status(200).json({
+      status: 'success',
+      results: events.length,
+      data: { events: events.map((event) => event.toJSON()) },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const incrementEventView = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.id as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    ensureEventReadableByUser(event, req.user || null);
+
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      { $inc: { viewsCount: 1 } },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: { event: updatedEvent!.toJSON() },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getRecommendedEvents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const eventId = typeof req.query.eventId === 'string' ? req.query.eventId.trim() : '';
+    const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+    const city = typeof req.query.city === 'string' ? req.query.city.trim() : '';
+    const tags = parseTagsParam(req.query.tags as string | string[] | undefined);
+    const limitParam = typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : 8;
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 30) : 8;
+
+    let seedCategory = category;
+    let seedCity = city;
+    let seedTags = tags;
+
+    if (eventId) {
+      const seedEvent = await EventModel.findById(eventId);
+      if (!seedEvent) return next(new AppError('Event not found', 404));
+      ensureEventReadableByUser(seedEvent, req.user || null);
+
+      if (!seedCategory) seedCategory = seedEvent.category || '';
+      if (!seedCity) seedCity = seedEvent.city || '';
+      if (seedTags.length === 0) seedTags = normalizeTags(seedEvent.tags || []);
+    }
+
+    const orConditions: Record<string, unknown>[] = [];
+    if (seedCategory) orConditions.push({ category: new RegExp(`^${seedCategory}$`, 'i') });
+    if (seedCity) orConditions.push({ city: new RegExp(`^${seedCity}$`, 'i') });
+    if (seedTags.length > 0) orConditions.push({ tags: { $in: seedTags } });
+
+    const query: Record<string, any> = {
+      status: 'published',
+      visibility: 'public',
+      ...(eventId ? { _id: { $ne: eventId } } : {}),
+      ...(orConditions.length > 0 ? { $or: orConditions } : {}),
+    };
+
+    const events = await EventModel.find(query)
+      .sort({ bookingCount: -1, viewsCount: -1, date: 1 })
+      .limit(limit);
+
+    res.status(200).json({
+      status: 'success',
+      results: events.length,
+      data: { events: events.map((event) => event.toJSON()) },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getEventCalendar = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.id as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    const requester = await resolveRequester(req);
+    ensureEventReadableByUser(event, requester);
+
+    const startDate = combineDateAndTime(event.date, event.startTime);
+    const endDate = combineDateAndTime(event.date, event.endTime);
+    let location = event.type === 'online'
+      ? (event.meetingLink || 'Online')
+      : (event.city || 'Venue');
+
+    if (event.type !== 'online' && event.venueId) {
+      const venue = await VenueModel.findById(event.venueId);
+      if (venue) {
+        location = `${venue.name}, ${venue.city}`;
+      }
+    }
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Evoria//Event Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      `UID:${event.id}@evoria.local`,
+      `DTSTAMP:${toIcsDateTime(new Date())}`,
+      `DTSTART:${toIcsDateTime(startDate)}`,
+      `DTEND:${toIcsDateTime(endDate)}`,
+      `SUMMARY:${escapeIcsText(event.title)}`,
+      `DESCRIPTION:${escapeIcsText(event.description)}`,
+      `LOCATION:${escapeIcsText(location)}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const shouldDownload = String(req.query.download || '').toLowerCase() === 'true';
+    if (shouldDownload) {
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=\"event-${event.id}.ics\"`);
+      return res.status(200).send(ics);
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        title: event.title,
+        description: event.description,
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
+        location,
+        ics,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const createEvent = async (req: Request, res: Response, next: NextFunction) => {
@@ -322,17 +619,7 @@ export const getEvent = async (req: Request, res: Response, next: NextFunction) 
     if (!event) return next(new AppError('Event not found', 404));
 
     const requester = await resolveRequester(req);
-    const isOwner = requester?.role === 'host_admin' && requester.id === event.hostAdminId;
-
-    if (!isOwner) {
-      if (event.status !== 'published') {
-        return next(new AppError('Event is not available', 403));
-      }
-
-      if (event.visibility === 'private') {
-        return next(new AppError('Event is private', 403));
-      }
-    }
+    ensureEventReadableByUser(event, requester);
 
     res.status(200).json({ status: 'success', data: { event: event.toJSON() } });
   } catch (error) {

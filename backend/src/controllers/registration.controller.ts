@@ -135,6 +135,9 @@ export const createRegistration = async (req: Request, res: Response, next: Next
     await TicketTypeModel.findByIdAndUpdate(ticket._id, {
       soldCount: ticket.soldCount + validatedData.quantity,
     });
+    await EventModel.findByIdAndUpdate(validatedData.eventId, {
+      $inc: { bookingCount: validatedData.quantity },
+    });
 
     res.status(201).json({ status: 'success', data: { registration: newRegistrationDoc.toJSON() } });
   } catch (error: any) {
