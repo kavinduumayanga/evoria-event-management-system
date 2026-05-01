@@ -30,6 +30,7 @@ export const mockCheckout = async (req: Request, res: Response, next: NextFuncti
 
     const event = await EventModel.findById(ticket.eventId);
     if (!event) return next(new AppError('Event not found', 404));
+    const pricingMode = event.pricingMode === 'free' ? 'free' : 'ticketed';
 
     if (event.moderationStatus && event.moderationStatus !== 'approved') {
       return next(new AppError('Event is not approved for booking', 400));
@@ -41,6 +42,10 @@ export const mockCheckout = async (req: Request, res: Response, next: NextFuncti
 
     if (event.visibility !== 'public') {
       return next(new AppError('Only public events can be booked', 403));
+    }
+
+    if (pricingMode === 'free') {
+      return next(new AppError('This is a free event. Payment is not required.', 400));
     }
 
     const eventAtCapacity = await isEventAtCapacityForQuantity(event.id, validatedData.quantity);

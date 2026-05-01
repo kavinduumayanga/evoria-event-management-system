@@ -10,7 +10,7 @@ import { Event, Venue, Session, TicketType } from '../../types';
 import { GradientBackground, Button, GlassCard, LoadingState, ErrorState, ScreenContainer, EventCard, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { EventService, PublicEventDetails, ReportService } from '../../api/services';
+import { BookingService, EventService, PublicEventDetails, ReportService } from '../../api/services';
 import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Wifi, Share2, Mail, Phone, UserRound, Users2, Pencil, Ticket, Eye, Copy, Send } from 'lucide-react-native';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -47,6 +47,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [blastTitle, setBlastTitle] = useState('');
   const [blastMessage, setBlastMessage] = useState('');
   const [isSendingBlast, setIsSendingBlast] = useState(false);
+  const [isRegisteringFree, setIsRegisteringFree] = useState(false);
 
   useEffect(() => {
     fetchEventDetails();
@@ -310,6 +311,42 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  const handleRegisterFreeEvent = async () => {
+    if (!event) return;
+
+    try {
+      setIsRegisteringFree(true);
+      const response = await BookingService.createBooking({
+        eventId: event.id,
+        quantity: 1,
+      });
+
+      const booking = response?.data?.booking;
+      if (!booking?.id) {
+        Alert.alert('Registration Complete', 'Free event registration submitted.');
+        fetchEventDetails();
+        return;
+      }
+
+      if (booking.isWaitlisted) {
+        Alert.alert(
+          'Added to Waitlist',
+          booking.waitlistPosition
+            ? `Event is full. You were added at waitlist position #${booking.waitlistPosition}.`
+            : 'Event is full. You were added to the waitlist.',
+        );
+      } else {
+        Alert.alert('Registered', 'Free event registration confirmed.');
+      }
+
+      navigation.navigate('BookingConfirmation', { bookingId: booking.id });
+    } catch (registrationError: any) {
+      Alert.alert('Registration Failed', registrationError?.response?.data?.message || 'Unable to register for this event.');
+    } finally {
+      setIsRegisteringFree(false);
+    }
+  };
+
   const handleSubmitReport = async () => {
     if (!event) return;
     if (!reportReason.trim()) {
@@ -355,6 +392,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const isAvailable = tickets.some((ticket) => ticket.isActive && ticket.quantity > ticket.soldCount);
   const isEventFull = event.bookingCount >= event.capacity;
   const canRegister = event.visibility === 'public';
+  const pricingMode = event.pricingMode || 'ticketed';
+  const isFreeEvent = pricingMode === 'free';
+  const hasActionableInventory = isFreeEvent || isAvailable;
   const canManageEvent = Boolean(
     publicData?.event.isManageableByCurrentUser
     || (currentUser && (event.ownerId === currentUser.id || (event.adminIds || []).includes(currentUser.id)))
@@ -550,7 +590,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tickets</Text>
-              {tickets.length > 0 ? (
+              {isFreeEvent ? (
+                <Text style={styles.description}>This is a free event. Tap Register to reserve your spot.</Text>
+              ) : tickets.length > 0 ? (
                 tickets.map((ticket) => (
                   <GlassCard key={ticket.id} style={styles.ticketCard} variant="light">
                     <View style={styles.ticketInfo}>
@@ -592,9 +634,16 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.waitlistHint}>Event full - joining now adds you to waitlist.</Text>
           )}
           <Button
-            title={isEventFull ? 'Join Waitlist' : (isAvailable ? 'Book Tickets' : 'Sold Out')}
-            disabled={!canRegister || event.status !== 'published' || (!isEventFull && !isAvailable)}
-            onPress={() => navigation.navigate('TicketSelection', { eventId })}
+            title={isEventFull ? 'Join Waitlist' : (isFreeEvent ? 'Register' : (isAvailable ? 'Book Tickets' : 'Sold Out'))}
+            disabled={!canRegister || event.status !== 'published' || (!isEventFull && !hasActionableInventory)}
+            isLoading={isFreeEvent && isRegisteringFree}
+            onPress={() => {
+              if (isFreeEvent) {
+                handleRegisterFreeEvent();
+                return;
+              }
+              navigation.navigate('TicketSelection', { eventId });
+            }}
             style={styles.bookButton}
           />
         </View>

@@ -9,7 +9,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { AttendeeTabParamList } from '../../types/navigation';
 import { QrCode } from 'lucide-react-native';
 
-type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyBookings'>;
+type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyRegistrations'>;
 
 export const MyBookingsScreen = () => {
   const navigation = useNavigation<AttendeeTabNavigationProp>();

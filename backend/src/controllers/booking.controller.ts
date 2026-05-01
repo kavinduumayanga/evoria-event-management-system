@@ -22,8 +22,8 @@ import {
 
 const bookingSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
-  ticketTypeId: z.string().trim().min(1, 'ticketTypeId is required'),
-  quantity: z.number().int().positive('quantity must be greater than 0'),
+  ticketTypeId: z.string().trim().min(1, 'ticketTypeId is required').optional(),
+  quantity: z.number().int().positive('quantity must be greater than 0').default(1),
   promoCode: z.string().trim().optional(),
   unlockCode: z.string().trim().optional(),
   customAnswers: z.array(z.object({
@@ -65,6 +65,41 @@ const ensureTicketForEvent = async (ticketTypeId: string, eventId: string) => {
   }
 
   return ticket;
+};
+
+const normalizePricingMode = (value: unknown): 'free' | 'ticketed' => {
+  return value === 'free' ? 'free' : 'ticketed';
+};
+
+const ensureFreeRegistrationTicket = async (event: any) => {
+  const freeTicket = await TicketTypeModel.findOne({
+    eventId: event.id,
+    isActive: true,
+    isFree: true,
+  }).sort({ createdAt: 1, soldCount: 1 });
+
+  if (freeTicket) {
+    const desiredQuantity = Math.max(freeTicket.quantity, Number(event.capacity || 1), freeTicket.soldCount || 0, 1);
+    if (desiredQuantity !== freeTicket.quantity) {
+      freeTicket.quantity = desiredQuantity;
+      await freeTicket.save();
+    }
+    return freeTicket;
+  }
+
+  return TicketTypeModel.create({
+    eventId: event.id,
+    name: 'Free Registration',
+    description: 'Auto-generated free registration ticket',
+    price: 0,
+    currency: 'LKR',
+    isFree: true,
+    quantity: Math.max(1, Number(event.capacity || 1)),
+    soldCount: 0,
+    maxPerUser: 1,
+    isActive: true,
+    promoCodes: [],
+  });
 };
 
 const validateMaxPerUser = async (userId: string, ticketTypeId: string, maxPerUser: number, requestedQuantity: number) => {
@@ -203,7 +238,28 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
   try {
     const validatedData = bookingSchema.parse(req.body);
     const event = await ensureBookableEvent(validatedData.eventId);
-    const ticket = await ensureTicketForEvent(validatedData.ticketTypeId, validatedData.eventId);
+    const pricingMode = normalizePricingMode(event.pricingMode);
+    let ticket: any;
+
+    if (pricingMode === 'free') {
+      if (validatedData.promoCode || validatedData.unlockCode) {
+        return next(new AppError('Promo code and unlock code are not applicable for free events', 400));
+      }
+
+      if (validatedData.ticketTypeId) {
+        ticket = await ensureTicketForEvent(validatedData.ticketTypeId, validatedData.eventId);
+        if (!ticket.isFree || ticket.price > 0) {
+          return next(new AppError('Free events require a free registration ticket', 400));
+        }
+      } else {
+        ticket = await ensureFreeRegistrationTicket(event);
+      }
+    } else {
+      if (!validatedData.ticketTypeId) {
+        return next(new AppError('ticketTypeId is required for ticketed events', 400));
+      }
+      ticket = await ensureTicketForEvent(validatedData.ticketTypeId, validatedData.eventId);
+    }
 
     validateUnlockCode(ticket as any, validatedData.unlockCode);
     await validateMaxPerUser(req.user!.id, ticket.id, ticket.maxPerUser, validatedData.quantity);
@@ -224,7 +280,7 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
     const pricing = calculateTicketPrice(
       ticket as any,
       validatedData.quantity,
-      validatedData.promoCode,
+      pricingMode === 'free' ? undefined : validatedData.promoCode,
     );
 
     if (eventAtCapacity) {

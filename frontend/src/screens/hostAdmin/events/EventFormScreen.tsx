@@ -8,7 +8,7 @@ import { theme } from '../../../constants/theme';
 import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { EventService, UploadService, VenueService } from '../../../api/services';
-import { Event, Venue, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType } from '../../../types';
+import { Event, Venue, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode } from '../../../types';
 import { resolveImageUrl } from '../../../utils/imageUrl';
 
 type EventFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'EventForm'>;
@@ -20,6 +20,7 @@ interface Props {
 }
 
 const eventTypes: EventType[] = ['online', 'physical', 'hybrid'];
+const pricingModes: EventPricingMode[] = ['free', 'ticketed'];
 const visibilityOptions: EventVisibility[] = ['public', 'private', 'unlisted'];
 const customQuestionTypes: CustomQuestionType[] = ['text', 'number', 'choice'];
 
@@ -44,6 +45,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [meetingLink, setMeetingLink] = useState('');
   const [venueId, setVenueId] = useState('');
   const [type, setType] = useState<EventType>('physical');
+  const [pricingMode, setPricingMode] = useState<EventPricingMode>('ticketed');
   const [visibility, setVisibility] = useState<EventVisibility>('public');
   const [coverImage, setCoverImage] = useState('');
   const [contactName, setContactName] = useState('');
@@ -85,6 +87,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setMeetingLink(event.meetingLink || '');
         setVenueId(event.venueId || '');
         setType(event.type || 'physical');
+        setPricingMode(event.pricingMode || 'ticketed');
         setVisibility(event.visibility);
         setCoverImage(event.coverImage || '');
         setContactName(event.contactDetails?.name || '');
@@ -266,6 +269,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         meetingLink: trimmedMeetingLink || undefined,
         venueId: venueId || null,
         type,
+        pricingMode,
         visibility,
         coverImage: coverImage.trim() ? coverImage.trim() : undefined,
         contactDetails: {
@@ -398,6 +402,21 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               <Text style={[styles.chipText, type === eventType && styles.chipTextSelected]}>
                 {eventType.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Pricing Mode *</Text>
+        <View style={styles.selectorContainer}>
+          {pricingModes.map((modeOption) => (
+            <TouchableOpacity
+              key={modeOption}
+              style={[styles.chip, pricingMode === modeOption && styles.chipSelected]}
+              onPress={() => setPricingMode(modeOption)}
+            >
+              <Text style={[styles.chipText, pricingMode === modeOption && styles.chipTextSelected]}>
+                {modeOption.toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}

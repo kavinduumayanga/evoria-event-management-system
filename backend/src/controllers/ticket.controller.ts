@@ -104,6 +104,10 @@ export const createTicket = async (req: Request, res: Response, next: NextFuncti
       return next(new AppError('Not authorized to add tickets to this event', 403));
     }
 
+    if ((event.pricingMode === 'free') && (!normalizedPayload.isFree || normalizedPayload.price > 0)) {
+      return next(new AppError('Free events can only have free ticket types (price must be 0)', 400));
+    }
+
     const newTicketDoc = await TicketTypeModel.create({
       soldCount: 0,
       ...normalizedPayload,
@@ -183,6 +187,10 @@ export const updateTicket = async (req: Request, res: Response, next: NextFuncti
 
     if (mergedData.price < 0) {
       return next(new AppError('Price must be at least 0', 400));
+    }
+
+    if ((event.pricingMode === 'free') && (!mergedData.isFree || mergedData.price > 0)) {
+      return next(new AppError('Free events can only have free ticket types (price must be 0)', 400));
     }
 
     if (mergedData.quantity <= 0) {

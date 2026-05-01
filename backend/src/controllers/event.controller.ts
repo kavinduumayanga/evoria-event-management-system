@@ -8,11 +8,12 @@ import { BookingModel } from '../models/Booking';
 import { UserModel } from '../models/User';
 import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
-import { EventCustomQuestion, EventStatus, EventType, EventVisibility } from '../types';
+import { EventCustomQuestion, EventPricingMode, EventStatus, EventType, EventVisibility } from '../types';
 import { canManageEvent, isEventOwner, manageableEventQuery } from '../utils/eventPermissions';
 import { getEventRegistrationQuestions } from '../utils/eventRegistrationFields';
 
 const EVENT_TYPES = ['online', 'physical', 'hybrid'] as const;
+const EVENT_PRICING_MODES = ['free', 'ticketed'] as const;
 const EVENT_VISIBILITIES = ['public', 'private', 'unlisted'] as const;
 const EVENT_STATUSES = ['draft', 'published', 'cancelled'] as const;
 const CUSTOM_QUESTION_TYPES = ['text', 'number', 'choice'] as const;
@@ -62,6 +63,7 @@ const createEventSchema = z.object({
   tags: z.array(z.string().trim()).optional().default([]),
   venueId: z.union([z.string().trim(), z.null()]).optional(),
   type: z.enum(EVENT_TYPES),
+  pricingMode: z.enum(EVENT_PRICING_MODES).default('ticketed'),
   visibility: z.enum(EVENT_VISIBILITIES).default('public'),
   meetingLink: z.union([
     z.string().trim().url('meetingLink must be a valid URL'),
@@ -105,6 +107,7 @@ interface EventInput {
   tags: string[];
   venueId: string | null;
   type: EventType;
+  pricingMode: EventPricingMode;
   visibility: EventVisibility;
   meetingLink?: string;
   coverImage?: string;
@@ -207,6 +210,10 @@ const normalizeMeetingLink = (meetingLink: string | undefined): string | undefin
   if (meetingLink === undefined) return undefined;
   const trimmed = meetingLink.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const normalizePricingMode = (pricingMode: unknown): EventPricingMode => {
+  return pricingMode === 'free' ? 'free' : 'ticketed';
 };
 
 const slugify = (value: string): string => {
@@ -362,6 +369,7 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
     tags: normalizeTags(validatedData.tags),
     venueId: normalizeVenueId(validatedData.venueId),
     type: validatedData.type,
+    pricingMode: validatedData.pricingMode,
     visibility: validatedData.visibility,
     meetingLink: normalizeMeetingLink(validatedData.meetingLink),
     coverImage: normalizeCoverImage(validatedData.coverImage),
@@ -393,6 +401,7 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
       ? normalizeVenueId(updates.venueId)
       : normalizeVenueId(event.venueId),
     type: updates.type !== undefined ? updates.type : event.type,
+    pricingMode: updates.pricingMode !== undefined ? updates.pricingMode : normalizePricingMode(event.pricingMode),
     visibility: updates.visibility !== undefined ? updates.visibility : event.visibility,
     meetingLink: Object.prototype.hasOwnProperty.call(updates, 'meetingLink')
       ? normalizeMeetingLink(updates.meetingLink)
@@ -436,6 +445,7 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
   if (updates.capacity !== undefined) payload.capacity = updates.capacity;
   if (updates.priorityAccessEnabled !== undefined) payload.priorityAccessEnabled = updates.priorityAccessEnabled;
   if (updates.type !== undefined) payload.type = updates.type;
+  if (updates.pricingMode !== undefined) payload.pricingMode = updates.pricingMode;
   if (updates.visibility !== undefined) payload.visibility = updates.visibility;
   if (updates.requiresApproval !== undefined) payload.requiresApproval = updates.requiresApproval;
 
@@ -474,9 +484,12 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
 };
 
 const ensurePublishable = async (event: any) => {
-  const ticketCount = await TicketTypeModel.countDocuments({ eventId: event.id });
-  if (ticketCount < 1) {
-    throw new AppError('Cannot publish event without at least one ticket', 400);
+  const pricingMode = normalizePricingMode(event.pricingMode);
+  if (pricingMode === 'ticketed') {
+    const ticketCount = await TicketTypeModel.countDocuments({ eventId: event.id, isActive: true });
+    if (ticketCount < 1) {
+      throw new AppError('Cannot publish a ticketed event without at least one active ticket', 400);
+    }
   }
 
   if (event.moderationStatus && event.moderationStatus !== 'approved') {
@@ -519,6 +532,21 @@ const resolveEventOwnerId = (event: any): string => {
   }
 
   return '';
+};
+
+const validatePricingModeTransition = async (event: any, nextPricingMode: EventPricingMode) => {
+  if (nextPricingMode !== 'free') return;
+
+  const hasPaidTickets = await TicketTypeModel.exists({
+    eventId: event.id,
+    isActive: true,
+    isFree: false,
+    price: { $gt: 0 },
+  });
+
+  if (hasPaidTickets) {
+    throw new AppError('Cannot switch to free while active paid ticket types exist', 400);
+  }
 };
 
 const parseTagsParam = (rawTags: string | string[] | undefined): string[] => {
@@ -964,6 +992,7 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
           capacity: Number(event.capacity || 0),
           bookingCount: Number(event.bookingCount || 0),
           type: event.type,
+          pricingMode: normalizePricingMode(event.pricingMode),
           visibility: event.visibility,
           about: event.description,
           description: event.description,
@@ -1060,6 +1089,7 @@ export const updateEvent = async (req: Request, res: Response, next: NextFunctio
     }
 
     const mergedEventInput = toMergedEventInputForUpdate(event, updates);
+    await validatePricingModeTransition(event, mergedEventInput.pricingMode);
     await validateEventData(mergedEventInput);
 
     const updatedEvent = await EventModel.findByIdAndUpdate(

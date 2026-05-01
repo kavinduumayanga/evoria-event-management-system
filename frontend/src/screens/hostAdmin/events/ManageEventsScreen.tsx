@@ -4,7 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban, Users, BarChart3, Star, ListOrdered } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban, Users, Star, ListOrdered } from 'lucide-react-native';
 import { EventService } from '../../../api/services';
 import { Event } from '../../../types';
 import { useFocusEffect } from '@react-navigation/native';
@@ -152,10 +152,6 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
                   <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageWaitlist', { eventId: item.id })}>
                     <ListOrdered size={16} color={theme.colors.warning} />
                     <Text style={styles.actionText}>Waitlist</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('EventAnalytics', { eventId: item.id })}>
-                    <BarChart3 size={16} color={theme.colors.primary} />
-                    <Text style={styles.actionText}>Analytics</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('EventForm', { eventId: item.id })}>
                     <Edit2 size={16} color={theme.colors.textMuted} />

@@ -11,8 +11,8 @@ export type AuthStackParamList = {
 
 export type AttendeeTabParamList = {
   HomeStack: NavigatorScreenParams<AttendeeHomeStackParamList>;
-  MyBookings: undefined;
-  Notifications: undefined;
+  MyEvents: undefined;
+  MyRegistrations: undefined;
   Profile: NavigatorScreenParams<AttendeeProfileStackParamList>;
 };
 
@@ -55,7 +55,6 @@ export type HostAdminTabParamList = {
 export type HostAdminEventStackParamList = {
   ManageEvents: undefined;
   EventForm: { eventId?: string };
-  EventAnalytics: { eventId: string };
   ManageTickets: { eventId: string };
   TicketForm: { eventId: string; ticketId?: string };
   ManageRegistrations: { eventId: string };

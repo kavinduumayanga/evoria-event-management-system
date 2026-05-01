@@ -178,6 +178,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   }
 
   const isSoldOut = tickets.every((ticket) => ticket.remaining <= 0);
+  const isTicketedEvent = event.pricingMode === 'ticketed';
 
   return (
     <ScreenContainer style={styles.screen}>
@@ -275,57 +276,70 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
               )}
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Event Registration</Text>
-              <Input label="Name *" value={name} onChangeText={setName} placeholder="Your full name" error={formErrors.name} />
-              <Input
-                label="Email *"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                error={formErrors.email}
-              />
-              <Input label="Mobile *" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" error={formErrors.mobile} />
-              <Input label="NIC *" value={nic} onChangeText={setNic} placeholder="200012345678" error={formErrors.nic} />
-
-              {registrationQuestions.map((question) => (
+            {!isTicketedEvent ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Event Registration</Text>
+                <Input label="Name *" value={name} onChangeText={setName} placeholder="Your full name" error={formErrors.name} />
                 <Input
-                  key={question.id}
-                  label={`${question.question}${question.required ? ' *' : ''}`}
-                  value={customAnswerMap[question.id] || ''}
-                  onChangeText={(value) => {
-                    setCustomAnswerMap((previous) => ({ ...previous, [question.id]: value }));
-                    setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
-                  }}
-                  placeholder={question.type === 'number' ? 'Enter a number' : 'Your answer'}
-                  keyboardType={question.type === 'number' ? 'numeric' : 'default'}
-                  error={formErrors[`q_${question.id}`]}
+                  label="Email *"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  error={formErrors.email}
                 />
-              ))}
+                <Input label="Mobile *" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" error={formErrors.mobile} />
+                <Input label="NIC *" value={nic} onChangeText={setNic} placeholder="200012345678" error={formErrors.nic} />
 
-              {registrationStatus ? (
-                <GlassCard style={styles.statusCard}>
-                  <Text style={styles.statusTitle}>Registration Status</Text>
-                  <Text style={styles.statusText}>{registrationStatus.toUpperCase()}</Text>
-                </GlassCard>
-              ) : null}
+                {registrationQuestions.map((question) => (
+                  <Input
+                    key={question.id}
+                    label={`${question.question}${question.required ? ' *' : ''}`}
+                    value={customAnswerMap[question.id] || ''}
+                    onChangeText={(value) => {
+                      setCustomAnswerMap((previous) => ({ ...previous, [question.id]: value }));
+                      setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
+                    }}
+                    placeholder={question.type === 'number' ? 'Enter a number' : 'Your answer'}
+                    keyboardType={question.type === 'number' ? 'numeric' : 'default'}
+                    error={formErrors[`q_${question.id}`]}
+                  />
+                ))}
 
-              <Button
-                title="Submit Registration"
-                onPress={handleSubmitRegistration}
-                isLoading={isSubmittingRegistration}
-              />
-            </View>
+                {registrationStatus ? (
+                  <GlassCard style={styles.statusCard}>
+                    <Text style={styles.statusTitle}>Registration Status</Text>
+                    <Text style={styles.statusText}>{registrationStatus.toUpperCase()}</Text>
+                  </GlassCard>
+                ) : null}
+
+                <Button
+                  title="Submit Registration"
+                  onPress={handleSubmitRegistration}
+                  isLoading={isSubmittingRegistration}
+                />
+              </View>
+            ) : null}
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
           <Button
-            title={isLoggedIn ? (isSoldOut ? 'Sold Out' : 'Book Tickets') : 'Login To Book Tickets'}
-            disabled={isSoldOut || !isLoggedIn}
-            onPress={() => navigation.navigate('TicketSelection', { eventId: event.id })}
+            title={
+              isTicketedEvent
+                ? (isLoggedIn ? (isSoldOut ? 'Sold Out' : 'Book Tickets') : 'Login To Book Tickets')
+                : 'Register'
+            }
+            disabled={isTicketedEvent ? (isSoldOut || !isLoggedIn) : isSubmittingRegistration}
+            onPress={() => {
+              if (isTicketedEvent) {
+                navigation.navigate('TicketSelection', { eventId: event.id });
+                return;
+              }
+              handleSubmitRegistration();
+            }}
+            isLoading={isSubmittingRegistration}
           />
         </View>
       </SafeAreaView>

@@ -77,7 +77,7 @@ export interface MockCheckoutPayload {
 
 export interface CreateBookingPayload {
   eventId: string;
-  ticketTypeId: string;
+  ticketTypeId?: string;
   quantity: number;
   promoCode?: string;
   unlockCode?: string;
@@ -196,6 +196,7 @@ export interface PublicEventDetails {
     capacity: number;
     bookingCount: number;
     type: 'online' | 'physical' | 'hybrid';
+    pricingMode: 'free' | 'ticketed';
     visibility: 'public' | 'private' | 'unlisted';
     about: string;
     description: string;

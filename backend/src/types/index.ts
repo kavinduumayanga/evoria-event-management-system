@@ -3,6 +3,7 @@ export type EventStatus = 'draft' | 'published' | 'cancelled';
 export type ModerationStatus = 'pending' | 'approved' | 'rejected';
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type EventType = 'online' | 'physical' | 'hybrid';
+export type EventPricingMode = 'free' | 'ticketed';
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
 export type RsvpStatus = 'going' | 'not_going';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -61,6 +62,7 @@ export interface Event {
   publicSlug: string;
   venueId?: string | null;
   type: EventType;
+  pricingMode: EventPricingMode;
   category: string;
   city: string;
   tags: string[];
