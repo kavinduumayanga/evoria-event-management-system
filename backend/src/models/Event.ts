@@ -19,6 +19,14 @@ const eventSchema = new Schema({
   meetingLink: { type: String, trim: true, default: '' },
   coverImage: { type: String, trim: true },
   capacity: { type: Number, required: true },
+  isFlagged: { type: Boolean, default: false },
+  isFeatured: { type: Boolean, default: false },
+  moderationStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved',
+  },
+  priorityAccessEnabled: { type: Boolean, default: false },
   status: { type: String, enum: ['draft', 'published', 'cancelled'], default: 'draft' },
   visibility: { type: String, enum: ['public', 'private', 'unlisted'], default: 'public' },
   requiresApproval: { type: Boolean, default: false },
@@ -46,6 +54,7 @@ const eventSchema = new Schema({
 eventSchema.index({ title: 'text', description: 'text' });
 eventSchema.index({ category: 1, city: 1, date: 1 });
 eventSchema.index({ tags: 1 });
+eventSchema.index({ isFeatured: -1, date: 1, startTime: 1 });
 eventSchema.index({ bookingCount: -1, viewsCount: -1 });
 
 export const EventModel = mongoose.model('Event', eventSchema);

@@ -16,8 +16,10 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
   const approvalStatus = booking.approvalStatus || 'approved';
   const rsvpStatus = booking.rsvpStatus || 'going';
   const registrationType = booking.registrationType || (booking.totalAmount > 0 ? 'paid' : 'free');
+  const isWaitlisted = Boolean(booking.isWaitlisted);
 
   const getStatusColor = () => {
+    if (isWaitlisted) return theme.colors.warning;
     switch (booking.bookingStatus) {
       case 'confirmed': return theme.colors.success;
       case 'pending': return theme.colors.warning;
@@ -43,7 +45,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
           <Text style={styles.title} numberOfLines={1}>Booking #{booking.id.substring(0, 8)}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor() + '20', borderColor: getStatusColor() }]}>
-          <Text style={[styles.statusText, { color: getStatusColor() }]}>{booking.bookingStatus.toUpperCase()}</Text>
+          <Text style={[styles.statusText, { color: getStatusColor() }]}>{isWaitlisted ? 'WAITLISTED' : booking.bookingStatus.toUpperCase()}</Text>
         </View>
       </View>
 
@@ -66,6 +68,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, styl
           <Text style={styles.label}>Quantity:</Text>
           <Text style={styles.value}>{booking.quantity}</Text>
         </View>
+        {isWaitlisted && (
+          <View style={styles.detailRow}>
+            <Text style={styles.label}>Queue:</Text>
+            <Text style={styles.value}>{booking.waitlistPosition ? `#${booking.waitlistPosition}` : 'Waiting'}</Text>
+          </View>
+        )}
         <View style={styles.detailRow}>
           <Text style={styles.label}>Type:</Text>
           <Text style={styles.value}>{registrationType.toUpperCase()}</Text>

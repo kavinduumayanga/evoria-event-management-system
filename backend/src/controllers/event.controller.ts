@@ -44,6 +44,7 @@ const createEventSchema = z.object({
   ]).optional(),
   coverImage: z.string().trim().optional(),
   capacity: z.number().int().positive('Capacity must be greater than 0'),
+  priorityAccessEnabled: z.boolean().default(false),
   requiresApproval: z.boolean().default(false),
   customQuestions: z.array(customQuestionSchema).default([]),
 }).strict();
@@ -69,6 +70,7 @@ interface EventInput {
   meetingLink?: string;
   coverImage?: string;
   capacity: number;
+  priorityAccessEnabled: boolean;
   requiresApproval: boolean;
   customQuestions: EventCustomQuestion[];
 }
@@ -132,6 +134,10 @@ const normalizeMeetingLink = (meetingLink: string | undefined): string | undefin
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const approvedModerationFilter = () => ({
+  moderationStatus: { $ne: 'rejected' },
+});
+
 const isIsoLikeDate = (value: string): boolean => {
   return /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(value.trim());
 };
@@ -147,8 +153,8 @@ const resolveRequester = async (req: Request): Promise<{ id: string; role: Role 
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string; role: Role };
-    const currentUser = await UserModel.findById(decoded.id).select('+isActive');
-    if (!currentUser || !currentUser.isActive) {
+    const currentUser = await UserModel.findById(decoded.id).select('+isActive +isSuspended');
+    if (!currentUser || !currentUser.isActive || currentUser.isSuspended) {
       throw new AppError('Unauthorized access. Please log in.', 401);
     }
 
@@ -236,6 +242,7 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
     meetingLink: normalizeMeetingLink(validatedData.meetingLink),
     coverImage: normalizeCoverImage(validatedData.coverImage),
     capacity: validatedData.capacity,
+    priorityAccessEnabled: validatedData.priorityAccessEnabled,
     requiresApproval: validatedData.requiresApproval,
     customQuestions: validatedData.customQuestions.map((question) => ({
       id: question.id.trim(),
@@ -268,6 +275,9 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
       ? normalizeCoverImage(updates.coverImage)
       : normalizeCoverImage(event.coverImage),
     capacity: updates.capacity !== undefined ? updates.capacity : event.capacity,
+    priorityAccessEnabled: updates.priorityAccessEnabled !== undefined
+      ? updates.priorityAccessEnabled
+      : Boolean(event.priorityAccessEnabled),
     requiresApproval: updates.requiresApproval !== undefined ? updates.requiresApproval : Boolean(event.requiresApproval),
     customQuestions: updates.customQuestions !== undefined
       ? updates.customQuestions.map((question) => ({
@@ -292,6 +302,7 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
   if (updates.city !== undefined) payload.city = normalizeOptionalText(updates.city);
   if (updates.tags !== undefined) payload.tags = normalizeTags(updates.tags);
   if (updates.capacity !== undefined) payload.capacity = updates.capacity;
+  if (updates.priorityAccessEnabled !== undefined) payload.priorityAccessEnabled = updates.priorityAccessEnabled;
   if (updates.type !== undefined) payload.type = updates.type;
   if (updates.visibility !== undefined) payload.visibility = updates.visibility;
   if (updates.requiresApproval !== undefined) payload.requiresApproval = updates.requiresApproval;
@@ -326,12 +337,20 @@ const ensurePublishable = async (event: any) => {
     throw new AppError('Cannot publish event without at least one ticket', 400);
   }
 
+  if (event.moderationStatus && event.moderationStatus !== 'approved') {
+    throw new AppError('Event must be moderation-approved before publishing', 400);
+  }
+
   await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId));
 };
 
 const ensureEventReadableByUser = (event: any, requester: { id: string; role: Role } | null) => {
   const isOwner = requester?.role === 'host_admin' && requester.id === event.hostAdminId;
   if (isOwner) return;
+
+  if (event.moderationStatus && event.moderationStatus !== 'approved') {
+    throw new AppError('Event is not available', 403);
+  }
 
   if (event.status !== 'published') {
     throw new AppError('Event is not available', 403);
@@ -388,6 +407,7 @@ export const searchEvents = async (req: Request, res: Response, next: NextFuncti
     const query: Record<string, any> = {
       status: 'published',
       visibility: 'public',
+      ...approvedModerationFilter(),
     };
 
     if (q) {
@@ -411,7 +431,7 @@ export const searchEvents = async (req: Request, res: Response, next: NextFuncti
       query.date = { $regex: `^${date}` };
     }
 
-    const events = await EventModel.find(query).sort({ date: 1, startTime: 1 });
+    const events = await EventModel.find(query).sort({ isFeatured: -1, date: 1, startTime: 1 });
     res.status(200).json({
       status: 'success',
       results: events.length,
@@ -430,8 +450,9 @@ export const getTrendingEvents = async (req: Request, res: Response, next: NextF
     const events = await EventModel.find({
       status: 'published',
       visibility: 'public',
+      ...approvedModerationFilter(),
     })
-      .sort({ bookingCount: -1, viewsCount: -1, date: 1 })
+      .sort({ isFeatured: -1, bookingCount: -1, viewsCount: -1, date: 1 })
       .limit(limit);
 
     res.status(200).json({
@@ -497,12 +518,13 @@ export const getRecommendedEvents = async (req: Request, res: Response, next: Ne
     const query: Record<string, any> = {
       status: 'published',
       visibility: 'public',
+      ...approvedModerationFilter(),
       ...(eventId ? { _id: { $ne: eventId } } : {}),
       ...(orConditions.length > 0 ? { $or: orConditions } : {}),
     };
 
     const events = await EventModel.find(query)
-      .sort({ bookingCount: -1, viewsCount: -1, date: 1 })
+      .sort({ isFeatured: -1, bookingCount: -1, viewsCount: -1, date: 1 })
       .limit(limit);
 
     res.status(200).json({
@@ -586,6 +608,9 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
     const newEventDoc = await EventModel.create({
       hostAdminId: req.user!.id,
       status: 'draft',
+      moderationStatus: 'approved',
+      isFlagged: false,
+      isFeatured: false,
       ...eventInput,
     });
 
@@ -604,9 +629,9 @@ export const getEvents = async (req: Request, res: Response, next: NextFunction)
 
     const query = requester?.role === 'host_admin'
       ? { hostAdminId: requester.id }
-      : { status: 'published', visibility: 'public' };
+      : { status: 'published', visibility: 'public', ...approvedModerationFilter() };
 
-    const events = await EventModel.find(query).sort({ date: 1, startTime: 1 });
+    const events = await EventModel.find(query).sort({ isFeatured: -1, date: 1, startTime: 1 });
     res.status(200).json({ status: 'success', results: events.length, data: { events: events.map(e => e.toJSON()) } });
   } catch (error) {
     next(error);
@@ -738,6 +763,28 @@ export const updateEventStatus = async (req: Request, res: Response, next: NextF
     if (error instanceof z.ZodError) {
       return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
     }
+    next(error);
+  }
+};
+
+export const toggleEventFeatured = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.id as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      { isFeatured: !Boolean(event.isFeatured) },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: updatedEvent!.toJSON(),
+      },
+    });
+  } catch (error) {
     next(error);
   }
 };

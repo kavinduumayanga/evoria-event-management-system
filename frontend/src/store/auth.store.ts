@@ -13,6 +13,8 @@ export interface User {
   phone?: string;
   profileImage?: string;
   isActive?: boolean;
+  isSuspended?: boolean;
+  reportCount?: number;
 }
 
 interface AuthState {

@@ -24,6 +24,8 @@ const userSchema = new Schema({
   phone: { type: String, trim: true },
   profileImage: { type: String, trim: true },
   isActive: { type: Boolean, default: true },
+  isSuspended: { type: Boolean, default: false },
+  reportCount: { type: Number, default: 0 },
   resetPasswordToken: { type: String, select: false },
   resetPasswordExpires: { type: Date, select: false },
 }, {

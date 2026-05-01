@@ -13,6 +13,10 @@ import uploadRoutes from './upload.routes';
 import checkinRoutes from './checkin.routes';
 import notificationRoutes from './notification.routes';
 import analyticsRoutes from './analytics.routes';
+import reportRoutes from './report.routes';
+import moderationRoutes from './moderation.routes';
+import waitlistRoutes from './waitlist.routes';
+import adminRoutes from './admin.routes';
 
 const router = Router();
 
@@ -30,5 +34,9 @@ router.use('/uploads', uploadRoutes);
 router.use('/checkins', checkinRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/reports', reportRoutes);
+router.use('/moderation', moderationRoutes);
+router.use('/waitlist', waitlistRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;

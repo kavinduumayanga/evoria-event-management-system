@@ -4,7 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban, Users, BarChart3 } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon, Megaphone, Ban, Users, BarChart3, Star, ListOrdered } from 'lucide-react-native';
 import { EventService } from '../../../api/services';
 import { Event } from '../../../types';
 import { useFocusEffect } from '@react-navigation/native';
@@ -88,6 +88,29 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
     ]);
   };
 
+  const handleFeatureToggle = (event: Event) => {
+    const willFeature = !event.isFeatured;
+    Alert.alert(
+      willFeature ? 'Feature Event' : 'Unfeature Event',
+      willFeature ? 'Show this event first in discovery lists?' : 'Remove featured priority for this event?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: willFeature ? 'Feature' : 'Unfeature',
+          onPress: async () => {
+            try {
+              const response = await EventService.toggleFeature(event.id);
+              const updatedEvent: Event = response.data.event;
+              setEvents((previous) => previous.map((item) => (item.id === event.id ? updatedEvent : item)));
+            } catch (toggleError: any) {
+              Alert.alert('Error', toggleError.response?.data?.message || 'Failed to update feature status');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScreenContainer style={styles.container}>
       <View style={styles.header}>
@@ -126,6 +149,10 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
                     <Users size={16} color={theme.colors.accent} />
                     <Text style={styles.actionText}>Guests</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ManageWaitlist', { eventId: item.id })}>
+                    <ListOrdered size={16} color={theme.colors.warning} />
+                    <Text style={styles.actionText}>Waitlist</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('EventAnalytics', { eventId: item.id })}>
                     <BarChart3 size={16} color={theme.colors.primary} />
                     <Text style={styles.actionText}>Analytics</Text>
@@ -146,6 +173,12 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
                       <Text style={[styles.actionText, { color: theme.colors.warning }]}>Cancel</Text>
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleFeatureToggle(item)}>
+                    <Star size={16} color={item.isFeatured ? theme.colors.warning : theme.colors.textMuted} />
+                    <Text style={[styles.actionText, { color: item.isFeatured ? theme.colors.warning : theme.colors.textMuted }]}>
+                      {item.isFeatured ? 'Unfeature' : 'Feature'}
+                    </Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item.id)}>
                     <Trash2 size={16} color={theme.colors.error} />
                     <Text style={[styles.actionText, { color: theme.colors.error }]}>Delete</Text>
