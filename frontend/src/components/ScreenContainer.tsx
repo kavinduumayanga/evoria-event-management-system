@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100,
   },
   inset: {
     paddingHorizontal: theme.spacing.base,

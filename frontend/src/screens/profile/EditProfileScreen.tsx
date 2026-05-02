@@ -88,7 +88,7 @@ export const EditProfileScreen = () => {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        colors={['#111111', '#1A1714', '#111111']}
         style={StyleSheet.absoluteFillObject}
       />
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: theme.spacing.base,
     paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100,
   },
   bottomZone: {
     paddingHorizontal: theme.spacing.base,

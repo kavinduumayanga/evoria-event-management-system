@@ -14,17 +14,17 @@ interface CardProps extends ViewProps {
 }
 
 const GRADIENT_MAP: Record<string, readonly [string, string]> = {
-  default:   ['#1C1A17', '#1C1A17'],
-  raised:    ['#262320', '#201E1B'],
+  default:   ['#11111A', '#11111A'],
+  raised:    ['#171725', '#14141E'],
   outlined:  ['transparent', 'transparent'],
-  glass:     ['rgba(28,26,23,0.85)', 'rgba(20,18,15,0.75)'],
+  glass:     ['rgba(17,17,26,0.85)', 'rgba(17,17,26,0.75)'],
   primary:   ['rgba(139,92,246,0.14)', 'rgba(139,92,246,0.05)'],
-  secondary: ['rgba(167,139,250,0.14)', 'rgba(167,139,250,0.05)'],
-  success:   ['rgba(76,175,80,0.12)', 'rgba(76,175,80,0.04)'],
-  warning:   ['rgba(234,179,8,0.12)', 'rgba(234,179,8,0.04)'],
+  secondary: ['rgba(99,102,241,0.14)', 'rgba(99,102,241,0.05)'], // Indigo for secondary
+  success:   ['rgba(16,185,129,0.12)', 'rgba(16,185,129,0.04)'],
+  warning:   ['rgba(245,158,11,0.12)', 'rgba(245,158,11,0.04)'],
   error:     ['rgba(239,68,68,0.12)', 'rgba(239,68,68,0.04)'],
-  dark:      ['#1C1A17', '#1C1A17'],
-  light:     ['#262320', '#201E1B'],
+  dark:      ['#11111A', '#11111A'],
+  light:     ['#171725', '#14141E'],
 };
 
 const BORDER_MAP: Record<string, string> = {
@@ -33,7 +33,7 @@ const BORDER_MAP: Record<string, string> = {
   outlined:  theme.colors.borderStrong,
   glass:     theme.colors.borderStrong,
   primary:   'rgba(139,92,246,0.25)',
-  secondary: 'rgba(167,139,250,0.25)',
+  secondary: 'rgba(99,102,241,0.25)',
   success:   theme.colors.successBorder,
   warning:   theme.colors.warningBorder,
   error:     theme.colors.errorBorder,
@@ -43,7 +43,7 @@ const BORDER_MAP: Record<string, string> = {
 
 const SHADOW_MAP: Record<string, object> = {
   default: theme.shadows.sm, raised: theme.shadows.md, outlined: theme.shadows.none,
-  glass: theme.shadows.md, primary: theme.shadows.glow, secondary: theme.shadows.glow,
+  glass: theme.shadows.md, primary: theme.shadows.glow, secondary: theme.shadows.accentGlow,
   success: theme.shadows.sm, warning: theme.shadows.sm, error: theme.shadows.sm,
   dark: theme.shadows.sm, light: theme.shadows.md,
 };
@@ -69,11 +69,11 @@ export const Card: React.FC<CardProps> = ({ children, style, variant = 'default'
   );
 };
 
-export const GlassCard: React.FC<ViewProps & { children: React.ReactNode; style?: StyleProp<ViewStyle>; variant?: 'dark' | 'light' | 'primary' | 'secondary'; animateEntrance?: boolean }> = ({ variant = 'dark', ...props }) => (
+export const GlassCard: React.FC<ViewProps & { children: React.ReactNode; style?: StyleProp<ViewStyle>; variant?: 'dark' | 'light' | 'primary' | 'secondary'; animateEntrance?: boolean }> = ({ variant = 'glass', ...props }) => (
   <Card variant={variant as CardVariant} {...props} />
 );
 
 const styles = StyleSheet.create({
-  container: { borderRadius: theme.borderRadius.l, borderWidth: 1, overflow: 'hidden' },
+  container: { borderRadius: theme.borderRadius.xl, borderWidth: 1, overflow: 'hidden' }, // use consistent padding radius
   inner: { padding: theme.spacing.m },
 });

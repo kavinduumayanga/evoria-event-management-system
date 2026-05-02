@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'rea
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState, Card, IconButton } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, SectionHeader } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { TicketService } from '../../../api/services';
@@ -241,7 +241,7 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
           </Card>
         </View>
 
-        <Text style={styles.sectionTitle}>Promo Codes</Text>
+        <SectionHeader title="Promo Codes" showDivider />
         <Card variant="raised" style={styles.promoCard} noPadding>
           <View style={styles.promoCardInner}>
             <Input

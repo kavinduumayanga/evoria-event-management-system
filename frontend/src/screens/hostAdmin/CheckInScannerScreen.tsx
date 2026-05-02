@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100,
     flexGrow: 1,
   },
   recordCard: {
