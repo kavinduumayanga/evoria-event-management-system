@@ -133,7 +133,7 @@ export const ManageWaitlistScreen: React.FC<Props> = ({ navigation, route }) => 
 };
 
 const styles = StyleSheet.create({
-  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
+  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: 100, flexGrow: 1 },
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.spacing.xl, marginBottom: theme.spacing.l },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.m, flex: 1 },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },

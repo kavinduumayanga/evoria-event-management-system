@@ -124,7 +124,7 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl },
+  container: { flex: 1, paddingHorizontal: theme.spacing.base, paddingBottom: 100 },
   heroSection: { alignItems: 'center', paddingTop: theme.spacing.xxl, paddingBottom: theme.spacing.xl },
   iconCircle: {
     width: 96, height: 96, borderRadius: 48,

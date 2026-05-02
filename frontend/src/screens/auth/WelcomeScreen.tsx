@@ -65,7 +65,7 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.root}>
       {/* Background gradient */}
       <LinearGradient
-        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        colors={['#111111', '#1A1714', '#111111']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
