@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } fr
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState, Card, IconButton } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, SectionHeader } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft, Plus, X, Upload, HelpCircle, Ticket, MapPin, Tag } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -496,7 +496,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           placeholder="https://example.com/image.jpg"
         />
 
-        <Text style={styles.sectionTitle}>Contact Details</Text>
+        <SectionHeader title="Contact Details" showDivider />
         <Input label="Contact Name" value={contactName} onChangeText={setContactName} placeholder="Event support team" />
         <Input
           label="Contact Email"
@@ -508,7 +508,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         />
         <Input label="Contact Phone" value={contactPhone} onChangeText={setContactPhone} placeholder="+94 77 123 4567" />
 
-        <Text style={styles.sectionTitle}>Branding Colors (Optional)</Text>
+        <SectionHeader title="Branding Colors (Optional)" showDivider />
         <Input
           label="Primary Color"
           value={brandingPrimaryColor}
@@ -578,7 +578,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           </Card>
         </View>
 
-        <Text style={styles.sectionTitle}>Custom Questions (Optional)</Text>
+        <SectionHeader title="Custom Questions (Optional)" showDivider />
         <Card variant="raised" style={styles.customQuestionsCard}>
           <Input
             label="Question"
@@ -751,7 +751,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  saveButton: { marginTop: theme.spacing.xl, marginBottom: theme.spacing.xxl },
+  saveButton: { marginTop: theme.spacing.xl, marginBottom: 120 },
   statusCard: {
     borderRadius: theme.borderRadius.l,
     overflow: 'hidden',

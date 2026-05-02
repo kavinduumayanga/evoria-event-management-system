@@ -83,7 +83,7 @@ export const Input: React.FC<InputProps> = ({
     ],
   });
 
-  const inputHeight = multiline ? Math.max(80, numberOfLines * 24 + 24) : 48;
+  const inputHeight = multiline ? Math.max(80, numberOfLines * 24 + 24) : 52;
 
   return (
     <View style={[styles.wrapper, containerStyle]}>
@@ -95,7 +95,7 @@ export const Input: React.FC<InputProps> = ({
         style={[
           styles.fieldContainer,
           { borderColor, height: multiline ? undefined : inputHeight },
-          multiline && { minHeight: inputHeight, paddingVertical: 12 },
+          multiline && { minHeight: inputHeight, paddingVertical: 14 },
           style,
         ]}
       >
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   label: {
     ...theme.typography.label,
     color: theme.colors.textSecondary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   labelError: {
     color: theme.colors.error,
@@ -168,15 +168,15 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.m,
     borderWidth: 1,
     overflow: 'hidden',
-    paddingHorizontal: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.m,
   },
   leftIcon: {
-    marginRight: 8,
+    marginRight: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   rightIcon: {
-    marginLeft: 8,
+    marginLeft: 10,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 4,
@@ -186,22 +186,24 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.text,
     paddingVertical: 0,
+    minHeight: 52,
   },
   inputWithLeftIcon: {},
   inputWithRightIcon: {},
   multilineInput: {
     textAlignVertical: 'top',
+    minHeight: 80,
   },
   error: {
     ...theme.typography.caption,
     color: theme.colors.error,
-    marginTop: 4,
-    marginLeft: 2,
+    marginTop: 6,
+    marginLeft: 4,
   },
   hint: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    marginTop: 4,
-    marginLeft: 2,
+    marginTop: 6,
+    marginLeft: 4,
   },
 });

@@ -4,7 +4,7 @@ import { theme } from '../constants/theme';
 import { ChevronDown, Check, X } from 'lucide-react-native';
 import { AnimatedPressable } from './AnimatedPressable';
 import { ScreenContainer } from './ScreenContainer';
-import { GlassCard } from './GlassCard';
+import { GlassCard } from './Card';
 import { IconButton } from './IconButton';
 
 export interface SelectOption {

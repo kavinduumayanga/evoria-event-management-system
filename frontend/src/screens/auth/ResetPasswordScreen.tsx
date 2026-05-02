@@ -64,7 +64,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        colors={['#111111', '#1A1714', '#111111']}
         style={StyleSheet.absoluteFillObject}
       />
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>

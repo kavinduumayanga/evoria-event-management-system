@@ -123,7 +123,7 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
+  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: 100, flexGrow: 1 },
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.spacing.xl, marginBottom: theme.spacing.l },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   venueCard: { flexDirection: 'row', alignItems: 'center', borderRadius: theme.borderRadius.l, marginBottom: theme.spacing.sm, overflow: 'hidden' },

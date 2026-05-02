@@ -145,7 +145,7 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: theme.spacing.base,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100,
     flexGrow: 1,
   },
   pageHeader: {

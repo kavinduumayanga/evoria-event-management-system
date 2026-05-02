@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle, Text } from 'react-native';
-import { GlassCard } from './GlassCard';
+import { GlassCard } from './Card';
 import QRCode from 'react-native-qrcode-svg';
 import { theme } from '../constants/theme';
 

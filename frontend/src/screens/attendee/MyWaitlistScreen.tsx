@@ -99,7 +99,7 @@ export const MyWaitlistScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
+  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: 100, flexGrow: 1 },
   pageHeader: { paddingTop: theme.spacing.xl, marginBottom: theme.spacing.l },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   pageSubtitle: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 4 },

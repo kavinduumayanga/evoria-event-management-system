@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { GlassCard } from './GlassCard';
+import { GlassCard } from './Card';
 import { AnimatedPressable } from './AnimatedPressable';
 import { theme } from '../constants/theme';
 import { Ticket, Calendar, MapPin } from 'lucide-react-native';

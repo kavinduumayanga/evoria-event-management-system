@@ -149,7 +149,7 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.m, paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.xl, marginBottom: theme.spacing.xl },
   headerTitle: { ...theme.typography.h1, color: theme.colors.text },
-  form: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl },
+  form: { paddingHorizontal: theme.spacing.base, paddingBottom: 100 },
   row: { flexDirection: 'row', gap: theme.spacing.m },
   flexHalf: { flex: 1 },
   fieldLabel: { ...theme.typography.label, color: theme.colors.textMuted, marginBottom: theme.spacing.s, marginTop: theme.spacing.xs },

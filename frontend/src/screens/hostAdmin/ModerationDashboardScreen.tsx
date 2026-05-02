@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: theme.spacing.m,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100,
     flexGrow: 1,
   },
   header: {
