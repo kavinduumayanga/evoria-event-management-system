@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Animated,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,7 +32,25 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const logoScale = useRef(new Animated.Value(0.84)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
   const login = useAuthStore((state) => state.login);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(logoScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 15,
+        bounciness: 8,
+      }),
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 340,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [logoOpacity, logoScale]);
 
   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -96,6 +116,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           >
             {/* Title */}
             <View style={styles.titleSection}>
+              <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+                <Image source={require('../../../assets/icon.png')} style={styles.logo} />
+              </Animated.View>
               <Text style={styles.title}>Welcome back</Text>
               <Text style={styles.subtitle}>Sign in to your account</Text>
             </View>
@@ -181,6 +204,22 @@ const styles = StyleSheet.create({
   },
   titleSection: {
     marginBottom: theme.spacing.xl,
+  },
+  logoWrap: {
+    width: 66,
+    height: 66,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.m,
+  },
+  logo: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
   },
   title: {
     ...theme.typography.h1,
