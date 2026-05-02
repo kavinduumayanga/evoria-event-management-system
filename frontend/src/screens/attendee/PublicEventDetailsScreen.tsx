@@ -3,7 +3,7 @@ import { Alert, Image, Linking, ScrollView, Share, StyleSheet, Text, TouchableOp
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
-import { ArrowLeft, Calendar as CalendarIcon, Clock, MapPin, Share2, Link as LinkIcon, Phone, Mail, Ticket as TicketIcon } from 'lucide-react-native';
+import { ArrowLeft, Calendar as CalendarIcon, Clock, MapPin, Share2, Link as LinkIcon, Phone, Mail, Ticket as TicketIcon, Star, CalendarPlus } from 'lucide-react-native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Button, Card, ErrorState, IconButton, Input, LoadingState, ScreenContainer, StatusBadge } from '../../components';
 import { EventService, PublicEventDetails, RegistrationService } from '../../api/services';
@@ -29,12 +29,19 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
   const [isSubmittingRegistration, setIsSubmittingRegistration] = useState(false);
+  const [reviewSummary, setReviewSummary] = useState<{ averageRating: number; totalReviews: number } | null>(null);
 
   const fetchPublicEvent = async () => {
     try {
       setError(null);
       const res = await EventService.getPublicEventBySlug(slug);
       setPublicData(res.data);
+      try {
+        const summaryRes = await EventService.getEventReviewSummary(res.data.event.id);
+        setReviewSummary(summaryRes.data);
+      } catch {
+        setReviewSummary(null);
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load event details');
     } finally {
@@ -86,6 +93,17 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
       if (await Linking.canOpenURL(url)) { await Linking.openURL(url); return; }
     }
     Alert.alert('Contact unavailable', 'No valid host contact method found.');
+  };
+
+  const handleAddToCalendar = async () => {
+    if (!event?.id) return;
+    const url = EventService.getCalendarIcsUrl(event.id);
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'Unable to open calendar link.');
+      return;
+    }
+    await Linking.openURL(url);
   };
 
   const validateForm = () => {
@@ -203,7 +221,24 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
               <Phone size={14} color={theme.colors.text} />
               <Text style={styles.actionChipText}>Contact</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.actionChip} onPress={handleAddToCalendar}>
+              <CalendarPlus size={14} color={theme.colors.text} />
+              <Text style={styles.actionChipText}>Add Calendar</Text>
+            </TouchableOpacity>
           </View>
+
+          {reviewSummary && reviewSummary.totalReviews > 0 ? (
+            <Card variant="raised" style={styles.metaCard} noPadding>
+              <View style={styles.metaCardInner}>
+                <View style={styles.metaRow}>
+                  <Star size={14} color={theme.colors.warning} />
+                  <Text style={styles.metaText}>
+                    {reviewSummary.averageRating.toFixed(1)} rating from {reviewSummary.totalReviews} review(s)
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          ) : null}
 
           {event.isManageableByCurrentUser && (
             <Button

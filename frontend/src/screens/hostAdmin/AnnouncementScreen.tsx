@@ -228,11 +228,14 @@ export const AnnouncementScreen = () => {
                         {item.source === 'email_log' ? 'EMAIL' : 'IN-APP'}
                       </Text>
                     </View>
-                    <Text style={styles.historyTime}>
-                      {new Date(item.createdAt).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                      })}
-                    </Text>
+                    <View style={styles.historyMetaRight}>
+                      <Text style={styles.historyStatus}>{String(item.status || '').toUpperCase()}</Text>
+                      <Text style={styles.historyTime}>
+                        {new Date(item.createdAt).toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
                   </View>
                   <Text style={styles.historySubject}>{item.subject}</Text>
                   <Text style={styles.historyRecipient}>
@@ -299,8 +302,10 @@ const styles = StyleSheet.create({
   historyLoading: { ...theme.typography.caption, color: theme.colors.textMuted },
   historyItem: { paddingVertical: theme.spacing.sm },
   historyMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  historyMetaRight: { alignItems: 'flex-end' },
   typePill: { backgroundColor: theme.colors.primarySubtle, borderRadius: theme.borderRadius.xs, paddingHorizontal: 6, paddingVertical: 2 },
   historyType: { ...theme.typography.overline, color: theme.colors.primary },
+  historyStatus: { ...theme.typography.overline, color: theme.colors.accentLight, marginBottom: 2 },
   historyTime: { ...theme.typography.caption, color: theme.colors.textMuted },
   historySubject: { ...theme.typography.bodyMedium, color: theme.colors.text, marginBottom: 2 },
   historyRecipient: { ...theme.typography.caption, color: theme.colors.primaryLight, marginBottom: 4 },

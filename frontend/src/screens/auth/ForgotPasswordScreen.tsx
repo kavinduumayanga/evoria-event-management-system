@@ -13,7 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Mail } from 'lucide-react-native';
 import { AuthStackParamList } from '../../types/navigation';
-import { Input, Button, IconButton, Card } from '../../components';
+import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -29,7 +29,6 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [devResetToken, setDevResetToken] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const handleForgotPassword = async () => {
@@ -47,15 +46,9 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       setIsLoading(true);
-      setDevResetToken(null);
 
       const response = await AuthService.forgotPassword({ email: normalizedEmail });
-      const resetToken = response?.data?.resetToken as string | undefined;
-
-      setMessage(response?.message || 'If your account exists, you can now reset your password.');
-      if (resetToken) {
-        setDevResetToken(resetToken);
-      }
+      setMessage(response?.message || 'If your account exists, an OTP was sent.');
     } catch (error: any) {
       Alert.alert('Request Failed', getApiErrorMessage(error, 'Unable to process forgot password request.'));
     } finally {
@@ -89,7 +82,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.titleSection}>
               <Text style={styles.title}>Forgot password?</Text>
               <Text style={styles.subtitle}>
-                Enter your email address and we'll generate a reset token for you.
+                Enter your email address and we'll send you an OTP code.
               </Text>
             </View>
 
@@ -107,19 +100,13 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.infoText}>{message}</Text>
             )}
 
-            {devResetToken && (
-              <Card variant="primary" style={styles.tokenCard} animateEntrance>
-                <Text style={styles.tokenLabel}>Development Reset Token</Text>
-                <Text style={styles.tokenValue} selectable>{devResetToken}</Text>
-              </Card>
-            )}
           </ScrollView>
         </KeyboardAvoidingView>
 
         {/* Bottom CTAs */}
         <View style={styles.bottomZone}>
           <Button
-            title="Generate Reset Token"
+            title="Send OTP Code"
             onPress={handleForgotPassword}
             isLoading={isLoading}
             variant="primary"
@@ -171,19 +158,6 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     marginTop: theme.spacing.m,
-  },
-  tokenCard: {
-    marginTop: theme.spacing.m,
-  },
-  tokenLabel: {
-    ...theme.typography.label,
-    color: theme.colors.primaryLight,
-    fontWeight: '600',
-    marginBottom: theme.spacing.s,
-  },
-  tokenValue: {
-    ...theme.typography.body,
-    color: theme.colors.text,
   },
   bottomZone: {
     paddingHorizontal: theme.spacing.base,

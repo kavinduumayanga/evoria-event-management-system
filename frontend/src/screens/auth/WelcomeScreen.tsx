@@ -1,11 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   Animated,
-  Dimensions,
   Image,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,134 +19,65 @@ interface Props {
   navigation: WelcomeScreenNavigationProp;
 }
 
-const { width, height } = Dimensions.get('window');
-
 export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(24)).current;
-  const logoScale = useRef(new Animated.Value(0.7)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const orb1Anim = useRef(new Animated.Value(0)).current;
-  const orb2Anim = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.82)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentY = useRef(new Animated.Value(22)).current;
 
   useEffect(() => {
-    // Staggered entrance
     Animated.sequence([
-      Animated.delay(100),
       Animated.parallel([
         Animated.spring(logoScale, {
           toValue: 1,
           useNativeDriver: true,
-          speed: 14,
-          bounciness: 10,
+          speed: 12,
+          bounciness: 8,
         }),
-        Animated.timing(logoOpacity, {
+        Animated.timing(contentOpacity, {
           toValue: 1,
-          duration: 380,
+          duration: 460,
           useNativeDriver: true,
         }),
       ]),
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]),
+      Animated.timing(contentY, {
+        toValue: 0,
+        duration: 320,
+        useNativeDriver: true,
+      }),
     ]).start();
-
-    // Ambient orb pulse
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(orb1Anim, { toValue: 1, duration: 3000, useNativeDriver: true }),
-        Animated.timing(orb1Anim, { toValue: 0, duration: 3000, useNativeDriver: true }),
-      ])
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.delay(1500),
-        Animated.timing(orb2Anim, { toValue: 1, duration: 3000, useNativeDriver: true }),
-        Animated.timing(orb2Anim, { toValue: 0, duration: 3000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [fadeAnim, logoOpacity, logoScale, orb1Anim, orb2Anim, slideAnim]);
+  }, [contentOpacity, contentY, logoScale]);
 
   return (
     <View style={styles.root}>
-      {/* Background gradient */}
       <LinearGradient
-        colors={['#111111', '#1A1714', '#111111']}
+        colors={['#09060f', '#140f24', '#09060f']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Ambient orbs */}
-      <Animated.View
-        style={[
-          styles.orb,
-          styles.orb1,
-          {
-            opacity: orb1Anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.55] }),
-            transform: [{ scale: orb1Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.orb,
-          styles.orb2,
-          {
-            opacity: orb2Anim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.35] }),
-            transform: [{ scale: orb2Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }) }],
-          },
-        ]}
-      />
+      <View style={styles.glowTop} />
+      <View style={styles.glowBottom} />
 
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        {/* Hero Zone */}
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <Animated.View
           style={[
-            styles.heroZone,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+            styles.centerContent,
+            {
+              opacity: contentOpacity,
+              transform: [{ translateY: contentY }],
+            },
           ]}
         >
-          <Animated.View
-            style={[
-              styles.logoWrap,
-              { opacity: logoOpacity, transform: [{ scale: logoScale }] },
-            ]}
-          >
+          <Animated.View style={[styles.logoShell, { transform: [{ scale: logoScale }] }]}>
             <Image source={require('../../../assets/icon.png')} style={styles.logo} />
           </Animated.View>
 
-          {/* Wordmark */}
-          <View style={styles.wordmarkContainer}>
-            <Text style={styles.wordmark}>EVORIA</Text>
-            <View style={styles.wordmarkBar} />
-          </View>
-
-          {/* Tagline */}
-          <Text style={styles.tagline}>The platform for experiences{'\n'}worth remembering.</Text>
+          <Text style={styles.brand}>Evoria</Text>
+          <Text style={styles.slogan}>Plan. Host. Celebrate.{`\n`}Everything in one place.</Text>
         </Animated.View>
 
-        {/* Social Proof */}
-        <Animated.View style={[styles.proofZone, { opacity: fadeAnim }]}>
-          <Text style={styles.proof}>Trusted by event creators worldwide</Text>
-        </Animated.View>
-
-        {/* Action Zone */}
-        <Animated.View
-          style={[
-            styles.actionZone,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-          ]}
-        >
+        <View style={styles.actions}>
           <Button
             title="Get Started"
             onPress={() => navigation.navigate('Register')}
@@ -159,9 +89,8 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => navigation.navigate('Login')}
             variant="ghost"
             size="lg"
-            style={styles.signInBtn}
           />
-        </Animated.View>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -172,93 +101,65 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  orb: {
-    position: 'absolute',
-    borderRadius: 9999,
-  },
-  orb1: {
-    width: width * 0.8,
-    height: width * 0.8,
-    backgroundColor: theme.colors.primary,
-    top: height * 0.05,
-    left: -width * 0.2,
-    opacity: 0.4,
-  },
-  orb2: {
-    width: width * 0.6,
-    height: width * 0.6,
-    backgroundColor: theme.colors.accent,
-    bottom: height * 0.1,
-    right: -width * 0.2,
-    opacity: 0.2,
-  },
-  container: {
+  safeArea: {
     flex: 1,
     paddingHorizontal: theme.spacing.base,
-    justifyContent: 'space-between',
   },
-
-  // Hero
-  heroZone: {
-    flex: 3,
-    justifyContent: 'center',
-    paddingTop: theme.spacing.xxl,
-  },
-  logoWrap: {
-    width: 84,
-    height: 84,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.l,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  logo: {
-    width: 62,
-    height: 62,
-    borderRadius: 16,
-  },
-  wordmarkContainer: {
-    marginBottom: theme.spacing.l,
-  },
-  wordmark: {
-    ...theme.typography.display,
-    color: theme.colors.text,
-    letterSpacing: 6,
-    fontWeight: '800',
-  },
-  wordmarkBar: {
-    marginTop: 8,
-    width: 48,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: theme.colors.primary,
-  },
-  tagline: {
-    ...theme.typography.h2,
-    color: theme.colors.textSecondary,
-    lineHeight: 34,
-  },
-
-  // Proof
-  proofZone: {
+  centerContent: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  proof: {
-    ...theme.typography.label,
-    color: theme.colors.textMuted,
-    letterSpacing: 0.5,
+  logoShell: {
+    width: 210,
+    height: 210,
+    borderRadius: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(139,92,246,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.35)',
+    ...theme.shadows.glow,
   },
-
-  // Actions
-  actionZone: {
+  logo: {
+    width: 158,
+    height: 158,
+    borderRadius: 36,
+  },
+  brand: {
+    marginTop: theme.spacing.xl,
+    ...theme.typography.display,
+    color: theme.colors.text,
+    letterSpacing: 1.5,
+    fontWeight: '800',
+  },
+  slogan: {
+    marginTop: theme.spacing.sm,
+    textAlign: 'center',
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    lineHeight: 24,
+  },
+  actions: {
     paddingBottom: theme.spacing.xl,
     gap: theme.spacing.sm,
   },
-  signInBtn: {
-    marginTop: 4,
+  glowTop: {
+    position: 'absolute',
+    top: -80,
+    left: -70,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(139,92,246,0.25)',
+  },
+  glowBottom: {
+    position: 'absolute',
+    bottom: -110,
+    right: -90,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(99,102,241,0.18)',
   },
 });

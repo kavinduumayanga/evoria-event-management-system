@@ -7,7 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon,
-  Megaphone, Ban, Users, Star, ListOrdered,
+  Megaphone, Ban, Users, Star, ListOrdered, LayoutDashboard, BellRing, History,
 } from 'lucide-react-native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import {
@@ -141,12 +141,15 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
             {/* Quick Actions */}
             <Card variant="raised" style={styles.actionsCard} noPadding>
               <View style={styles.actionsRow}>
+                <ActionPill icon={<LayoutDashboard size={14} color={theme.colors.primary} />} label="Dashboard" onPress={() => navigation.navigate('EventDashboard', { eventId: item.id })} />
                 <ActionPill icon={<TicketIcon size={14} color={theme.colors.primary} />} label="Tickets" onPress={() => navigation.navigate('ManageTickets', { eventId: item.id })} />
                 <ActionPill icon={<CalendarIcon size={14} color={theme.colors.primary} />} label="Agenda" onPress={() => navigation.navigate('ManageSessions', { eventId: item.id })} />
                 <ActionPill icon={<Users size={14} color={theme.colors.primary} />} label="Guests" onPress={() => navigation.navigate('ManageRegistrations', { eventId: item.id })} />
                 <ActionPill icon={<ListOrdered size={14} color={theme.colors.primary} />} label="Waitlist" onPress={() => navigation.navigate('ManageWaitlist', { eventId: item.id })} />
               </View>
               <View style={[styles.actionsRow, styles.actionsRowBottom]}>
+                <ActionPill icon={<BellRing size={14} color={theme.colors.textSecondary} />} label="Reminders" onPress={() => navigation.navigate('EventReminders', { eventId: item.id })} />
+                <ActionPill icon={<History size={14} color={theme.colors.textSecondary} />} label="Check-ins" onPress={() => navigation.navigate('CheckInHistory', { eventId: item.id })} />
                 <ActionPill icon={<Edit2 size={14} color={theme.colors.textSecondary} />} label="Edit" onPress={() => navigation.navigate('EventForm', { eventId: item.id })} />
                 {item.status === 'draft' && (
                   <ActionPill icon={<Megaphone size={14} color={theme.colors.success} />} label="Publish" onPress={() => handleStatusUpdate(item, 'published')} />

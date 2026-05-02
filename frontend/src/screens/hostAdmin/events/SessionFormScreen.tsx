@@ -111,7 +111,8 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.8,
+        aspect: [16, 9],
+        quality: 0.75,
       });
 
       if (pickerResult.canceled || !pickerResult.assets.length) return;

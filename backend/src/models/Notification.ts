@@ -14,7 +14,7 @@ const notificationSchema = new Schema({
   },
   channel: {
     type: String,
-    enum: ['in_app', 'email_mock', 'sms_mock'],
+    enum: ['in_app', 'push', 'email_mock', 'sms_mock'],
     default: 'in_app',
   },
   status: {
