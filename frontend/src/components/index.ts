@@ -7,6 +7,8 @@
 export * from './AnimatedPressable';   // AnimatedPressable + IconButton
 export * from './ScreenContainer';
 export * from './Card';                // Card + GlassCard alias
+export * from './GlassCard';
+export * from './HeaderBar';
 
 // Typography / Layout
 export * from './SectionHeader';
@@ -14,10 +16,13 @@ export * from './SectionBlock';
 
 // Form
 export * from './Input';               // Input + FormInput alias
+export * from './InputField';
 export * from './Select';
 
 // Buttons
 export * from './Button';              // Button + PrimaryButton + SecondaryButton + GhostButton
+export * from './PrimaryButton';
+export * from './SecondaryButton';
 export * from './IconButton';
 export * from './ActionButtonsRow';
 
@@ -47,3 +52,4 @@ export * from './GradientBackground';
 
 // Overlays
 export * from './ToastProvider';
+

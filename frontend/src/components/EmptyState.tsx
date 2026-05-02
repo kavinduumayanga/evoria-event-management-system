@@ -10,6 +10,7 @@ interface EmptyStateProps {
   actionTitle?: string;
   onAction?: () => void;
   icon?: React.ReactNode;
+  action?: { label: string; onPress: () => void };
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -18,6 +19,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   actionTitle,
   onAction,
   icon,
+  action,
 }) => {
   return (
     <View style={styles.container}>
@@ -28,6 +30,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       <Text style={styles.message}>{message}</Text>
       {actionTitle && onAction && (
         <Button title={actionTitle} onPress={onAction} style={styles.actionBtn} />
+      )}
+      {action && (
+        <Button title={action.label} onPress={action.onPress} style={styles.actionBtn} />
       )}
     </View>
   );

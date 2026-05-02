@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { GlassCard } from './Card';
+import { GlassCard } from './GlassCard';
 import { AnimatedPressable } from './AnimatedPressable';
 import { theme } from '../constants/theme';
 import { Ticket, Calendar, MapPin } from 'lucide-react-native';
@@ -25,7 +25,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   const displayLocation = safeString(location, 'Location not specified');
 
   const CardContent = (
-    <GlassCard style={[styles.container, style]} variant="primary" animateEntrance>
+    <GlassCard style={[styles.container, style]} variant="dark" animateEntrance>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
           <Ticket size={24} color={theme.colors.primaryLight} />
