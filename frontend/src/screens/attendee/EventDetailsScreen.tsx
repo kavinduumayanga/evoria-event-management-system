@@ -1,37 +1,22 @@
 import React, { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Linking,
-  Image,
-  Share,
-  Modal,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Image, Share, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Event, Venue, Session, TicketType } from '../../types';
-import { Button, LoadingState, ErrorState, ScreenContainer, IconButton, Card, StatusBadge } from '../../components';
+import { Button, LoadingState, ErrorState, ScreenContainer, IconButton, StatusBadge } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { EventService, PublicEventDetails } from '../../api/services';
-import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Share2, Mail, Phone, Users, Star } from 'lucide-react-native';
+import { ArrowLeft, Calendar, MapPin, Clock, Share2, Mail, Phone, Users, Star } from 'lucide-react-native';
 import { formatSafeDate, formatSafeTime, logDevMissing, safeLower, safeStatus, safeString, safeTitle } from '../../utils/safeText';
 import { resolveImageUrl } from '../../utils/imageUrl';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
 
-interface Props {
-  navigation: EventDetailsScreenNavigationProp;
-  route: EventDetailsScreenRouteProp;
-}
+interface Props { navigation: EventDetailsScreenNavigationProp; route: EventDetailsScreenRouteProp; }
 
 export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const eventId = route.params?.eventId;
@@ -49,508 +34,136 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchEventDetails = useCallback(async () => {
     if (!eventId) return;
     try {
-      setIsLoading(true);
-      setError(null);
-
+      setIsLoading(true); setError(null);
       const [eventRes, sessionsRes, ticketsRes] = await Promise.all([
-        apiClient.get(`/events/${eventId}`),
-        apiClient.get(`/sessions/event/${eventId}`),
-        apiClient.get(`/tickets/event/${eventId}`),
+        apiClient.get(`/events/${eventId}`), apiClient.get(`/sessions/event/${eventId}`), apiClient.get(`/tickets/event/${eventId}`)
       ]);
-
       const eventData = eventRes.data.data.event as Event;
-      setEvent(eventData);
-      setSessions(sessionsRes.data.data.sessions || []);
-      setTickets(ticketsRes.data.data.tickets || []);
-
-      if (eventData.venueId) {
-        const venueRes = await apiClient.get(`/venues/${eventData.venueId}`);
-        setVenue(venueRes.data.data.venue);
-      } else {
-        setVenue(null);
-      }
-
+      setEvent(eventData); setSessions(sessionsRes.data.data.sessions || []); setTickets(ticketsRes.data.data.tickets || []);
+      if (eventData.venueId) { const venueRes = await apiClient.get(`/venues/${eventData.venueId}`); setVenue(venueRes.data.data.venue); } else setVenue(null);
       const resolvedSlug = publicSlug || eventData.publicSlug;
-      if (resolvedSlug) {
-        try {
-          const publicRes = await EventService.getPublicEventBySlug(resolvedSlug);
-          setPublicData(publicRes.data);
-        } catch {
-          setPublicData(null);
-        }
-      } else {
-        setPublicData(null);
-      }
-
-      try {
-        const summaryRes = await EventService.getEventReviewSummary(eventId);
-        setReviewSummary(summaryRes.data);
-      } catch {
-        setReviewSummary(null);
-      }
-
+      if (resolvedSlug) { try { setPublicData((await EventService.getPublicEventBySlug(resolvedSlug)).data); } catch { setPublicData(null); } }
+      try { setReviewSummary((await EventService.getEventReviewSummary(eventId)).data); } catch { setReviewSummary(null); }
       EventService.incrementView(eventId).catch(() => undefined);
-    } catch (fetchError: any) {
-      setError(fetchError?.response?.data?.message || 'Failed to load event details');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e: any) { setError(e?.response?.data?.message || 'Failed to load event details'); } finally { setIsLoading(false); }
   }, [eventId, publicSlug]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchEventDetails();
-    }, [fetchEventDetails]),
-  );
+  useFocusEffect(useCallback(() => { fetchEventDetails(); }, [fetchEventDetails]));
 
-  const handleShareEvent = async () => {
-    if (!event) return;
-    const slug = publicData?.event.publicSlug || event.publicSlug || publicSlug;
-    if (!slug) {
-      Alert.alert('Share Unavailable', 'Public URL is not available for this event.');
-      return;
-    }
-
-    const shareUrl = publicData?.event.publicUrl || EventService.buildPublicEventUrl(slug);
-    await Share.share({
-      title: event.title,
-      message: `Check out this event: ${shareUrl}`,
-      url: shareUrl,
-    });
-  };
-
-  const openMailClient = async (email: string) => {
-    const mailUrl = `mailto:${email}`;
-    const canEmail = await Linking.canOpenURL(mailUrl);
-    if (!canEmail) {
-      Alert.alert('Unavailable', 'Email app is unavailable on this device.');
-      return;
-    }
-    await Linking.openURL(mailUrl);
-  };
-
-  const openDialer = async (phone: string) => {
-    const dialUrl = `tel:${phone}`;
-    const canDial = await Linking.canOpenURL(dialUrl);
-    if (!canDial) {
-      Alert.alert('Unavailable', 'Calling is unavailable on this device.');
-      return;
-    }
-    await Linking.openURL(dialUrl);
-  };
-
-  const handleAddToCalendar = async () => {
-    const calendarUrl = EventService.getCalendarIcsUrl(eventId);
-    const canOpen = await Linking.canOpenURL(calendarUrl);
-    if (!canOpen) {
-      Alert.alert('Unavailable', 'Unable to open calendar link on this device.');
-      return;
-    }
-    await Linking.openURL(calendarUrl);
-  };
-
-  if (!eventId) {
-    logDevMissing('event-details-missing-id', 'EventDetailsScreen missing eventId route param.');
-    return (
-      <ScreenContainer>
-        <ErrorState message="Missing event details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
-      </ScreenContainer>
-    );
-  }
-
+  if (!eventId) return <ScreenContainer><ErrorState message="Missing event details." onRetry={() => navigation.goBack()} actionLabel="Go Back" /></ScreenContainer>;
   if (isLoading) return <LoadingState />;
-  if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchEventDetails} /></ScreenContainer>;
-  if (!event) return <ScreenContainer><ErrorState message="Event not found" onRetry={() => navigation.goBack()} actionLabel="Go Back" /></ScreenContainer>;
+  if (error || !event) return <ScreenContainer><ErrorState message={error || "Event not found"} onRetry={() => navigation.goBack()} actionLabel="Go Back" /></ScreenContainer>;
 
-  const host = typeof publicData?.event.host === 'object' && publicData?.event.host
-    ? publicData.event.host
-    : null;
+  const host = typeof publicData?.event.host === 'object' && publicData?.event.host ? publicData.event.host : null;
   const hostName = safeTitle(host?.name, 'Host unavailable');
-  const hostEmail = safeString(publicData?.event.contactDetails?.email || host?.email, '');
-  const hostPhone = safeString(publicData?.event.contactDetails?.phone || host?.phone, '');
   const coverImage = resolveImageUrl(publicData?.event.image || event.coverImage);
   const eventType = safeLower(event.type, 'physical');
-  const locationLabel = eventType === 'online'
-    ? safeString(event.meetingLink, 'Online')
-    : safeString(venue ? `${venue.name}, ${venue.city}` : event.city, 'Location not specified');
-  const formattedDate = formatSafeDate(event.date, 'Date unavailable', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const startTimeLabel = formatSafeTime(event.startTime, 'Time unavailable');
-  const endTimeLabel = formatSafeTime(event.endTime, 'Time unavailable');
-  const bookingCount = Number.isFinite(Number(event.bookingCount)) ? Number(event.bookingCount) : 0;
-  const capacity = Number.isFinite(Number(event.capacity)) ? Number(event.capacity) : 0;
-  const hasActiveTickets = tickets.some((ticket) => ticket.isActive && ticket.quantity > ticket.soldCount);
-  const isSoldOut = capacity > 0 && bookingCount >= capacity;
-  const pricingMode = safeString(event.pricingMode, 'ticketed');
-  const visibility = safeString(event.visibility, 'private');
-  const status = safeStatus(event.status, 'draft');
-  const hasRegistrationInventory = pricingMode === 'free' || hasActiveTickets;
-  const canRegister = status === 'published' && visibility === 'public' && !isSoldOut && hasRegistrationInventory;
-  const registerLabel = isSoldOut ? 'Sold Out / Capacity Full' : (hasRegistrationInventory ? 'Register' : 'Registration Unavailable');
-  const title = safeTitle(event.title, 'Untitled Event');
-  const description = safeString(event.description, '');
+  const locationLabel = eventType === 'online' ? safeString(event.meetingLink, 'Online') : safeString(venue ? `${venue.name}, ${venue.city}` : event.city, 'Location not specified');
+  const formattedDate = formatSafeDate(event.date, 'Date unavailable', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const isSoldOut = Number(event.capacity) > 0 && Number(event.bookingCount) >= Number(event.capacity);
+  const hasRegistrationInventory = safeString(event.pricingMode, 'ticketed') === 'free' || tickets.some(t => t.isActive && t.quantity > t.soldCount);
+  const canRegister = safeStatus(event.status, 'draft') === 'published' && safeString(event.visibility, 'private') === 'public' && !isSoldOut && hasRegistrationInventory;
 
   return (
     <View style={styles.root}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.header}>
-          <IconButton
-            icon={<ArrowLeft color={theme.colors.text} size={20} />}
-            onPress={() => navigation.goBack()}
-            variant="surface"
-            size={40}
-          />
-          <View style={styles.headerActions}>
-            <IconButton
-              icon={<Share2 color={theme.colors.text} size={18} />}
-              onPress={handleShareEvent}
-              variant="surface"
-              size={40}
-            />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} bounces={false}>
+        <View style={styles.heroSection}>
+          {coverImage ? <Image source={{ uri: coverImage }} style={styles.coverImage} /> : <View style={styles.coverPlaceholder} />}
+          <View style={styles.overlay} />
+          <SafeAreaView style={styles.heroHeader} edges={['top']}>
+            <IconButton icon={<ArrowLeft color="#FFF" size={24} />} onPress={() => navigation.goBack()} variant="ghost" size={48} />
+            <IconButton icon={<Share2 color="#FFF" size={24} />} onPress={() => {}} variant="ghost" size={48} />
+          </SafeAreaView>
+          <View style={styles.heroContent}>
+            <View style={styles.badges}>
+              <StatusBadge status="info" label={safeString(event.type, 'event')} />
+              {isSoldOut && <StatusBadge status="error" label="SOLD OUT" />}
+            </View>
+            <Text style={styles.title}>{safeTitle(event.title, 'Untitled Event')}</Text>
           </View>
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {coverImage ? (
-            <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.coverPlaceholder}>
-              <CalendarIcon size={40} color={theme.colors.textMuted} />
-            </View>
-          )}
-
-          <Text style={styles.title}>{title}</Text>
-
-          <View style={styles.metaCard}>
-            <View style={styles.metaRow}>
-              <CalendarIcon size={14} color={theme.colors.primary} />
-              <Text style={styles.metaText}>{formattedDate}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Clock size={14} color={theme.colors.secondary} />
-              <Text style={styles.metaText}>{startTimeLabel} - {endTimeLabel}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <MapPin size={14} color={theme.colors.accent} />
-              <Text style={styles.metaText}>{locationLabel}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Users size={14} color={theme.colors.textMuted} />
-              <Text style={styles.metaText}>{bookingCount}/{capacity || '--'} registered</Text>
-            </View>
-            <View style={styles.badgesRow}>
-              <StatusBadge status="neutral" label={safeString(event.type, 'unknown')} />
-              <StatusBadge status="neutral" label={safeString(event.visibility, 'unknown')} />
-              <StatusBadge status={isSoldOut ? 'error' : 'success'} label={isSoldOut ? 'SOLD OUT' : 'OPEN'} />
-            </View>
-          </View>
-
-          <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickActionButton} onPress={() => setIsContactModalVisible(true)} activeOpacity={0.8}>
-              <Mail size={18} color={theme.colors.text} />
-              <Text style={styles.quickActionLabel}>Contact</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionButton} onPress={handleShareEvent} activeOpacity={0.8}>
-              <Share2 size={18} color={theme.colors.text} />
-              <Text style={styles.quickActionLabel}>Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionButton} onPress={handleAddToCalendar} activeOpacity={0.8}>
-              <CalendarIcon size={18} color={theme.colors.text} />
-              <Text style={styles.quickActionLabel}>Add Calendar</Text>
-            </TouchableOpacity>
-          </View>
-
-          {reviewSummary && reviewSummary.totalReviews > 0 ? (
-            <Card variant="raised" style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Reviews</Text>
-              <View style={styles.reviewRow}>
-                <Star size={14} color={theme.colors.warning} />
-                <Text style={styles.reviewText}>
-                  {reviewSummary.averageRating.toFixed(1)} average from {reviewSummary.totalReviews} review(s)
-                </Text>
+        <View style={styles.body}>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIconWrap}><Calendar size={20} color={theme.colors.primary} /></View>
+              <View>
+                <Text style={styles.infoLabel}>Date</Text>
+                <Text style={styles.infoValue}>{formattedDate}</Text>
               </View>
-            </Card>
-          ) : null}
+            </View>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIconWrap}><Clock size={20} color={theme.colors.primary} /></View>
+              <View>
+                <Text style={styles.infoLabel}>Time</Text>
+                <Text style={styles.infoValue}>{formatSafeTime(event.startTime, '--')} - {formatSafeTime(event.endTime, '--')}</Text>
+              </View>
+            </View>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIconWrap}><MapPin size={20} color={theme.colors.primary} /></View>
+              <View>
+                <Text style={styles.infoLabel}>Location</Text>
+                <Text style={styles.infoValue} numberOfLines={2}>{locationLabel}</Text>
+              </View>
+            </View>
+          </View>
 
-          <Card variant="raised" style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Host</Text>
-            <Text style={styles.description}>{hostName}</Text>
-            {hostEmail ? <Text style={styles.hostMeta}>{hostEmail}</Text> : null}
-            {hostPhone ? <Text style={styles.hostMeta}>{hostPhone}</Text> : null}
-          </Card>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => setIsContactModalVisible(true)}>
+              <Mail size={18} color={theme.colors.text} />
+              <Text style={styles.actionBtnText}>Contact Host</Text>
+            </TouchableOpacity>
+          </View>
 
-          <Card variant="raised" style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>About Event</Text>
-            <Text style={styles.description}>{description}</Text>
-          </Card>
-
-          {sessions.length > 0 && (
-            <Card variant="raised" style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Agenda</Text>
-              {sessions.map((session) => (
-                <View key={session.id} style={styles.sessionRow}>
-                  <Text style={styles.sessionTitle}>{safeTitle(session.title, 'Session')}</Text>
-                  <Text style={styles.sessionMeta}>{formatSafeTime(session.startTime, 'Time unavailable')} - {formatSafeTime(session.endTime, 'Time unavailable')}</Text>
-                  {session.speakerName ? <Text style={styles.sessionMeta}>Speaker: {safeString(session.speakerName, 'Guest')}</Text> : null}
-                </View>
-              ))}
-            </Card>
-          )}
-
-          <Card variant="raised" style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Tickets</Text>
-            <Text style={styles.description}>
-              {event.pricingMode === 'free'
-                ? 'This event is free to attend.'
-                : (hasActiveTickets ? 'Select ticket type and continue to mock payment.' : 'No active ticket types available.')}
-            </Text>
-          </Card>
-
-          {isSoldOut ? (
-            <Text style={styles.soldOutText}>Sold Out / Capacity Full</Text>
-          ) : null}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <Button
-            title={registerLabel}
-            onPress={() => navigation.navigate('TicketSelection', { eventId })}
-            disabled={!canRegister}
-            variant="primary"
-            size="lg"
-          />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About this event</Text>
+            <Text style={styles.description}>{safeString(event.description, '')}</Text>
+          </View>
+          
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Hosted by</Text>
+            <Text style={styles.hostName}>{hostName}</Text>
+          </View>
         </View>
-      </SafeAreaView>
+      </ScrollView>
 
-      <Modal
-        transparent
-        visible={isContactModalVisible}
-        animationType="slide"
-        onRequestClose={() => setIsContactModalVisible(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setIsContactModalVisible(false)}>
-          <Pressable style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Contact Host</Text>
-            {hostEmail ? (
-              <TouchableOpacity style={styles.contactRow} onPress={() => openMailClient(hostEmail)}>
-                <Mail size={16} color={theme.colors.primary} />
-                <Text style={styles.contactText}>{hostEmail}</Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={styles.contactUnavailable}>Host email unavailable</Text>
-            )}
-            {hostPhone ? (
-              <TouchableOpacity style={styles.contactRow} onPress={() => openDialer(hostPhone)}>
-                <Phone size={16} color={theme.colors.primary} />
-                <Text style={styles.contactText}>{hostPhone}</Text>
-              </TouchableOpacity>
-            ) : null}
-            <Button
-              title="Close"
-              onPress={() => setIsContactModalVisible(false)}
-              variant="secondary"
-              size="md"
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <View style={styles.bottomBar}>
+        <Button
+          title={isSoldOut ? 'Sold Out' : (hasRegistrationInventory ? 'Register Now' : 'Unavailable')}
+          onPress={() => navigation.navigate('TicketSelection', { eventId })}
+          disabled={!canRegister}
+          variant="primary"
+          size="lg"
+          fullWidth
+        />
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: theme.spacing.base,
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scrollContent: {
-    paddingHorizontal: theme.spacing.base,
-    paddingBottom: 168,
-  },
-  coverImage: {
-    width: '100%',
-    height: 260,
-    borderRadius: theme.borderRadius.l,
-    marginBottom: theme.spacing.m,
-  },
-  coverPlaceholder: {
-    width: '100%',
-    height: 220,
-    borderRadius: theme.borderRadius.l,
-    marginBottom: theme.spacing.m,
-    backgroundColor: theme.colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.m,
-  },
-  metaCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: theme.borderRadius.m,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.m,
-    gap: theme.spacing.s,
-    marginBottom: theme.spacing.m,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  metaText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    flex: 1,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.s,
-    marginTop: theme.spacing.xs,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.s,
-    marginBottom: theme.spacing.m,
-  },
-  quickActionButton: {
-    flex: 1,
-    borderRadius: theme.borderRadius.m,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceRaised,
-    paddingVertical: theme.spacing.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  quickActionLabel: {
-    ...theme.typography.caption,
-    color: theme.colors.textSecondary,
-    fontWeight: '600',
-  },
-  sectionCard: {
-    marginBottom: theme.spacing.m,
-  },
-  reviewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.s,
-  },
-  reviewText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-  },
-  sectionTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.s,
-  },
-  description: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    lineHeight: 22,
-  },
-  hostMeta: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  sessionRow: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    paddingTop: theme.spacing.s,
-    marginTop: theme.spacing.s,
-  },
-  sessionTitle: {
-    ...theme.typography.bodyMedium,
-    color: theme.colors.text,
-  },
-  sessionMeta: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  soldOutText: {
-    ...theme.typography.bodyMedium,
-    color: theme.colors.error,
-    marginTop: theme.spacing.s,
-    marginBottom: theme.spacing.s,
-  },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: theme.spacing.base,
-    paddingTop: theme.spacing.m,
-    paddingBottom: theme.spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    padding: theme.spacing.base,
-    gap: theme.spacing.s,
-  },
-  modalTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.s,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.s,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.m,
-  },
-  contactText: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-  },
-  contactUnavailable: {
-    ...theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.s,
-  },
+  root: { flex: 1, backgroundColor: theme.colors.background },
+  scrollContent: { paddingBottom: 120 },
+  heroSection: { height: 350, position: 'relative' },
+  coverImage: { width: '100%', height: '100%' },
+  coverPlaceholder: { width: '100%', height: '100%', backgroundColor: theme.colors.primaryDark },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  heroHeader: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
+  heroContent: { position: 'absolute', bottom: 24, left: 24, right: 24 },
+  badges: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  title: { ...theme.typography.display, color: '#FFF' },
+  body: { padding: 24, borderTopLeftRadius: 32, borderTopRightRadius: 32, backgroundColor: theme.colors.background, marginTop: -32 },
+  infoGrid: { gap: 20, marginBottom: 24 },
+  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  infoIconWrap: { width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.primarySubtle, alignItems: 'center', justifyContent: 'center' },
+  infoLabel: { ...theme.typography.caption, color: theme.colors.textMuted },
+  infoValue: { ...theme.typography.bodyMedium, color: theme.colors.text, marginTop: 2 },
+  actionsRow: { flexDirection: 'row', marginBottom: 32 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20, backgroundColor: theme.colors.surfaceLight },
+  actionBtnText: { ...theme.typography.button, color: theme.colors.text },
+  section: { marginBottom: 32 },
+  sectionTitle: { ...theme.typography.h2, color: theme.colors.text, marginBottom: 12 },
+  description: { ...theme.typography.body, color: theme.colors.textSecondary, lineHeight: 24 },
+  hostName: { ...theme.typography.bodyMedium, color: theme.colors.primary },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, backgroundColor: theme.colors.background, borderTopWidth: 1, borderTopColor: theme.colors.border },
 });

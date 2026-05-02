@@ -1,4 +1,11 @@
+const fs = require('fs');
+const path = require('path');
 
+const componentsDir = path.join(__dirname, 'frontend/src/components');
+const screensDir = path.join(__dirname, 'frontend/src/screens');
+const themePath = path.join(__dirname, 'frontend/src/constants/theme.ts');
+
+const THEME_CODE = `
 export const theme = {
   colors: {
     background: '#FFFFFF',
@@ -77,3 +84,7 @@ export const theme = {
 export type Theme = typeof theme;
 export type ThemeColors = typeof theme.colors;
 export type ThemeSpacing = typeof theme.spacing;
+`;
+
+fs.writeFileSync(themePath, THEME_CODE);
+console.log('Updated theme.ts');
