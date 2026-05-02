@@ -16,6 +16,7 @@ import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, Button, In
 import { CheckInService, EventService, UserService } from '../../api/services';
 import { Event } from '../../types';
 import { HostAdminEventStackParamList } from '../../types/navigation';
+import { formatSafeDate, safeUpper } from '../../utils/safeText';
 
 interface AttendanceRecord {
   id: string;
@@ -316,10 +317,10 @@ export const CheckInScannerScreen = () => {
                 <Text style={styles.recordMeta}>{item.attendeeEmail}</Text>
                 {item.mobile ? <Text style={styles.recordMeta}>Mobile: {item.mobile}</Text> : null}
                 {item.nic ? <Text style={styles.recordMeta}>NIC: {item.nic}</Text> : null}
-                {item.guestStatus ? <Text style={styles.recordMeta}>Status: {item.guestStatus.toUpperCase()}</Text> : null}
+                {item.guestStatus ? <Text style={styles.recordMeta}>Status: {safeUpper(item.guestStatus, 'UNKNOWN')}</Text> : null}
                 {item.checkedInAt ? (
                   <Text style={styles.recordMeta}>
-                    At: {new Date(item.checkedInAt).toLocaleString()} ({item.checkInMethod || 'manual'})
+                    At: {formatSafeDate(item.checkedInAt, 'Time unavailable', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ({item.checkInMethod || 'manual'})
                   </Text>
                 ) : null}
 
@@ -362,7 +363,7 @@ export const CheckInScannerScreen = () => {
                 return (
                   <Card key={scan.id} variant="raised" style={styles.recentCard} noPadding>
                     <View style={styles.recentRow}>
-                      <Text style={[styles.recentStatus, { color }]}>{scan.status.toUpperCase()}</Text>
+                      <Text style={[styles.recentStatus, { color }]}>{safeUpper(scan.status, 'UNKNOWN')}</Text>
                       <Text style={styles.recentMessage}>{scan.message}</Text>
                     </View>
                   </Card>

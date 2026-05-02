@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { theme } from '../constants/theme';
+import { safeString, safeUpper } from '../utils/safeText';
 
 // ============================================================
 // AVATAR STACK — Luma-style overlapping circular avatars
@@ -34,6 +35,7 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({
   const visible = Math.min(maxVisible, count);
   const remaining = count - visible;
   const overlap = size * 0.3;
+  const normalizedNames = names.map((name) => safeString(name, '')).filter((name) => name.length > 0);
 
   return (
     <View style={style}>
@@ -54,7 +56,9 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({
             ]}
           >
             <Text style={[styles.avatarInitial, { fontSize: size * 0.35 }]}>
-              {names[i] ? names[i].charAt(0).toUpperCase() : '•'}
+              {normalizedNames[i]
+                ? safeUpper(normalizedNames[i].charAt(0), '•')
+                : '•'}
             </Text>
           </View>
         ))}
@@ -78,10 +82,10 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({
           </View>
         )}
       </View>
-      {names.length > 0 && (
+      {normalizedNames.length > 0 && (
         <Text style={styles.namesList} numberOfLines={2}>
-          {names.slice(0, 3).join(', ')}
-          {names.length > 3 ? `, and ${count - 3} more` : ''}
+          {normalizedNames.slice(0, 3).join(', ')}
+          {normalizedNames.length > 3 ? `, and ${Math.max(0, count - 3)} more` : ''}
         </Text>
       )}
     </View>

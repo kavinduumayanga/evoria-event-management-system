@@ -6,11 +6,12 @@ import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList, AttendeeTabParamList } from '../../types/navigation';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { ScreenContainer, Card, Button, IconButton } from '../../components';
+import { ScreenContainer, Card, Button, IconButton, ErrorState, LoadingState } from '../../components';
 import { theme } from '../../constants/theme';
 import { CheckCircle2, Clock, Ticket as TicketIcon, ArrowLeft } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { Booking } from '../../types';
+import { logDevMissing, safeStatus, safeString, safeUpper } from '../../utils/safeText';
 
 type BookingConfirmationNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AttendeeHomeStackParamList, 'BookingConfirmation'>,
@@ -37,21 +38,45 @@ const infoStyles = StyleSheet.create({
 });
 
 export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { bookingId } = route.params;
+  const bookingId = route.params?.bookingId;
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { fetchBooking(); }, [bookingId]);
 
   const fetchBooking = async () => {
     try {
+      if (!bookingId) return;
+      setIsLoading(true);
+      setError(null);
       const res = await apiClient.get(`/bookings/${bookingId}`);
       setBooking(res.data.data.booking);
-    } catch (err) { console.error(err); }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to load booking details');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const isWaitlisted = Boolean(booking?.isWaitlisted);
-  const approvalStatus = booking?.approvalStatus || 'approved';
-  const rsvpStatus = booking?.rsvpStatus || 'going';
+  if (!bookingId) {
+    logDevMissing('booking-confirmation-missing-id', 'BookingConfirmationScreen missing bookingId route param.');
+    return (
+      <ScreenContainer>
+        <ErrorState message="Missing booking details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+      </ScreenContainer>
+    );
+  }
+
+  if (isLoading) return <LoadingState />;
+  if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchBooking} /></ScreenContainer>;
+  if (!booking) return <ScreenContainer><ErrorState message="Booking not found" onRetry={fetchBooking} /></ScreenContainer>;
+
+  const isWaitlisted = Boolean(booking.isWaitlisted);
+  const approvalStatus = safeStatus(booking.approvalStatus, 'approved');
+  const rsvpStatus = safeStatus(booking.rsvpStatus, 'going');
+  const bookingIdLabel = safeString(booking.id, '').slice(-8);
+  const totalAmount = Number.isFinite(Number(booking.totalAmount)) ? Number(booking.totalAmount) : 0;
 
   return (
     <ScreenContainer scrollable>
@@ -84,29 +109,27 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
         </View>
 
         {/* Booking details card */}
-        {booking && (
-          <Card variant="raised" style={styles.detailCard} noPadding>
-            <View style={styles.cardHeader}>
-              <TicketIcon size={16} color={theme.colors.primary} />
-              <Text style={styles.cardTitle}>Booking Details</Text>
+        <Card variant="raised" style={styles.detailCard} noPadding>
+          <View style={styles.cardHeader}>
+            <TicketIcon size={16} color={theme.colors.primary} />
+            <Text style={styles.cardTitle}>Booking Details</Text>
+          </View>
+          <View style={styles.cardBody}>
+            <InfoRow label="Booking ID" value={`#${safeUpper(bookingIdLabel || '—', '—')}`} />
+            {isWaitlisted && (
+              <InfoRow label="Waitlist Position" value={`#${booking.waitlistPosition || '—'}`} />
+            )}
+            <InfoRow label="Quantity" value={String(booking.quantity || 0)} />
+            <InfoRow label="Approval" value={safeUpper(approvalStatus, 'APPROVED')} />
+            <InfoRow label="RSVP" value={safeUpper(rsvpStatus.replace('_', ' '), 'UNKNOWN')} />
+            <View style={[infoStyles.row, { borderBottomWidth: 0 }]}>
+              <Text style={infoStyles.label}>Total Paid</Text>
+              <Text style={[infoStyles.value, styles.totalAmount]}>
+                ${totalAmount.toFixed(2)}
+              </Text>
             </View>
-            <View style={styles.cardBody}>
-              <InfoRow label="Booking ID" value={`#${booking.id.slice(-8).toUpperCase()}`} />
-              {isWaitlisted && (
-                <InfoRow label="Waitlist Position" value={`#${booking.waitlistPosition || '—'}`} />
-              )}
-              <InfoRow label="Quantity" value={String(booking.quantity)} />
-              <InfoRow label="Approval" value={approvalStatus.toUpperCase()} />
-              <InfoRow label="RSVP" value={rsvpStatus.replace('_', ' ').toUpperCase()} />
-              <View style={[infoStyles.row, { borderBottomWidth: 0 }]}>
-                <Text style={infoStyles.label}>Total Paid</Text>
-                <Text style={[infoStyles.value, styles.totalAmount]}>
-                  ${booking.totalAmount.toFixed(2)}
-                </Text>
-              </View>
-            </View>
-          </Card>
-        )}
+          </View>
+        </Card>
 
         {/* Actions */}
         <View style={styles.actions}>

@@ -4,32 +4,35 @@ import { Card } from './Card';
 import { Booking } from '../types';
 import { theme } from '../constants/theme';
 import { Calendar, Clock, MapPin } from 'lucide-react-native';
+import { formatSafeDate, formatSafeTime, safeStatus, safeString, safeUpper } from '../utils/safeText';
 
 interface BookingCardProps {
-  booking: Booking;
+  booking: Partial<Booking>;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   actions?: React.ReactNode;
 }
 
-const toDisplayDate = (rawDate?: string) => {
-  if (!rawDate) return 'Date TBD';
-  const parsed = new Date(rawDate);
-  if (Number.isNaN(parsed.getTime())) return rawDate;
-  return parsed.toLocaleDateString('en-US', {
+export const BookingCard: React.FC<BookingCardProps> = ({ booking, style, actions }) => {
+  const isWaitlisted = Boolean(booking.isWaitlisted);
+  const bookingStatus = isWaitlisted
+    ? 'WAITLISTED'
+    : safeUpper(booking.bookingStatus, 'PENDING');
+  const bookingId = safeString(booking.eventId, '');
+  const title = booking.event?.title || (bookingId ? `Event ${bookingId.slice(0, 8)}` : 'Untitled Event');
+  const location = safeString(booking.event?.location, 'Location not specified');
+  const dateLabel = formatSafeDate(booking.event?.date, 'Date unavailable', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-};
+  const startTimeLabel = formatSafeTime(booking.event?.startTime, 'Time unavailable');
+  const endTimeLabel = formatSafeTime(booking.event?.endTime, 'Time unavailable');
+  const rsvpLabel = safeUpper(safeStatus(booking.rsvpStatus, 'unknown').replace('_', ' '), 'UNKNOWN');
+  const quantityLabel = Number.isFinite(Number(booking.quantity)) ? Number(booking.quantity) : 0;
 
-export const BookingCard: React.FC<BookingCardProps> = ({ booking, style, actions }) => {
-  const bookingStatus = booking.isWaitlisted ? 'WAITLISTED' : booking.bookingStatus.toUpperCase();
-  const title = booking.event?.title || `Event ${booking.eventId.slice(0, 8)}`;
-  const location = booking.event?.location || 'Location TBD';
-
-  const statusColor = booking.isWaitlisted
+  const statusColor = isWaitlisted
     ? theme.colors.warning
     : booking.bookingStatus === 'confirmed'
       ? theme.colors.success
@@ -48,11 +51,11 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, style, action
 
       <View style={styles.metaRow}>
         <Calendar size={14} color={theme.colors.primary} />
-        <Text style={styles.metaText}>{toDisplayDate(booking.event?.date)}</Text>
+        <Text style={styles.metaText}>{dateLabel}</Text>
       </View>
       <View style={styles.metaRow}>
         <Clock size={14} color={theme.colors.secondary} />
-        <Text style={styles.metaText}>{booking.event?.startTime || '--'} - {booking.event?.endTime || '--'}</Text>
+        <Text style={styles.metaText}>{startTimeLabel} - {endTimeLabel}</Text>
       </View>
       <View style={styles.metaRow}>
         <MapPin size={14} color={theme.colors.accent} />
@@ -60,8 +63,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, style, action
       </View>
 
       <View style={styles.bottomRow}>
-        <Text style={styles.badge}>RSVP: {booking.rsvpStatus.replace('_', ' ').toUpperCase()}</Text>
-        <Text style={styles.badge}>Qty: {booking.quantity}</Text>
+        <Text style={styles.badge}>RSVP: {rsvpLabel}</Text>
+        <Text style={styles.badge}>Qty: {quantityLabel}</Text>
       </View>
 
       {actions ? <View style={styles.actionsContainer}>{actions}</View> : null}

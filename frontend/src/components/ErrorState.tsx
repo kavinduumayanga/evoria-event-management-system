@@ -15,12 +15,14 @@ interface ErrorStateProps {
   message?: string;
   onRetry?: () => void;
   style?: StyleProp<ViewStyle>;
+  actionLabel?: string;
 }
 
 export const ErrorState: React.FC<ErrorStateProps> = ({
   message = 'Something went wrong. Please try again.',
   onRetry,
   style,
+  actionLabel = 'Try Again',
 }) => {
   return (
     <View style={[styles.container, style]}>
@@ -31,7 +33,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       <Text style={styles.message}>{message}</Text>
       {onRetry && (
         <Button
-          title="Try Again"
+          title={actionLabel}
           onPress={onRetry}
           variant="secondary"
           size="sm"

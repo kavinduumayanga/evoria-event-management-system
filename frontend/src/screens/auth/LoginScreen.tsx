@@ -19,6 +19,7 @@ import { AuthStackParamList } from '../../types/navigation';
 import { Button, Card, IconButton, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
+import { safeLower } from '../../utils/safeText';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -55,7 +56,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   }, [brandOpacity, logoScale]);
 
   const handleLogin = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = safeLower(email.trim());
 
     if (!normalizedEmail || !password) {
       Alert.alert('Validation', 'Please fill in all fields.');

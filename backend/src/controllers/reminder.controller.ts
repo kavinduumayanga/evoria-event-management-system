@@ -10,14 +10,13 @@ import { canManageEvent, manageableEventQuery } from '../utils/eventPermissions'
 import { sendEmail } from '../services/email.service';
 import { reminderTemplate } from '../services/emailTemplates';
 import { buildEventEmailContext } from '../utils/eventCommunication.helper';
-import { sendPushToUsers } from '../services/pushNotification.service';
 import { createNotificationsForUsers } from '../utils/notification.helper';
 
 const reminderCreateSchema = z.object({
   title: z.string().trim().min(2).max(160),
   message: z.string().trim().min(2).max(4000),
   scheduledAt: z.string().trim().min(1),
-  channels: z.array(z.enum(['email', 'push'])).min(1).default(['email']),
+  channels: z.array(z.enum(['email'])).min(1).default(['email']),
 }).strict();
 
 const reminderQuerySchema = z.object({
@@ -109,7 +108,7 @@ const processReminder = async (
   event: any,
   req: Request,
 ) => {
-  const { recipients, pushUserIds } = await resolveReminderRecipients(reminder.eventId);
+  const { recipients } = await resolveReminderRecipients(reminder.eventId);
 
   if (!recipients.length) {
     await ReminderModel.findByIdAndUpdate(reminder.id, {
@@ -161,27 +160,11 @@ const processReminder = async (
     }
   }
 
-  let pushSent = 0;
-  let pushFailed = 0;
-  if (reminder.channels.includes('push') && pushUserIds.length > 0) {
-    const pushSummary = await sendPushToUsers(pushUserIds, {
-      title: reminder.title,
-      message: reminder.message,
-      eventId: reminder.eventId,
-      type: 'reminder',
-      createdBy: reminder.createdBy,
-      data: {
-        eventId: reminder.eventId,
-        type: 'reminder',
-      },
-    });
 
-    pushSent = pushSummary.sent;
-    pushFailed = pushSummary.failed;
-  }
-
-  if (pushUserIds.length > 0) {
-    await createNotificationsForUsers(pushUserIds, {
+  if (recipients.length > 0) {
+    const userIds = Array.from(new Set(recipients.map(r => r.userId).filter((id): id is string => !!id)));
+    if (userIds.length > 0) {
+      await createNotificationsForUsers(userIds, {
       eventId: reminder.eventId,
       title: reminder.title,
       message: reminder.message,
@@ -193,7 +176,7 @@ const processReminder = async (
     });
   }
 
-  const hasFailures = emailFailed > 0 || pushFailed > 0;
+  const hasFailures = emailFailed > 0;
 
   await ReminderModel.findByIdAndUpdate(reminder.id, {
     status: hasFailures ? 'failed' : 'sent',
@@ -207,8 +190,6 @@ const processReminder = async (
     recipients: recipients.length,
     emailSent,
     emailFailed,
-    pushSent,
-    pushFailed,
   };
 };
 

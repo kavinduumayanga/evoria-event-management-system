@@ -44,3 +44,6 @@ export * from './AvatarStack';
 
 // Background
 export * from './GradientBackground';
+
+// Overlays
+export * from './ToastProvider';

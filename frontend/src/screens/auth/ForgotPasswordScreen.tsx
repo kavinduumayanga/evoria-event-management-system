@@ -16,6 +16,7 @@ import { AuthStackParamList } from '../../types/navigation';
 import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
+import { safeLower } from '../../utils/safeText';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
@@ -32,7 +33,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const [message, setMessage] = useState<string | null>(null);
 
   const handleForgotPassword = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = safeLower(email.trim());
 
     if (!normalizedEmail) {
       Alert.alert('Validation', 'Please enter your email address.');
@@ -114,7 +115,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
           />
           <Button
             title="Go to Reset Password"
-            onPress={() => navigation.navigate('ResetPassword', { email: email.trim().toLowerCase() || undefined })}
+            onPress={() => navigation.navigate('ResetPassword', { email: safeLower(email.trim()) || undefined })}
             variant="ghost"
             size="md"
           />

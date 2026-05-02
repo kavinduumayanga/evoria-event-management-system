@@ -25,6 +25,7 @@ import {
 } from '../../../components';
 import { EventService } from '../../../api/services';
 import { EventReminder } from '../../../types';
+import { safeUpper } from '../../../utils/safeText';
 
 interface Props {
   navigation: NativeStackNavigationProp<HostAdminEventStackParamList, 'EventReminders'>;
@@ -43,7 +44,6 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
   const [message, setMessage] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(true);
-  const [pushEnabled, setPushEnabled] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingDue, setIsProcessingDue] = useState(false);
 
@@ -84,9 +84,8 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
       return;
     }
 
-    const channels: Array<'email' | 'push'> = [];
+    const channels: Array<'email'> = [];
     if (emailEnabled) channels.push('email');
-    if (pushEnabled) channels.push('push');
 
     if (!channels.length) {
       Alert.alert('Validation', 'Enable at least one channel.');
@@ -105,7 +104,6 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
       setMessage('');
       setScheduledAt('');
       setEmailEnabled(true);
-      setPushEnabled(true);
       Alert.alert('Success', 'Reminder scheduled successfully.');
       fetchReminders();
     } catch (err: any) {
@@ -202,12 +200,6 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
                   >
                     <Text style={[styles.channelText, emailEnabled && styles.channelTextActive]}>Email</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.channelChip, pushEnabled && styles.channelChipActive]}
-                    onPress={() => setPushEnabled((prev) => !prev)}
-                  >
-                    <Text style={[styles.channelText, pushEnabled && styles.channelTextActive]}>Push</Text>
-                  </TouchableOpacity>
                 </View>
 
                 <Button
@@ -257,7 +249,7 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
                   styles.statusPill,
                   item.status === 'sent' ? styles.statusSent : item.status === 'failed' ? styles.statusFailed : styles.statusScheduled,
                 ]}>
-                  <Text style={styles.statusPillText}>{item.status.toUpperCase()}</Text>
+                  <Text style={styles.statusPillText}>{safeUpper(item.status)}</Text>
                 </View>
               </View>
               {item.errorMessage ? <Text style={styles.errorText}>{item.errorMessage}</Text> : null}

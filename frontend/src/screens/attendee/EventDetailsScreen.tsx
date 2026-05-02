@@ -22,6 +22,8 @@ import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { EventService, PublicEventDetails } from '../../api/services';
 import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Share2, Mail, Phone, Users, Star } from 'lucide-react-native';
+import { formatSafeDate, formatSafeTime, logDevMissing, safeLower, safeStatus, safeString, safeTitle } from '../../utils/safeText';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -32,7 +34,8 @@ interface Props {
 }
 
 export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId, publicSlug } = route.params;
+  const eventId = route.params?.eventId;
+  const publicSlug = route.params?.publicSlug;
   const [event, setEvent] = useState<Event | null>(null);
   const [venue, setVenue] = useState<Venue | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -44,6 +47,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
 
   const fetchEventDetails = useCallback(async () => {
+    if (!eventId) return;
     try {
       setIsLoading(true);
       setError(null);
@@ -145,29 +149,50 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     await Linking.openURL(calendarUrl);
   };
 
+  if (!eventId) {
+    logDevMissing('event-details-missing-id', 'EventDetailsScreen missing eventId route param.');
+    return (
+      <ScreenContainer>
+        <ErrorState message="Missing event details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+      </ScreenContainer>
+    );
+  }
+
   if (isLoading) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchEventDetails} /></ScreenContainer>;
-  if (!event) return <ScreenContainer><ErrorState message="Event not found" onRetry={() => navigation.goBack()} /></ScreenContainer>;
+  if (!event) return <ScreenContainer><ErrorState message="Event not found" onRetry={() => navigation.goBack()} actionLabel="Go Back" /></ScreenContainer>;
 
-  const host = publicData?.event.host;
-  const hostName = (host?.name || 'Event Host').trim();
-  const hostEmail = (publicData?.event.contactDetails?.email || host?.email || '').trim();
-  const hostPhone = (publicData?.event.contactDetails?.phone || host?.phone || '').trim();
-  const coverImage = publicData?.event.image || event.coverImage;
-  const locationLabel = event.type === 'online'
-    ? (event.meetingLink || 'Online')
-    : (venue ? `${venue.name}, ${venue.city}` : event.city || 'Venue');
-  const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
+  const host = typeof publicData?.event.host === 'object' && publicData?.event.host
+    ? publicData.event.host
+    : null;
+  const hostName = safeTitle(host?.name, 'Host unavailable');
+  const hostEmail = safeString(publicData?.event.contactDetails?.email || host?.email, '');
+  const hostPhone = safeString(publicData?.event.contactDetails?.phone || host?.phone, '');
+  const coverImage = resolveImageUrl(publicData?.event.image || event.coverImage);
+  const eventType = safeLower(event.type, 'physical');
+  const locationLabel = eventType === 'online'
+    ? safeString(event.meetingLink, 'Online')
+    : safeString(venue ? `${venue.name}, ${venue.city}` : event.city, 'Location not specified');
+  const formattedDate = formatSafeDate(event.date, 'Date unavailable', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
   });
+  const startTimeLabel = formatSafeTime(event.startTime, 'Time unavailable');
+  const endTimeLabel = formatSafeTime(event.endTime, 'Time unavailable');
+  const bookingCount = Number.isFinite(Number(event.bookingCount)) ? Number(event.bookingCount) : 0;
+  const capacity = Number.isFinite(Number(event.capacity)) ? Number(event.capacity) : 0;
   const hasActiveTickets = tickets.some((ticket) => ticket.isActive && ticket.quantity > ticket.soldCount);
-  const isSoldOut = Number(event.bookingCount || 0) >= Number(event.capacity || 0);
-  const hasRegistrationInventory = event.pricingMode === 'free' || hasActiveTickets;
-  const canRegister = event.status === 'published' && event.visibility === 'public' && !isSoldOut && hasRegistrationInventory;
+  const isSoldOut = capacity > 0 && bookingCount >= capacity;
+  const pricingMode = safeString(event.pricingMode, 'ticketed');
+  const visibility = safeString(event.visibility, 'private');
+  const status = safeStatus(event.status, 'draft');
+  const hasRegistrationInventory = pricingMode === 'free' || hasActiveTickets;
+  const canRegister = status === 'published' && visibility === 'public' && !isSoldOut && hasRegistrationInventory;
   const registerLabel = isSoldOut ? 'Sold Out / Capacity Full' : (hasRegistrationInventory ? 'Register' : 'Registration Unavailable');
+  const title = safeTitle(event.title, 'Untitled Event');
+  const description = safeString(event.description, '');
 
   return (
     <View style={styles.root}>
@@ -202,7 +227,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )}
 
-          <Text style={styles.title}>{event.title}</Text>
+          <Text style={styles.title}>{title}</Text>
 
           <View style={styles.metaCard}>
             <View style={styles.metaRow}>
@@ -211,7 +236,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             <View style={styles.metaRow}>
               <Clock size={14} color={theme.colors.secondary} />
-              <Text style={styles.metaText}>{event.startTime} - {event.endTime}</Text>
+              <Text style={styles.metaText}>{startTimeLabel} - {endTimeLabel}</Text>
             </View>
             <View style={styles.metaRow}>
               <MapPin size={14} color={theme.colors.accent} />
@@ -219,11 +244,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             <View style={styles.metaRow}>
               <Users size={14} color={theme.colors.textMuted} />
-              <Text style={styles.metaText}>{event.bookingCount}/{event.capacity} registered</Text>
+              <Text style={styles.metaText}>{bookingCount}/{capacity || '--'} registered</Text>
             </View>
             <View style={styles.badgesRow}>
-              <StatusBadge status="neutral" label={event.type.toUpperCase()} />
-              <StatusBadge status="neutral" label={event.visibility.toUpperCase()} />
+              <StatusBadge status="neutral" label={safeString(event.type, 'unknown')} />
+              <StatusBadge status="neutral" label={safeString(event.visibility, 'unknown')} />
               <StatusBadge status={isSoldOut ? 'error' : 'success'} label={isSoldOut ? 'SOLD OUT' : 'OPEN'} />
             </View>
           </View>
@@ -264,7 +289,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           <Card variant="raised" style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>About Event</Text>
-            <Text style={styles.description}>{event.description}</Text>
+            <Text style={styles.description}>{description}</Text>
           </Card>
 
           {sessions.length > 0 && (
@@ -272,9 +297,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.sectionTitle}>Agenda</Text>
               {sessions.map((session) => (
                 <View key={session.id} style={styles.sessionRow}>
-                  <Text style={styles.sessionTitle}>{session.title}</Text>
-                  <Text style={styles.sessionMeta}>{session.startTime} - {session.endTime}</Text>
-                  {session.speakerName ? <Text style={styles.sessionMeta}>Speaker: {session.speakerName}</Text> : null}
+                  <Text style={styles.sessionTitle}>{safeTitle(session.title, 'Session')}</Text>
+                  <Text style={styles.sessionMeta}>{formatSafeTime(session.startTime, 'Time unavailable')} - {formatSafeTime(session.endTime, 'Time unavailable')}</Text>
+                  {session.speakerName ? <Text style={styles.sessionMeta}>Speaker: {safeString(session.speakerName, 'Guest')}</Text> : null}
                 </View>
               ))}
             </Card>

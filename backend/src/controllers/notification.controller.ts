@@ -7,7 +7,6 @@ import { EventModel } from '../models/Event';
 import { AppError } from '../utils/appError';
 import { createNotificationsForUsers } from '../utils/notification.helper';
 import { canManageEvent } from '../utils/eventPermissions';
-import { sendPushToUsers } from '../services/pushNotification.service';
 
 const notificationCreateSchema = z.object({
   userIds: z.array(z.string()).optional(),
@@ -15,7 +14,7 @@ const notificationCreateSchema = z.object({
   title: z.string().min(2),
   message: z.string().min(2),
   type: z.enum(['booking', 'reminder', 'announcement', 'checkin', 'system']).default('announcement'),
-  channel: z.enum(['in_app', 'push', 'email_mock', 'sms_mock']).default('in_app'),
+  channel: z.enum(['in_app', 'email_mock', 'sms_mock']).default('in_app'),
   scheduledAt: z.string().optional(),
 });
 
@@ -23,7 +22,7 @@ const eventBlastSchema = z.object({
   title: z.string().min(2),
   message: z.string().min(2),
   type: z.enum(['booking', 'reminder', 'announcement', 'checkin', 'system']).default('announcement'),
-  channel: z.enum(['in_app', 'push', 'email_mock', 'sms_mock']).default('in_app'),
+  channel: z.enum(['in_app', 'email_mock', 'sms_mock']).default('in_app'),
   scheduledAt: z.string().optional(),
 });
 
@@ -113,19 +112,6 @@ export const createNotification = async (req: Request, res: Response, next: Next
       createdBy: req.user!.id,
     });
 
-    if (validated.channel === 'push' && status === 'sent') {
-      await sendPushToUsers(recipientIds, {
-        title: validated.title,
-        message: validated.message,
-        eventId: validated.eventId || null,
-        type: validated.type,
-        createdBy: req.user!.id,
-        data: {
-          eventId: validated.eventId || null,
-          type: validated.type,
-        },
-      });
-    }
 
     const mockChannelMessage = validated.channel === 'email_mock' || validated.channel === 'sms_mock'
       ? 'Mock email/SMS notification recorded successfully'
@@ -234,19 +220,6 @@ export const eventBlastNotifications = async (req: Request, res: Response, next:
       createdBy: req.user!.id,
     });
 
-    if (validated.channel === 'push' && status === 'sent') {
-      await sendPushToUsers(attendeeIds, {
-        eventId,
-        title: validated.title,
-        message: validated.message,
-        type: validated.type,
-        createdBy: req.user!.id,
-        data: {
-          eventId,
-          type: validated.type,
-        },
-      });
-    }
 
     const mockChannelMessage = validated.channel === 'email_mock' || validated.channel === 'sms_mock'
       ? 'Mock email/SMS notification recorded successfully'

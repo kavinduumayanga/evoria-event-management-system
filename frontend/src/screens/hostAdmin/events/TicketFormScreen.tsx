@@ -8,6 +8,7 @@ import { theme } from '../../../constants/theme';
 import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { TicketService } from '../../../api/services';
 import { PromoCode, TicketType } from '../../../types';
+import { safeUpper } from '../../../utils/safeText';
 
 type TicketFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'TicketForm'>;
 type TicketFormRouteProp = RouteProp<HostAdminEventStackParamList, 'TicketForm'>;
@@ -75,7 +76,7 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const addPromoCode = () => {
-    const normalizedCode = promoCodeDraft.trim().toUpperCase();
+    const normalizedCode = safeUpper(promoCodeDraft.trim());
     const parsedValue = Number.parseFloat(promoValueDraft);
 
     if (!normalizedCode) {
@@ -93,7 +94,7 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
-    const alreadyExists = promoCodes.some((promo) => promo.code.toUpperCase() === normalizedCode);
+    const alreadyExists = promoCodes.some((promo) => safeUpper(promo.code) === normalizedCode);
     if (alreadyExists) {
       Alert.alert('Validation Error', 'This promo code already exists.');
       return;
@@ -148,7 +149,7 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
         name: name.trim(),
         description: description.trim() || undefined,
         price: isFree ? 0 : parsedPrice,
-        currency: currency.trim().toUpperCase() || 'LKR',
+        currency: safeUpper(currency.trim(), 'LKR'),
         isFree,
         quantity: parsedQuantity,
         maxPerUser: parsedMaxPerUser,
@@ -302,7 +303,7 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
                   <View style={styles.promoInfo}>
                     <Text style={styles.promoCode}>{promo.code}</Text>
                     <Text style={styles.promoMeta}>
-                      {promo.discountType.toUpperCase()} • {promo.value} • {promo.isActive ? 'ACTIVE' : 'INACTIVE'}
+                      {safeUpper(promo.discountType)} • {promo.value} • {promo.isActive ? 'ACTIVE' : 'INACTIVE'}
                     </Text>
                   </View>
                   <IconButton

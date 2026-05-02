@@ -4,12 +4,13 @@ import { GlassCard } from './Card';
 import { AnimatedPressable } from './AnimatedPressable';
 import { theme } from '../constants/theme';
 import { Ticket, Calendar, MapPin } from 'lucide-react-native';
+import { safeString, safeTitle, safeUpper } from '../utils/safeText';
 
 interface TicketCardProps {
-  eventName: string;
-  ticketType: string;
-  date: string;
-  location: string;
+  eventName?: string;
+  ticketType?: string;
+  date?: string;
+  location?: string;
   qrValue?: string;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -18,6 +19,11 @@ interface TicketCardProps {
 export const TicketCard: React.FC<TicketCardProps> = ({ 
   eventName, ticketType, date, location, onPress, style 
 }) => {
+  const displayEventName = safeTitle(eventName, 'Untitled Event');
+  const displayTicketType = safeUpper(ticketType, 'TICKET');
+  const displayDate = safeString(date, 'Date unavailable');
+  const displayLocation = safeString(location, 'Location not specified');
+
   const CardContent = (
     <GlassCard style={[styles.container, style]} variant="primary" animateEntrance>
       <View style={styles.header}>
@@ -25,20 +31,20 @@ export const TicketCard: React.FC<TicketCardProps> = ({
           <Ticket size={24} color={theme.colors.primaryLight} />
         </View>
         <View style={styles.ticketTypeContainer}>
-          <Text style={styles.ticketTypeText}>{ticketType.toUpperCase()}</Text>
+          <Text style={styles.ticketTypeText}>{displayTicketType}</Text>
         </View>
       </View>
 
-      <Text style={styles.eventName} numberOfLines={2}>{eventName}</Text>
+      <Text style={styles.eventName} numberOfLines={2}>{displayEventName}</Text>
 
       <View style={styles.detailsContainer}>
         <View style={styles.detailRow}>
           <Calendar size={14} color={theme.colors.secondary} />
-          <Text style={styles.detailText}>{date}</Text>
+          <Text style={styles.detailText}>{displayDate}</Text>
         </View>
         <View style={styles.detailRow}>
           <MapPin size={14} color={theme.colors.accent} />
-          <Text style={styles.detailText}>{location}</Text>
+          <Text style={styles.detailText}>{displayLocation}</Text>
         </View>
       </View>
       

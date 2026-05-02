@@ -8,6 +8,7 @@ import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { resolveImageUrl } from '../../utils/imageUrl';
+import { safeInitials } from '../../utils/safeText';
 
 export const ProfileScreen = () => {
   const navigation = useNavigation<any>();
@@ -64,7 +65,7 @@ export const ProfileScreen = () => {
   if (isLoading) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchProfile} /></ScreenContainer>;
 
-  const initials = (user?.name || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+  const initials = safeInitials(user?.name, 'U');
 
   return (
     <ScreenContainer scrollable>

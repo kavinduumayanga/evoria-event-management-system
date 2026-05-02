@@ -8,6 +8,7 @@ import { Event } from '../../types';
 import { ScreenContainer, EventCard, LoadingState, EmptyState, ErrorState, Input, Card } from '../../components';
 import { theme } from '../../constants/theme';
 import { EventService } from '../../api/services';
+import { logDevMissing, safeString } from '../../utils/safeText';
 
 type EventListScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventList'>;
 
@@ -78,7 +79,7 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
     <ScreenContainer>
       <FlatList
         data={events}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, String(index))}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -119,25 +120,37 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
             {trendingEvents.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Trending</Text>
-                {trendingEvents.map((item) => (
-                  <EventCard
-                    key={`trend-${item.id}`}
-                    event={item}
-                    onPress={() => navigation.navigate('EventDetails', { eventId: item.id, publicSlug: item.publicSlug })}
-                  />
-                ))}
+                {trendingEvents.map((item, index) => {
+                  const eventId = safeString(item.id, '');
+                  if (!eventId) {
+                    logDevMissing('event-list-trending-id', 'Trending event missing id; navigation disabled.');
+                  }
+                  return (
+                    <EventCard
+                      key={`trend-${eventId || index}`}
+                      event={item}
+                      onPress={eventId ? () => navigation.navigate('EventDetails', { eventId, publicSlug: item.publicSlug }) : undefined}
+                    />
+                  );
+                })}
               </View>
             )}
 
             <Text style={styles.sectionTitle}>All Events</Text>
           </>
         }
-        renderItem={({ item }) => (
-          <EventCard
-            event={item}
-            onPress={() => navigation.navigate('EventDetails', { eventId: item.id, publicSlug: item.publicSlug })}
-          />
-        )}
+        renderItem={({ item }) => {
+          const eventId = safeString(item.id, '');
+          if (!eventId) {
+            logDevMissing('event-list-id', 'Event list item missing id; navigation disabled.');
+          }
+          return (
+            <EventCard
+              event={item}
+              onPress={eventId ? () => navigation.navigate('EventDetails', { eventId, publicSlug: item.publicSlug }) : undefined}
+            />
+          );
+        }}
         ListEmptyComponent={<EmptyState title="No Events Found" message="Try changing your filters or check back later." />}
       />
     </ScreenContainer>
