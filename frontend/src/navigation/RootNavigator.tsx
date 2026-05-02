@@ -6,14 +6,12 @@ import { RootStackParamList } from '../types/navigation';
 import { AuthNavigator } from './AuthNavigator';
 import { AttendeeNavigator } from './AttendeeNavigator';
 import { theme } from '../constants/theme';
-import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator = () => {
   const token = useAuthStore((state) => state.token);
   const isAuthLoading = useAuthStore((state) => state.isAuthLoading);
-  usePushNotifications();
 
   useEffect(() => {
     initAuth().catch((error) => {

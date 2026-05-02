@@ -17,6 +17,7 @@ import { AuthStackParamList } from '../../types/navigation';
 import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
+import { safeLower } from '../../utils/safeText';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -35,7 +36,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleRegister = async () => {
     const normalizedName = name.trim();
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = safeLower(email.trim());
 
     if (!normalizedName || !normalizedEmail || !password) {
       Alert.alert('Validation', 'Please fill in all required fields.');

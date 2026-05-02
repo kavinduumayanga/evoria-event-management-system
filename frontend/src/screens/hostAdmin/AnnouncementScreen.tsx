@@ -12,6 +12,7 @@ import {
   Card, Input, Button,
 } from '../../components';
 import { EventCommunicationEntry, EventService, UserService } from '../../api/services';
+import { safeUpper } from '../../utils/safeText';
 
 export const AnnouncementScreen = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -229,7 +230,7 @@ export const AnnouncementScreen = () => {
                       </Text>
                     </View>
                     <View style={styles.historyMetaRight}>
-                      <Text style={styles.historyStatus}>{String(item.status || '').toUpperCase()}</Text>
+                      <Text style={styles.historyStatus}>{safeUpper(item.status)}</Text>
                       <Text style={styles.historyTime}>
                         {new Date(item.createdAt).toLocaleDateString('en-US', {
                           month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',

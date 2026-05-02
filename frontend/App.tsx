@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
+import { ToastProvider } from './src/components';
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
       <NavigationContainer ref={navigationRef}>
         <StatusBar style="light" />
         <RootNavigator />
+        <ToastProvider />
       </NavigationContainer>
     </SafeAreaProvider>
   );

@@ -9,6 +9,7 @@ import { Notification } from '../../types';
 import { NotificationService } from '../../api/services';
 import { theme } from '../../constants/theme';
 import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatusBadge } from '../../components';
+import { formatSafeDate, logDevMissing, safeStatus, safeString } from '../../utils/safeText';
 
 const TYPE_STATUS: Record<string, any> = {
   booking: 'success',
@@ -73,7 +74,7 @@ export const NotificationsScreen = () => {
     <ScreenContainer>
       <FlatList
         data={notifications}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, String(index))}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -100,52 +101,66 @@ export const NotificationsScreen = () => {
             message="You're all caught up. New updates will appear here."
           />
         }
-        renderItem={({ item }) => (
-          <Card
-            variant={item.isRead ? 'default' : 'primary'}
-            style={styles.notifCard}
-            noPadding
-          >
-            <View style={styles.notifInner}>
-              {/* Title row */}
-              <View style={styles.notifHeader}>
-                <Text style={styles.notifTitle} numberOfLines={1}>{item.title}</Text>
-                <StatusBadge status={TYPE_STATUS[item.type] ?? 'neutral'} label={item.type} />
-              </View>
+        renderItem={({ item }) => {
+          const notificationId = safeString(item.id, '');
+          if (!notificationId) {
+            logDevMissing('notification-id', 'Notification item is missing an id. Actions are disabled.');
+          }
+          const title = safeString(item.title, 'Notification');
+          const message = safeString(item.message, '');
+          const typeLabel = safeStatus(item.type, 'unknown');
+          const dateLabel = formatSafeDate(item.createdAt, 'Date unavailable', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
 
-              {/* Message */}
-              <Text style={styles.notifMessage}>{item.message}</Text>
+          return (
+            <Card
+              variant={item.isRead ? 'default' : 'primary'}
+              style={styles.notifCard}
+              noPadding
+            >
+              <View style={styles.notifInner}>
+                {/* Title row */}
+                <View style={styles.notifHeader}>
+                  <Text style={styles.notifTitle} numberOfLines={1}>{title}</Text>
+                  <StatusBadge status={TYPE_STATUS[item.type] ?? 'neutral'} label={typeLabel} />
+                </View>
 
-              {/* Meta + actions */}
-              <View style={styles.notifFooter}>
-                <Text style={styles.notifTime}>
-                  {new Date(item.createdAt).toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                  })}
-                </Text>
-                <View style={styles.notifActions}>
-                  {!item.isRead && (
+                {/* Message */}
+                <Text style={styles.notifMessage}>{message}</Text>
+
+                {/* Meta + actions */}
+                <View style={styles.notifFooter}>
+                  <Text style={styles.notifTime}>
+                    {dateLabel}
+                  </Text>
+                  <View style={styles.notifActions}>
+                    {!item.isRead && (
+                      <TouchableOpacity
+                        style={styles.actionPill}
+                        onPress={() => notificationId && handleMarkAsRead(notificationId)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Check size={13} color={theme.colors.success} />
+                        <Text style={[styles.actionPillText, { color: theme.colors.success }]}>Read</Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       style={styles.actionPill}
-                      onPress={() => handleMarkAsRead(item.id)}
+                      onPress={() => notificationId && handleDelete(notificationId)}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     >
-                      <Check size={13} color={theme.colors.success} />
-                      <Text style={[styles.actionPillText, { color: theme.colors.success }]}>Read</Text>
+                      <Trash2 size={13} color={theme.colors.error} />
                     </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={styles.actionPill}
-                    onPress={() => handleDelete(item.id)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <Trash2 size={13} color={theme.colors.error} />
-                  </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          </Card>
-        )}
+            </Card>
+          );
+        }}
       />
     </ScreenContainer>
   );

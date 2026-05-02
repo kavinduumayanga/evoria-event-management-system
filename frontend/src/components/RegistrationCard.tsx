@@ -5,12 +5,13 @@ import { AnimatedPressable } from './AnimatedPressable';
 import { StatusBadge } from './StatusBadge';
 import { theme } from '../constants/theme';
 import { Mail, Calendar } from 'lucide-react-native';
+import { formatSafeDate, safeStatus, safeString, safeTitle, safeUpper } from '../utils/safeText';
 
 interface RegistrationCardProps {
-  name: string;
-  email: string;
-  date: string;
-  status: 'approved' | 'pending' | 'rejected';
+  name?: string;
+  email?: string;
+  date?: string;
+  status?: 'approved' | 'pending' | 'rejected' | string;
   avatarUrl?: string;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -29,6 +30,12 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
     }
   };
 
+  const displayName = safeTitle(name, 'Guest');
+  const displayEmail = safeString(email, 'Unknown email');
+  const initial = safeUpper(displayName.trim().charAt(0), 'G');
+  const statusLabel = safeStatus(status, 'unknown');
+  const dateLabel = formatSafeDate(date, 'Date unavailable');
+
   const CardContent = (
     <GlassCard style={[styles.container, style]} variant="dark" animateEntrance>
       <View style={styles.headerRow}>
@@ -37,23 +44,23 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
             <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+              <Text style={styles.avatarText}>{initial}</Text>
             </View>
           )}
           <View style={styles.userInfo}>
-            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.name}>{displayName}</Text>
             <View style={styles.iconTextRow}>
               <Mail size={12} color={theme.colors.textMuted} />
-              <Text style={styles.email}>{email}</Text>
+              <Text style={styles.email}>{displayEmail}</Text>
             </View>
           </View>
         </View>
-        <StatusBadge status={getStatus()} label={status} />
+        <StatusBadge status={getStatus()} label={statusLabel} />
       </View>
 
       <View style={styles.detailsRow}>
         <Calendar size={14} color={theme.colors.secondary} />
-        <Text style={styles.detailText}>Registered: {new Date(date).toLocaleDateString()}</Text>
+        <Text style={styles.detailText}>Registered: {dateLabel}</Text>
       </View>
 
       {actions && (

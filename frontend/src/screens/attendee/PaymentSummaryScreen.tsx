@@ -7,6 +7,7 @@ import { ScreenContainer, Card, Button, LoadingState, ErrorState, IconButton, In
 import { theme } from '../../constants/theme';
 import { ArrowLeft, Tag, Receipt, CreditCard } from 'lucide-react-native';
 import { BookingService, PaymentService } from '../../api/services';
+import { logDevMissing, safeString, safeTitle, safeUpper } from '../../utils/safeText';
 
 type PaymentSummaryNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'PaymentSummary'>;
 type PaymentSummaryRouteProp = RouteProp<AttendeeHomeStackParamList, 'PaymentSummary'>;
@@ -35,7 +36,16 @@ const lineStyles = StyleSheet.create({
 });
 
 export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId, ticketTypeId, quantity, promoCode, unlockCode, ticketName, currency, unitPrice, customAnswers } = route.params;
+  const params = route.params;
+  const eventId = params?.eventId;
+  const ticketTypeId = params?.ticketTypeId;
+  const quantity = params?.quantity;
+  const promoCode = params?.promoCode;
+  const unlockCode = params?.unlockCode;
+  const ticketName = params?.ticketName;
+  const currency = params?.currency;
+  const unitPrice = params?.unitPrice;
+  const customAnswers = params?.customAnswers;
 
   const [isLoading, setIsLoading] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -52,6 +62,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
     try {
       setIsLoading(true);
       setError(null);
+      if (!ticketTypeId || !quantity) return;
       const res = await PaymentService.mockCheckout({ ticketTypeId, quantity, promoCode, unlockCode });
       setSummary(res.data);
     } catch (err: any) {
@@ -62,6 +73,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
   };
 
   const confirmPayment = async () => {
+    if (!eventId || !ticketTypeId || !quantity) return;
     const normalizedCardNumber = cardNumber.replace(/\s+/g, '');
     if (!cardholderName.trim()) {
       Alert.alert('Validation', 'Cardholder name is required.');
@@ -102,6 +114,15 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
     }
   };
 
+  if (!eventId || !ticketTypeId || !quantity || !ticketName || !currency || typeof unitPrice !== 'number') {
+    logDevMissing('payment-summary-missing-params', 'PaymentSummaryScreen missing required route params.');
+    return (
+      <ScreenContainer>
+        <ErrorState message="Missing payment details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+      </ScreenContainer>
+    );
+  }
+
   if (isLoading) return <LoadingState />;
 
   return (
@@ -131,11 +152,11 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
             <Card variant="primary" style={styles.ticketCard} noPadding>
               <View style={styles.ticketHeader}>
                 <CreditCard size={16} color={theme.colors.primary} />
-                <Text style={styles.ticketName}>{ticketName}</Text>
+                <Text style={styles.ticketName}>{safeTitle(ticketName, 'Ticket')}</Text>
               </View>
               <View style={styles.ticketBody}>
                 <LineRow label="Quantity" value={String(quantity)} />
-                <LineRow label="Unit price" value={`${currency} ${unitPrice.toFixed(2)}`} />
+                <LineRow label="Unit price" value={`${safeString(currency, 'LKR')} ${Number(unitPrice || 0).toFixed(2)}`} />
                 <View style={styles.divider} />
                 <LineRow label="Subtotal" value={summary ? `${summary.currency} ${summary.totalAmount.toFixed(2)}` : '—'} />
                 {(summary?.discountAmount ?? 0) > 0 && (
@@ -144,7 +165,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
                 {promoCode && (
                   <View style={styles.promoPill}>
                     <Tag size={12} color={theme.colors.success} />
-                    <Text style={styles.promoText}>Code: {promoCode.toUpperCase()}</Text>
+                    <Text style={styles.promoText}>Code: {safeUpper(promoCode)}</Text>
                   </View>
                 )}
                 <View style={styles.divider} />

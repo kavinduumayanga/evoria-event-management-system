@@ -11,8 +11,7 @@ import { createNotificationRecord, createNotificationsForUsers } from '../utils/
 import { buildEventPublicUrl } from '../utils/mockEmail.helper';
 import { buildEventEmailContext } from '../utils/eventCommunication.helper';
 import { sendEmail } from '../services/email.service';
-import { eventBlastTemplate, inviteGuestTemplate } from '../services/emailTemplates';
-import { sendPushToUsers } from '../services/pushNotification.service';
+import { inviteGuestTemplate, eventBlastTemplate } from '../services/emailTemplates';
 
 const inviteGuestSchema = z.object({
   email: z.string().trim().email('Please provide a valid guest email'),
@@ -122,18 +121,6 @@ export const inviteGuestToEvent = async (req: Request, res: Response, next: Next
         createdBy: req.user!.id,
       });
 
-      await sendPushToUsers([invitedUser.id], {
-        eventId: event.id,
-        title: 'Event Invitation',
-        message: `You were invited to ${event.title}.`,
-        type: 'announcement',
-        createdBy: req.user!.id,
-        data: {
-          eventId: event.id,
-          type: 'event_invite',
-          publicUrl,
-        },
-      });
     }
 
     const responseMessage = emailResult.status === 'failed'
@@ -259,17 +246,6 @@ export const blastEventMessage = async (req: Request, res: Response, next: NextF
       inAppNotificationsCount = createdNotifications.length;
     }
 
-    const pushSummary = await sendPushToUsers(inAppRecipientIds, {
-      eventId: event.id,
-      title: subject,
-      message: payload.message.trim(),
-      type: 'announcement',
-      createdBy: req.user!.id,
-      data: {
-        eventId: event.id,
-        type: 'event_blast',
-      },
-    });
 
     res.status(201).json({
       status: 'success',
@@ -282,7 +258,6 @@ export const blastEventMessage = async (req: Request, res: Response, next: NextF
         recipients: recipients.length,
         email: { sent, failed, mock },
         inAppRecipients: inAppNotificationsCount,
-        push: pushSummary,
       },
     });
   } catch (error: any) {

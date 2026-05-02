@@ -6,6 +6,7 @@ import { theme } from '../../constants/theme';
 import { AdminService, ModerationService, ReportService } from '../../api/services';
 import { PlatformAnalytics, ReportRecord } from '../../types';
 import { Flag, ShieldBan, ShieldCheck } from 'lucide-react-native';
+import { safeUpper } from '../../utils/safeText';
 
 export const ModerationDashboardScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -191,7 +192,7 @@ export const ModerationDashboardScreen = () => {
             <Card variant="raised" style={styles.reportCard} noPadding>
               <View style={styles.reportCardInner}>
                 <View style={styles.reportHeader}>
-                  <Text style={styles.reportType}>{item.targetType.toUpperCase()} REPORT</Text>
+                  <Text style={styles.reportType}>{safeUpper(item.targetType)} REPORT</Text>
                   <View style={[
                     styles.statusBadge,
                     item.isResolved ? styles.statusResolved : styles.statusPending,
