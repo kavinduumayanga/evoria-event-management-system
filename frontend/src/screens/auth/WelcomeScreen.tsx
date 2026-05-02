@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import { AuthStackParamList } from '../../types/navigation';
 import { Button } from '../../components';
 import { theme } from '../../constants/theme';
@@ -49,12 +48,7 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={['#09060f', '#140f24', '#09060f']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      
 
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />

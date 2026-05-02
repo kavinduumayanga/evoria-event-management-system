@@ -1,209 +1,82 @@
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TextInputProps,
-  StyleProp,
-  ViewStyle,
-  TouchableOpacity,
-  Animated,
-} from 'react-native';
-import { Eye, EyeOff } from 'lucide-react-native';
+import React, { forwardRef, useState } from 'react';
+import { View, TextInput, Text, StyleSheet, TextInputProps, Animated } from 'react-native';
 import { theme } from '../constants/theme';
 
-// ============================================================
-// INPUT — Unified input component (replaces both Input.tsx and FormInput.tsx)
-//
-// Features:
-//   - Fixed 48dp height (single-line), auto-height (multiline)
-//   - Label always visible above field
-//   - Focus border animation (primary color)
-//   - Error state with message below
-//   - Left icon slot
-//   - Password toggle built-in
-//   - NO dynamic keys — stable component, never remounts on typing
-//
-// Usage:
-//   <Input label="Email" value={email} onChangeText={setEmail} />
-//   <Input label="Password" isPassword value={pw} onChangeText={setPw} />
-//   <Input label="Bio" multiline numberOfLines={4} value={bio} onChangeText={setBio} />
-// ============================================================
-
-interface InputProps extends Omit<TextInputProps, 'style'> {
+export interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   leftIcon?: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-  containerStyle?: StyleProp<ViewStyle>;
+  rightIcon?: React.ReactNode;
   isPassword?: boolean;
-  hint?: string;
+  containerStyle?: object;
 }
 
-export const Input: React.FC<InputProps> = ({
-  label,
-  error,
-  leftIcon,
-  style,
-  containerStyle,
-  isPassword = false,
-  multiline = false,
-  numberOfLines = 1,
-  hint,
-  ...textInputProps
-}) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const borderAnim = useRef(new Animated.Value(0)).current;
+export const Input = forwardRef<TextInput, InputProps>(
+  ({ label, error, leftIcon, rightIcon, isPassword, containerStyle, style, ...props }, ref) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [secureText, setSecureText] = useState(isPassword);
 
-  const handleFocus = () => {
-    setIsFocused(true);
-    Animated.timing(borderAnim, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
-  };
+    const focusAnim = React.useRef(new Animated.Value(0)).current;
 
-  const handleBlur = () => {
-    setIsFocused(false);
-    Animated.timing(borderAnim, {
-      toValue: 0,
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
-  };
+    React.useEffect(() => {
+      Animated.timing(focusAnim, {
+        toValue: isFocused ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }, [isFocused]);
 
-  const borderColor = borderAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      error ? theme.colors.errorBorder : theme.colors.border,
-      error ? theme.colors.error : theme.colors.borderFocus,
-    ],
-  });
+    const borderColor = focusAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [error ? theme.colors.error : theme.colors.borderStrong, error ? theme.colors.error : theme.colors.primary],
+    });
 
-  const inputHeight = multiline ? Math.max(80, numberOfLines * 24 + 24) : 52;
+    const backgroundColor = focusAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [theme.colors.surface, theme.colors.background],
+    });
 
-  return (
-    <View style={[styles.wrapper, containerStyle]}>
-      {label && (
-        <Text style={[styles.label, error && styles.labelError]}>{label}</Text>
-      )}
-
-      <Animated.View
-        style={[
-          styles.fieldContainer,
-          { borderColor, height: multiline ? undefined : inputHeight },
-          multiline && { minHeight: inputHeight, paddingVertical: 14 },
-          style,
-        ]}
-      >
-        {leftIcon && (
-          <View style={styles.leftIcon}>{leftIcon}</View>
-        )}
-
-        <TextInput
-          style={[
-            styles.input,
-            leftIcon && styles.inputWithLeftIcon,
-            isPassword && styles.inputWithRightIcon,
-            multiline && styles.multilineInput,
-          ]}
-          placeholderTextColor={theme.colors.textMuted}
-          selectionColor={theme.colors.primary}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          secureTextEntry={isPassword && !showPassword}
-          multiline={multiline}
-          numberOfLines={multiline ? numberOfLines : undefined}
-          textAlignVertical={multiline ? 'top' : 'center'}
-          {...textInputProps}
-        />
-
-        {isPassword && (
-          <TouchableOpacity
-            style={styles.rightIcon}
-            onPress={() => setShowPassword((prev) => !prev)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            {showPassword
-              ? <EyeOff size={18} color={theme.colors.textMuted} />
-              : <Eye size={18} color={theme.colors.textMuted} />
-            }
-          </TouchableOpacity>
-        )}
-      </Animated.View>
-
-      {error ? (
-        <Text style={styles.error}>{error}</Text>
-      ) : hint ? (
-        <Text style={styles.hint}>{hint}</Text>
-      ) : null}
-    </View>
-  );
-};
-
-// ============================================================
-// Legacy aliases — FormInput maps to Input
-// ============================================================
-export const FormInput = Input;
+    return (
+      <View style={[styles.container, containerStyle]}>
+        {label && <Text style={styles.label}>{label}</Text>}
+        <Animated.View style={[styles.inputWrapper, { borderColor, backgroundColor }]}>
+          {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
+          <TextInput
+            ref={ref}
+            style={[styles.input, leftIcon && styles.inputWithLeftIcon, style]}
+            placeholderTextColor={theme.colors.textMuted}
+            onFocus={(e) => { setIsFocused(true); props.onFocus?.(e); }}
+            onBlur={(e) => { setIsFocused(false); props.onBlur?.(e); }}
+            secureTextEntry={secureText}
+            {...props}
+          />
+          {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
+        </Animated.View>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+      </View>
+    );
+  }
+);
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: theme.spacing.m,
-  },
-  label: {
-    ...theme.typography.label,
-    color: theme.colors.textSecondary,
-    marginBottom: 8,
-  },
-  labelError: {
-    color: theme.colors.error,
-  },
-  fieldContainer: {
+  container: { marginBottom: theme.spacing.m, width: '100%' },
+  label: { ...theme.typography.label, color: theme.colors.text, marginBottom: 8, marginLeft: 4 },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: theme.borderRadius.m,
-    borderWidth: 1,
-    overflow: 'hidden',
-    paddingHorizontal: theme.spacing.m,
-  },
-  leftIcon: {
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rightIcon: {
-    marginLeft: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 4,
+    borderWidth: 2,
+    borderRadius: theme.borderRadius.l,
+    height: 56,
+    paddingHorizontal: 16,
   },
   input: {
     flex: 1,
-    ...theme.typography.body,
+    height: '100%',
     color: theme.colors.text,
-    paddingVertical: 0,
-    minHeight: 52,
+    ...theme.typography.bodyMedium,
   },
-  inputWithLeftIcon: {},
-  inputWithRightIcon: {},
-  multilineInput: {
-    textAlignVertical: 'top',
-    minHeight: 80,
-  },
-  error: {
-    ...theme.typography.caption,
-    color: theme.colors.error,
-    marginTop: 6,
-    marginLeft: 4,
-  },
-  hint: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: 6,
-    marginLeft: 4,
-  },
+  inputWithLeftIcon: { marginLeft: 12 },
+  leftIcon: { alignItems: 'center', justifyContent: 'center' },
+  rightIcon: { alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  errorText: { ...theme.typography.caption, color: theme.colors.error, marginTop: 6, marginLeft: 4 },
 });

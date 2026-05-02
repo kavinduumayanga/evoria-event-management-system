@@ -1,108 +1,42 @@
 import React from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  StyleProp,
-  ViewStyle,
-  RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../constants/theme';
-
-// ============================================================
-// SCREEN CONTAINER — Base layout wrapper for all screens
-//
-// Provides:
-//   - Safe area (top + bottom)
-//   - Background color
-//   - Optional scrollable mode
-//   - Consistent horizontal inset (20dp)
-//   - RefreshControl support
-//
-// Usage:
-//   <ScreenContainer>...</ScreenContainer>
-//   <ScreenContainer scrollable inset>...</ScreenContainer>
-//   <ScreenContainer scrollable refreshing={...} onRefresh={...}>
-// ============================================================
 
 interface ScreenContainerProps {
   children: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-  scrollable?: boolean;
-  inset?: boolean;         // Apply standard 20dp horizontal inset
-  refreshing?: boolean;
-  onRefresh?: () => void;
-  scrollRef?: React.RefObject<ScrollView>;
-  // Legacy props
-  refreshControl?: React.ReactElement;
+  withSafeArea?: boolean;
+  edges?: ('top' | 'right' | 'bottom' | 'left')[];
+  style?: object;
+  backgroundColor?: string;
 }
 
 export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   children,
+  withSafeArea = true,
+  edges = ['top'],
   style,
-  scrollable = false,
-  inset = false,
-  refreshing,
-  onRefresh,
-  scrollRef,
-  refreshControl,
+  backgroundColor = theme.colors.background,
 }) => {
-  const inner = inset ? [styles.inset] : [];
-
-  if (scrollable) {
-    const refreshCtrl = refreshControl
-      ?? (onRefresh
-        ? <RefreshControl
-            refreshing={refreshing ?? false}
-            onRefresh={onRefresh}
-            tintColor={theme.colors.primary}
-            colors={[theme.colors.primary]}
-          />
-        : undefined);
-
+  const insets = useSafeAreaInsets();
+  
+  if (withSafeArea) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, ...inner, style]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={refreshCtrl}
-        >
-          {children}
-        </ScrollView>
+      <SafeAreaView style={[styles.container, { backgroundColor }, style]} edges={edges}>
+        {children}
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, style]} edges={['top']}>
-      <View style={[styles.flex, ...inner]}>
-        {children}
-      </View>
-    </SafeAreaView>
+    <View style={[styles.container, { backgroundColor, paddingTop: insets.top }, style]}>
+      {children}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 100,
-  },
-  inset: {
-    paddingHorizontal: theme.spacing.base,
   },
 });

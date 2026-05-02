@@ -9,7 +9,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import { Input, Button, IconButton } from '../../components';
@@ -68,10 +67,7 @@ export const ChangePasswordScreen = () => {
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={['#111111', '#1A1714', '#111111']}
-        style={StyleSheet.absoluteFillObject}
-      />
+      
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <IconButton

@@ -10,7 +10,6 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, User, Phone, Image as ImageIcon } from 'lucide-react-native';
 import { Input, Button, IconButton, LoadingState } from '../../components';
@@ -119,10 +118,7 @@ export const EditProfileScreen = () => {
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={['#111111', '#1A1714', '#111111']}
-        style={StyleSheet.absoluteFillObject}
-      />
+      
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={styles.header}>
