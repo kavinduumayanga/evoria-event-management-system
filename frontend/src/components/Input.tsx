@@ -9,10 +9,11 @@ export interface InputProps extends TextInputProps {
   rightIcon?: React.ReactNode;
   isPassword?: boolean;
   containerStyle?: object;
+  hint?: string;
 }
 
 export const Input = forwardRef<TextInput, InputProps>(
-  ({ label, error, leftIcon, rightIcon, isPassword, containerStyle, style, ...props }, ref) => {
+  ({ label, error, leftIcon, rightIcon, isPassword, containerStyle, hint, style, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
     const [secureText, setSecureText] = useState(isPassword);
 
@@ -28,13 +29,10 @@ export const Input = forwardRef<TextInput, InputProps>(
 
     const borderColor = focusAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [error ? theme.colors.error : theme.colors.borderStrong, error ? theme.colors.error : theme.colors.primary],
+      outputRange: [error ? theme.colors.error : 'rgba(255,255,255,0.08)', error ? theme.colors.error : 'rgba(255,255,255,0.2)'],
     });
 
-    const backgroundColor = focusAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [theme.colors.surface, theme.colors.background],
-    });
+    const backgroundColor = 'rgba(30,30,30,0.8)';
 
     return (
       <View style={[styles.container, containerStyle]}>
@@ -43,7 +41,7 @@ export const Input = forwardRef<TextInput, InputProps>(
           {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
           <TextInput
             ref={ref}
-            style={[styles.input, leftIcon && styles.inputWithLeftIcon, style]}
+            style={[styles.input, leftIcon ? styles.inputWithLeftIcon : undefined, style]}
             placeholderTextColor={theme.colors.textMuted}
             onFocus={(e) => { setIsFocused(true); props.onFocus?.(e); }}
             onBlur={(e) => { setIsFocused(false); props.onBlur?.(e); }}
@@ -52,6 +50,7 @@ export const Input = forwardRef<TextInput, InputProps>(
           />
           {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
         </Animated.View>
+        {hint && !error && <Text style={styles.hintText}>{hint}</Text>}
         {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
     );
@@ -59,24 +58,25 @@ export const Input = forwardRef<TextInput, InputProps>(
 );
 
 const styles = StyleSheet.create({
-  container: { marginBottom: theme.spacing.m, width: '100%' },
-  label: { ...theme.typography.label, color: theme.colors.text, marginBottom: 8, marginLeft: 4 },
+  container: { marginBottom: 16, width: '100%' },
+  label: { color: '#A3A3A3', fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: theme.borderRadius.l,
+    borderWidth: 1,
+    borderRadius: 16,
     height: 56,
     paddingHorizontal: 16,
   },
   input: {
     flex: 1,
     height: '100%',
-    color: theme.colors.text,
-    ...theme.typography.bodyMedium,
+    color: '#FFFFFF',
+    fontSize: 16,
   },
   inputWithLeftIcon: { marginLeft: 12 },
   leftIcon: { alignItems: 'center', justifyContent: 'center' },
   rightIcon: { alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  hintText: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 6, marginLeft: 4 },
   errorText: { ...theme.typography.caption, color: theme.colors.error, marginTop: 6, marginLeft: 4 },
 });

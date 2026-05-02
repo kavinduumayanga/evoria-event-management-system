@@ -4,7 +4,7 @@ import { theme } from '../constants/theme';
 import { ChevronDown, Check, X } from 'lucide-react-native';
 import { AnimatedPressable } from './AnimatedPressable';
 import { ScreenContainer } from './ScreenContainer';
-import { GlassCard } from './Card';
+import { GlassCard } from './GlassCard';
 import { IconButton } from './IconButton';
 
 export interface SelectOption {
@@ -97,12 +97,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: 'rgba(30,30,30,0.8)',
     borderWidth: 1,
-    borderColor: theme.colors.glassBorder,
-    borderRadius: theme.borderRadius.l,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.m,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 56,
   },
   triggerError: {
     borderColor: theme.colors.error,

@@ -162,7 +162,7 @@ export const MyBookingsScreen = () => {
             actions={
               <View style={styles.actionsWrapper}>
                 {item.isWaitlisted ? (
-                  <Card variant="warning" style={styles.waitingBanner} noPadding>
+                  <Card variant="outline" style={styles.waitingBanner} noPadding>
                     <Text style={styles.waitingBannerText}>
                       Waiting in queue{item.waitlistPosition ? ` (#${item.waitlistPosition})` : ''}
                     </Text>

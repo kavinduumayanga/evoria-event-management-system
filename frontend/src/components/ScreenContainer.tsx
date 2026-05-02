@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, SafeAreaView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, RefreshControl } from 'react-native';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../constants/theme';
 
 interface ScreenContainerProps {
@@ -9,6 +9,10 @@ interface ScreenContainerProps {
   edges?: ('top' | 'right' | 'bottom' | 'left')[];
   style?: object;
   backgroundColor?: string;
+  scrollable?: boolean;
+  contentContainerStyle?: object;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 export const ScreenContainer: React.FC<ScreenContainerProps> = ({
@@ -17,6 +21,10 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   edges = ['top'],
   style,
   backgroundColor = theme.colors.background,
+  scrollable = false,
+  contentContainerStyle,
+  refreshing,
+  onRefresh,
 }) => {
   const insets = useSafeAreaInsets();
   
@@ -28,10 +36,20 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
     );
   }
 
+  const Container = scrollable ? require('react-native').ScrollView : View;
+  
+  const refreshControl = scrollable && onRefresh ? (
+    <RefreshControl refreshing={refreshing || false} onRefresh={onRefresh} />
+  ) : undefined;
+
   return (
-    <View style={[styles.container, { backgroundColor, paddingTop: insets.top }, style]}>
+    <Container 
+      style={[styles.container, { backgroundColor, paddingTop: insets.top }, style]}
+      contentContainerStyle={contentContainerStyle}
+      refreshControl={refreshControl}
+    >
       {children}
-    </View>
+    </Container>
   );
 };
 

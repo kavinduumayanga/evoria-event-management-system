@@ -5,7 +5,7 @@ import { theme } from '../constants/theme';
 interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  variant?: 'elevated' | 'flat' | 'outline' | 'raised';
+  variant?: 'elevated' | 'flat' | 'outline' | 'raised' | 'primary';
   noPadding?: boolean;
   onPress?: () => void;
 }
@@ -27,6 +27,8 @@ export const Card: React.FC<CardProps> = ({
         return styles.flat;
       case 'outline':
         return styles.outline;
+      case 'primary':
+        return [styles.raised, { borderColor: theme.colors.primary, borderWidth: 1 }];
       default:
         return [styles.elevated, theme.shadows.md];
     }
@@ -52,26 +54,27 @@ export const Card: React.FC<CardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surfaceRaised,
-    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     overflow: 'hidden',
   },
   padding: {
-    padding: theme.spacing.l,
+    padding: 24,
   },
   elevated: {
-    backgroundColor: theme.colors.surfaceRaised,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   raised: {
-    backgroundColor: theme.colors.surfaceRaised,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   flat: {
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: 'rgba(255,255,255,0.02)',
   },
   outline: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
 });

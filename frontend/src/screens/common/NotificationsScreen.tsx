@@ -118,7 +118,7 @@ export const NotificationsScreen = () => {
 
           return (
             <Card
-              variant={item.isRead ? 'default' : 'primary'}
+              variant={item.isRead ? 'elevated' : 'primary'}
               style={styles.notifCard}
               noPadding
             >

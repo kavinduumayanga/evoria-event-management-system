@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Animated, Platform, Text } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
@@ -14,7 +15,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
 
   const handlePress = (index: number, routeName: string, isFocused: boolean) => {
     Animated.sequence([
-      Animated.timing(scaleAnims[index], { toValue: 0.85, duration: 80, useNativeDriver: true }),
+      Animated.timing(scaleAnims[index], { toValue: 0.9, duration: 80, useNativeDriver: true }),
       Animated.timing(scaleAnims[index], { toValue: 1, duration: 150, useNativeDriver: true }),
     ]).start();
 
@@ -23,50 +24,64 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
   };
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-      <View style={styles.bar}>
+    <View style={[styles.container, { bottom: Math.max(insets.bottom, 16) }]}>
+      <LinearGradient
+        colors={['rgba(60,60,60,0.85)', 'rgba(30,30,30,0.95)']}
+        style={styles.pill}
+      >
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
           const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
-          const icon = options.tabBarIcon ? options.tabBarIcon({ focused: isFocused, color: isFocused ? theme.colors.primary : theme.colors.tabBarInactive, size: 24 }) : null;
+          // The reference has Home, Discover, Chat (we'll keep dynamic icons but map colors)
+          const icon = options.tabBarIcon ? options.tabBarIcon({ 
+            focused: isFocused, 
+            color: isFocused ? '#FFF' : '#A3A3A3', 
+            size: 20 
+          }) : null;
 
           return (
             <Animated.View key={route.key} style={[styles.tabWrap, { transform: [{ scale: scaleAnims[index] }] }]}>
               <TouchableOpacity
-                style={styles.tab}
+                style={[styles.tab, isFocused && styles.tabActive]}
                 onPress={() => handlePress(index, route.name, isFocused)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
-                  {icon}
-                </View>
-                {isFocused && <View style={styles.activeDot} />}
+                {icon}
+                <Text style={[styles.label, isFocused && styles.labelActive]}>
+                  {label as string}
+                </Text>
               </TouchableOpacity>
             </Animated.View>
           );
         })}
-      </View>
+      </LinearGradient>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.tabBarBg,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    ...theme.shadows.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    zIndex: 999,
   },
-  bar: {
+  pill: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
+    height: 64,
+    borderRadius: 32,
+    paddingHorizontal: 8,
+    alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    ...theme.shadows.premium,
+    width: '100%',
+    maxWidth: 320,
   },
   tabWrap: {
     flex: 1,
@@ -75,21 +90,21 @@ const styles = StyleSheet.create({
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    height: 48,
+    borderRadius: 24,
+    width: '100%',
+    gap: 4,
   },
-  iconWrap: {
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
+  tabActive: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  iconWrapActive: {
-    backgroundColor: theme.colors.primarySubtle,
+  label: {
+    ...theme.typography.small,
+    fontSize: 10,
+    color: '#A3A3A3',
+    fontWeight: '600',
   },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.primary,
-    marginTop: -2,
+  labelActive: {
+    color: '#FFF',
   },
 });
