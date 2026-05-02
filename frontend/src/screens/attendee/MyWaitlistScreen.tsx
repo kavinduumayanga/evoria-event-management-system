@@ -66,7 +66,7 @@ export const MyWaitlistScreen = () => {
         renderItem={({ item }) => {
           const isWaiting = item.status === 'waiting';
           return (
-            <GlassCard style={styles.card}>
+            <GlassCard style={styles.card} variant="dark">
               <View style={styles.cardHeader}>
                 <Text style={styles.eventTitle}>{item.event?.title || 'Event'}</Text>
                 <View style={[

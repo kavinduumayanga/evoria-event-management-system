@@ -71,7 +71,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
           <IconButton 
             icon={<ArrowLeft color={theme.colors.text} size={24} />} 
             onPress={() => navigation.goBack()} 
-            variant="solid" 
+            variant="ghost" 
           />
         </View>
 
@@ -87,7 +87,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             <GlassCard style={styles.card} variant="dark" animateEntrance>
               <FormInput
                 label="Email Address"
-                placeholder="Enter your email"
+                placeholder="name@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -112,7 +112,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             {message ? <Text style={styles.infoText}>{message}</Text> : null}
 
             {devResetToken ? (
-              <GlassCard style={styles.tokenCard} variant="neonPurple" animateEntrance>
+              <GlassCard style={styles.tokenCard} variant="primary" animateEntrance>
                 <Text style={styles.tokenLabel}>Development Reset Token</Text>
                 <Text style={styles.tokenValue}>{devResetToken}</Text>
               </GlassCard>
@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: theme.spacing.xl,
     justifyContent: 'center',
+    paddingBottom: theme.spacing.xxxl,
   },
   title: {
     ...theme.typography.h1,
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   card: {
-    padding: theme.spacing.l,
+    padding: theme.spacing.xl,
   },
   button: {
     marginTop: theme.spacing.s,

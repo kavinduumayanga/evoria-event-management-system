@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   actionBtn: {
     padding: theme.spacing.s,
     marginLeft: theme.spacing.xs,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: theme.colors.glass,
     borderRadius: theme.borderRadius.m,
   },
 });

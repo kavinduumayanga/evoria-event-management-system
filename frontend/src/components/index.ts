@@ -8,7 +8,7 @@ export * from './FormInput';
 export * from './Select';
 export * from './GradientBackground';
 export * from './ScreenContainer';
-export * from './NeonCard';
+
 export * from './GlassCard';
 export * from './StatusBadge';
 export * from './SectionHeader';

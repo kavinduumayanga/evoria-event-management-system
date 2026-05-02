@@ -45,7 +45,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
             opacity: pulseAnim,
             transform: [{ scale: pulseAnim }]
           },
-          theme.shadows.neonPurple
+          theme.shadows.glow
         ]} 
       />
     </View>

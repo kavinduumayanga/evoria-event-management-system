@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: theme.colors.glass,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.m,
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   roleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: theme.colors.glass,
     paddingHorizontal: theme.spacing.m,
     paddingVertical: 4,
     borderRadius: theme.borderRadius.round,

@@ -182,7 +182,7 @@ export const AnnouncementScreen = () => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <GlassCard style={styles.formCard} variant="neonPurple">
+        <GlassCard style={styles.formCard} variant="primary">
           <View style={styles.formHeader}>
             <Send size={18} color={theme.colors.primaryLight} />
             <Text style={styles.formTitle}>Blast Message</Text>
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   eventChipSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: theme.colors.glass,
   },
   eventChipText: {
     ...theme.typography.caption,

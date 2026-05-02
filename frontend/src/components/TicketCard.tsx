@@ -19,7 +19,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   eventName, ticketType, date, location, onPress, style 
 }) => {
   const CardContent = (
-    <GlassCard style={[styles.container, style]} variant="neonPurple" animateEntrance>
+    <GlassCard style={[styles.container, style]} variant="primary" animateEntrance>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
           <Ticket size={24} color={theme.colors.primaryLight} />

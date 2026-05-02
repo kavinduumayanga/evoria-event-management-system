@@ -20,14 +20,15 @@ export const IconButton: React.FC<IconButtonProps> = ({
 }) => {
   const getBackgroundColor = () => {
     switch(variant) {
-      case 'solid': return 'rgba(139, 92, 246, 0.15)';
+      case 'solid': return theme.colors.glass;
       case 'outline': return 'transparent';
       case 'ghost': return 'transparent';
     }
   };
 
   const getBorderColor = () => {
-    if (variant === 'outline') return theme.colors.border;
+    if (variant === 'outline') return theme.colors.glassBorder;
+    if (variant === 'solid') return theme.colors.glassBorder;
     return 'transparent';
   };
 

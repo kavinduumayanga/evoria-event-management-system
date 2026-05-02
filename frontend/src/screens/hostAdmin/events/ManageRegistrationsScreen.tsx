@@ -46,7 +46,7 @@ const getStatusColor = (status: string) => {
 };
 
 const getCardVariant = (status: string) => {
-  if (status === 'checked_in') return 'neonPurple';
+  if (status === 'checked_in') return 'primary';
   if (status === 'declined' || status === 'not_going') return 'dark';
   return 'dark';
 };
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.s,
   },
   statusChipSelected: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: theme.colors.glass,
   },
   statusChipText: {
     ...theme.typography.small,

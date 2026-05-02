@@ -27,14 +27,17 @@ export const Input: React.FC<InputProps> = ({
 }) => {
   const inputRef = useRef<TextInput>(null);
   const [isSecure, setIsSecure] = useState(isPassword);
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleFocus: NonNullable<TextInputProps['onFocus']> = (event) => {
+    setIsFocused(true);
     if (onFocus) {
       onFocus(event);
     }
   };
 
   const handleBlur: NonNullable<TextInputProps['onBlur']> = (event) => {
+    setIsFocused(false);
     if (onBlur) {
       onBlur(event);
     }
@@ -56,6 +59,7 @@ export const Input: React.FC<InputProps> = ({
       <View 
         style={[
           styles.inputContainer,
+          isFocused ? styles.inputFocused : null,
           error ? styles.inputError : null,
           style
         ]}
@@ -96,17 +100,17 @@ const styles = StyleSheet.create({
   },
   label: {
     ...theme.typography.caption,
-    color: theme.colors.text,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.s,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
+    borderColor: theme.colors.glassBorder,
+    borderRadius: theme.borderRadius.l,
     paddingHorizontal: theme.spacing.m,
   },
   input: {
@@ -114,6 +118,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     paddingVertical: theme.spacing.m,
     ...theme.typography.body,
+  },
+  inputFocused: {
+    borderColor: theme.colors.primary,
   },
   inputError: {
     borderColor: theme.colors.error,

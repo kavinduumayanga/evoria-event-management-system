@@ -45,7 +45,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, act
         isCancelled && styles.cancelledContainer,
         style,
       ]}
-      variant={event.isFeatured ? 'neonPurple' : 'dark'}
+      variant={event.isFeatured ? 'primary' : 'dark'}
       animateEntrance
     >
       {event.coverImage ? (
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.m,
   },
   publishedContainer: {
-    borderColor: `${theme.colors.success}66`,
+    borderColor: theme.colors.glassBorder,
     borderWidth: 1,
   },
   cancelledContainer: {
@@ -115,12 +115,12 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 140,
+    height: 160,
   },
   imagePlaceholder: {
     width: '100%',
-    height: 140,
-    backgroundColor: theme.colors.surfaceLight,
+    height: 160,
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -143,18 +143,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: theme.spacing.s,
   },
-  statusBadge: {
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.s,
-    borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
   detailsContainer: {
-    marginTop: theme.spacing.xs,
+    marginTop: theme.spacing.m,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -162,22 +152,10 @@ const styles = StyleSheet.create({
     gap: theme.spacing.s,
     flexWrap: 'wrap',
   },
-  metaBadge: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
-  },
-  metaBadgeText: {
-    ...theme.typography.small,
-    color: theme.colors.textMuted,
-    fontWeight: '600',
-  },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   detailText: {
     ...theme.typography.caption,
@@ -188,7 +166,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.m,
     paddingTop: theme.spacing.m,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: theme.colors.glassBorder,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },

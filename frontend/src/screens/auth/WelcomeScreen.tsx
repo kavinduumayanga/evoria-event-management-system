@@ -43,9 +43,9 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <View style={styles.textContainer}>
-            <Text style={styles.title}>Discover Premium Events</Text>
+            <Text style={styles.title}>The New Standard for Events</Text>
             <Text style={styles.subtitle}>
-              Book tickets, manage your events, and experience the neon nightlife like never before.
+              Discover curated experiences, seamlessly manage registrations, and elevate your events.
             </Text>
           </View>
           
@@ -87,21 +87,18 @@ const styles = StyleSheet.create({
     width: width * 0.45,
     height: width * 0.45,
     borderRadius: theme.borderRadius.round,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: theme.colors.glassBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.neonPurple,
+    ...theme.shadows.glow,
   },
   logoText: {
     ...theme.typography.h2,
     color: theme.colors.text,
-    letterSpacing: 6,
+    letterSpacing: 4,
     fontWeight: '800',
-    textShadowColor: theme.colors.primary,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
   },
   textContainer: {
     flex: 1,
@@ -119,6 +116,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: theme.spacing.m,
   },
   buttonContainer: {
     flex: 1,

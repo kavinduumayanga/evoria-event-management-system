@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   label: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: theme.spacing.xs, marginLeft: 4, marginTop: theme.spacing.s },
   selectorContainer: { flexDirection: 'row', marginBottom: theme.spacing.m, gap: theme.spacing.xs, backgroundColor: theme.colors.surfaceLight, padding: 4, borderRadius: theme.borderRadius.m },
   chip: { flex: 1, paddingVertical: theme.spacing.m, borderRadius: theme.borderRadius.m, alignItems: 'center' },
-  chipSelected: { backgroundColor: 'rgba(139, 92, 246, 0.15)' },
+  chipSelected: { backgroundColor: theme.colors.glass },
   chipText: { ...theme.typography.body, color: theme.colors.textMuted },
   chipTextSelected: { color: theme.colors.primary, fontWeight: 'bold' },
   saveButton: { marginTop: theme.spacing.xl, marginBottom: theme.spacing.xxl },

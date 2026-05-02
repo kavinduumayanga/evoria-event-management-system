@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { NeonCard } from './NeonCard';
+import { GlassCard } from './GlassCard';
 import { theme } from '../constants/theme';
 
 interface StatCardProps {
@@ -19,15 +19,15 @@ export const StatCard: React.FC<StatCardProps> = ({
   accentColor = theme.colors.primary 
 }) => {
   return (
-    <NeonCard style={[styles.container, style]} accentColor={accentColor}>
-      <View style={styles.iconContainer}>
+    <GlassCard style={[styles.container, style]} variant="dark">
+      <View style={[styles.iconContainer, { backgroundColor: `${accentColor}1A` }]}>
         {icon}
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.value}>{value}</Text>
         <Text style={styles.title}>{title}</Text>
       </View>
-    </NeonCard>
+    </GlassCard>
   );
 };
 

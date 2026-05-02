@@ -53,7 +53,7 @@ export const FormInput: React.FC<FormInputProps> = ({
 
   const borderColor = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [error ? theme.colors.error : theme.colors.border, error ? theme.colors.error : theme.colors.primary]
+    outputRange: [error ? theme.colors.error : theme.colors.glassBorder, error ? theme.colors.error : theme.colors.primary]
   });
 
   return (
@@ -97,16 +97,16 @@ const styles = StyleSheet.create({
   },
   label: {
     ...theme.typography.caption,
-    color: theme.colors.text,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.s,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderRadius: theme.borderRadius.m,
+    borderRadius: theme.borderRadius.l,
     paddingHorizontal: theme.spacing.m,
   },
   leftIcon: {

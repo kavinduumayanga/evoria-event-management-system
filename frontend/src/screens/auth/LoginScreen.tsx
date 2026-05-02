@@ -75,7 +75,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           <IconButton 
             icon={<ArrowLeft color={theme.colors.text} size={24} />} 
             onPress={() => navigation.goBack()} 
-            variant="solid" 
+            variant="ghost" 
           />
         </View>
 
@@ -85,7 +85,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         >
           <ScrollView
             contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="always"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.title}>Welcome Back</Text>
@@ -94,7 +94,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <GlassCard style={styles.card} variant="dark" animateEntrance>
               <FormInput
                 label="Email Address"
-                placeholder="Enter your email"
+                placeholder="name@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -157,6 +157,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: theme.spacing.xl,
     justifyContent: 'center',
+    paddingBottom: theme.spacing.xxxl,
   },
   title: {
     ...theme.typography.h1,
@@ -169,7 +170,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   card: {
-    padding: theme.spacing.l,
+    padding: theme.spacing.xl,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
@@ -177,7 +178,7 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     ...theme.typography.caption,
-    color: theme.colors.secondary,
+    color: theme.colors.textMuted,
   },
   button: {
     marginTop: theme.spacing.s,
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     ...theme.typography.body,
-    color: theme.colors.primary,
-    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontWeight: '700',
   },
 });

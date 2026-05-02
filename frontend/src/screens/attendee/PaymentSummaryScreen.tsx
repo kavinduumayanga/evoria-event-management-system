@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   headerTitle: { ...theme.typography.h2, color: theme.colors.text },
   content: { flex: 1, padding: theme.spacing.m },
   summaryCard: {
-    padding: theme.spacing.l,
+    padding: theme.spacing.xl,
   },
   ticketName: {
     ...theme.typography.h2,
@@ -164,8 +164,8 @@ const styles = StyleSheet.create({
   },
   finalAmount: {
     ...theme.typography.h3,
-    color: theme.colors.success,
-    marginTop: theme.spacing.s,
+    color: theme.colors.text,
+    marginTop: theme.spacing.m,
     marginBottom: theme.spacing.s,
   },
   promoText: {
@@ -174,12 +174,14 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: theme.spacing.l,
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.glassBorder,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
   errorCard: {
-    padding: theme.spacing.l,
+    padding: theme.spacing.xl,
   },
   errorText: {
     ...theme.typography.body,

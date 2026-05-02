@@ -137,5 +137,5 @@ const styles = StyleSheet.create({
   sessionDetail: { ...theme.typography.caption, color: theme.colors.primaryLight, marginBottom: 2 },
   sessionSpeaker: { ...theme.typography.caption, color: theme.colors.textMuted },
   actions: { flexDirection: 'row' },
-  actionBtn: { padding: theme.spacing.s, marginLeft: theme.spacing.xs, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: theme.borderRadius.m },
+  actionBtn: { padding: theme.spacing.s, marginLeft: theme.spacing.xs, backgroundColor: theme.colors.glass, borderRadius: theme.borderRadius.m },
 });

@@ -29,7 +29,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
       disabled={disabled || isLoading}
       style={[
         styles.container, 
-        !disabled ? theme.shadows.neonPurple : {},
+        !disabled ? theme.shadows.glow : {},
         disabled && styles.disabled,
         style
       ]}
@@ -56,7 +56,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: theme.borderRadius.l,
+    borderRadius: theme.borderRadius.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

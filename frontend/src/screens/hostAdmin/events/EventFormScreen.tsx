@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.s,
   },
   segmentButtonSelected: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: theme.colors.glass,
   },
   segmentButtonText: {
     ...theme.typography.caption,
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     marginRight: theme.spacing.s,
   },
-  chipSelected: { borderColor: theme.colors.primary, backgroundColor: 'rgba(139, 92, 246, 0.1)' },
+  chipSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.glass },
   chipText: { ...theme.typography.caption, color: theme.colors.textMuted },
   chipTextSelected: { color: theme.colors.primary, fontWeight: 'bold' },
   coverPreview: {

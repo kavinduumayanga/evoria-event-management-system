@@ -287,7 +287,7 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
         {promoCodes.length > 0 && (
           <ScrollView style={styles.promoList}>
             {promoCodes.map((promo) => (
-              <GlassCard key={promo.code} style={styles.promoItem} variant={promo.isActive ? 'dark' : 'neonPurple'}>
+              <GlassCard key={promo.code} style={styles.promoItem} variant={promo.isActive ? 'dark' : 'primary'}>
                 <View style={styles.promoInfo}>
                   <Text style={styles.promoCode}>{promo.code}</Text>
                   <Text style={styles.promoMeta}>
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.s,
   },
   segmentButtonSelected: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: theme.colors.glass,
   },
   segmentButtonText: {
     ...theme.typography.caption,

@@ -91,7 +91,7 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
         data={tickets}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <GlassCard style={styles.ticketCard} variant={item.isActive ? 'dark' : 'neonPurple'}>
+          <GlassCard style={styles.ticketCard} variant={item.isActive ? 'dark' : 'primary'}>
             <View style={styles.ticketInfo}>
               <View style={styles.ticketTitleRow}>
                 <TicketIcon size={18} color={theme.colors.secondary} />

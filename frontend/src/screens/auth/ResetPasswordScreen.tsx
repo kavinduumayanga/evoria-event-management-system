@@ -77,7 +77,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
           <IconButton 
             icon={<ArrowLeft color={theme.colors.text} size={24} />} 
             onPress={() => navigation.goBack()} 
-            variant="solid" 
+            variant="ghost" 
           />
         </View>
 
@@ -147,6 +147,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: theme.spacing.xl,
     justifyContent: 'center',
+    paddingBottom: theme.spacing.xxxl,
   },
   title: {
     ...theme.typography.h1,
@@ -160,11 +161,11 @@ const styles = StyleSheet.create({
   },
   prefillText: {
     ...theme.typography.caption,
-    color: theme.colors.secondary,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.l,
   },
   card: {
-    padding: theme.spacing.l,
+    padding: theme.spacing.xl,
   },
   button: {
     marginTop: theme.spacing.s,

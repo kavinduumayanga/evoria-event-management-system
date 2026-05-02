@@ -271,7 +271,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tickets / Registration</Text>
               {tickets.length > 0 ? tickets.map((ticket) => (
-                <GlassCard key={ticket.id} style={styles.ticketCard} variant="light">
+                <GlassCard key={ticket.id} style={styles.ticketCard} variant="dark">
                   <View style={{ flex: 1 }}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
                     <Text style={styles.ticketPrice}>
@@ -318,7 +318,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                   ))}
 
                   {registrationStatus ? (
-                    <GlassCard style={styles.statusCard}>
+                    <GlassCard style={styles.statusCard} variant="primary">
                       <Text style={styles.statusTitle}>Registration Status</Text>
                       <Text style={styles.statusText}>{registrationStatus.toUpperCase()}</Text>
                     </GlassCard>
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     height: 230,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: theme.colors.surface,
   },
   coverPlaceholderText: {
     ...theme.typography.caption,
@@ -489,8 +489,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     padding: theme.spacing.l,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: 'rgba(9, 9, 11, 0.92)',
+    borderTopColor: theme.colors.glassBorder,
+    backgroundColor: theme.colors.background,
   },
   statusCard: {
     marginBottom: theme.spacing.m,
@@ -498,11 +498,11 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     ...theme.typography.caption,
-    color: theme.colors.textMuted,
+    color: theme.colors.primaryLight,
     marginBottom: 2,
   },
   statusText: {
     ...theme.typography.h3,
-    color: theme.colors.success,
+    color: theme.colors.text,
   },
 });

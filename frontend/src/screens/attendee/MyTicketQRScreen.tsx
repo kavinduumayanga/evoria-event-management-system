@@ -89,7 +89,7 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
         <Text style={styles.title}>My Ticket</Text>
       </View>
 
-      <GlassCard style={styles.card} variant={checkedIn ? 'neonPurple' : 'dark'}>
+      <GlassCard style={styles.card} variant={checkedIn ? 'primary' : 'dark'}>
         <Text style={styles.eventTitle}>{eventTitle}</Text>
         <Text style={styles.ticketName}>{ticketName}</Text>
 

@@ -6,7 +6,7 @@ import { theme } from '../constants/theme';
 interface GlassCardProps extends ViewProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  variant?: 'dark' | 'light' | 'neonPurple' | 'neonCyan';
+  variant?: 'dark' | 'light' | 'primary' | 'secondary';
   animateEntrance?: boolean;
 }
 
@@ -18,39 +18,46 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   ...props
 }) => {
   const fadeAnim = useRef(new Animated.Value(animateEntrance ? 0 : 1)).current;
+  const slideAnim = useRef(new Animated.Value(animateEntrance ? 10 : 0)).current;
 
   useEffect(() => {
     if (animateEntrance) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        })
+      ]).start();
     }
   }, [animateEntrance]);
 
   const getGradientColors = () => {
     switch (variant) {
-      case 'light': return ['rgba(35, 35, 48, 0.8)', 'rgba(25, 25, 35, 0.6)'];
-      case 'neonPurple': return ['rgba(139, 92, 246, 0.15)', 'rgba(139, 92, 246, 0.05)'];
-      case 'neonCyan': return ['rgba(6, 182, 212, 0.15)', 'rgba(6, 182, 212, 0.05)'];
+      case 'light': return ['rgba(39, 39, 42, 0.8)', 'rgba(39, 39, 42, 0.6)']; // Zinc 800
+      case 'primary': return ['rgba(129, 140, 248, 0.15)', 'rgba(129, 140, 248, 0.05)']; // Indigo 400
+      case 'secondary': return ['rgba(167, 139, 250, 0.15)', 'rgba(167, 139, 250, 0.05)']; // Violet 400
       case 'dark':
-      default: return ['rgba(21, 21, 30, 0.8)', 'rgba(15, 15, 20, 0.6)'];
+      default: return ['rgba(24, 24, 27, 0.8)', 'rgba(24, 24, 27, 0.5)']; // Zinc 900
     }
   };
 
   const getBorderColor = () => {
     switch (variant) {
-      case 'neonPurple': return 'rgba(139, 92, 246, 0.4)';
-      case 'neonCyan': return 'rgba(6, 182, 212, 0.4)';
-      default: return theme.colors.border;
+      case 'primary': return 'rgba(129, 140, 248, 0.3)';
+      case 'secondary': return 'rgba(167, 139, 250, 0.3)';
+      default: return theme.colors.glassBorder;
     }
   };
 
   const getGlow = () => {
-    if (variant === 'neonPurple') return theme.shadows.neonPurple;
-    if (variant === 'neonCyan') return theme.shadows.neonCyan;
-    return {};
+    if (variant === 'primary' || variant === 'secondary') return theme.shadows.glow;
+    return theme.shadows.glass;
   };
 
   return (
@@ -60,6 +67,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
         {
           borderColor: getBorderColor(),
           opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
         },
         getGlow(),
         style,
@@ -79,9 +87,9 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: theme.borderRadius.l,
+    borderRadius: theme.borderRadius.xl,
     borderWidth: 1,
-    padding: theme.spacing.m,
+    padding: theme.spacing.l,
     overflow: 'hidden',
   },
 });

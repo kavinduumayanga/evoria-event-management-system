@@ -77,7 +77,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <IconButton 
             icon={<ArrowLeft color={theme.colors.text} size={24} />} 
             onPress={() => navigation.goBack()} 
-            variant="solid" 
+            variant="ghost" 
           />
         </View>
 
@@ -87,7 +87,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="always"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.title}>Create Account</Text>
@@ -96,7 +96,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             <GlassCard style={styles.card} variant="dark" animateEntrance>
               <FormInput
                 label="Full Name"
-                placeholder="Enter your full name"
+                placeholder="John Doe"
                 value={name}
                 onChangeText={setName}
                 leftIcon={<User size={20} color={theme.colors.textMuted} />}
@@ -104,7 +104,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
               <FormInput
                 label="Email Address"
-                placeholder="Enter your email"
+                placeholder="name@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -114,7 +114,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
               <FormInput
                 label="Password"
-                placeholder="Create a password"
+                placeholder="Create a strong password"
                 isPassword
                 value={password}
                 onChangeText={setPassword}
@@ -158,6 +158,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.xl,
     flexGrow: 1,
     justifyContent: 'center',
+    paddingBottom: theme.spacing.xxxl,
   },
   title: {
     ...theme.typography.h1,
@@ -170,7 +171,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   card: {
-    padding: theme.spacing.l,
+    padding: theme.spacing.xl,
   },
   button: {
     marginTop: theme.spacing.l,
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     ...theme.typography.body,
-    color: theme.colors.primary,
-    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontWeight: '700',
   },
 });

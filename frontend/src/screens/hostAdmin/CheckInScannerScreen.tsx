@@ -241,7 +241,7 @@ export const CheckInScannerScreen = () => {
         />
       </View>
 
-      <GlassCard style={styles.summaryCard} variant="neonPurple">
+      <GlassCard style={styles.summaryCard} variant="primary">
         <Text style={styles.summaryLabel}>Attendance Summary</Text>
         <Text style={styles.summaryValue}>{summary.checkedIn}/{summary.total} checked in</Text>
         <Text style={styles.summaryMeta}>{summary.notCheckedIn} pending check-in</Text>
@@ -291,7 +291,7 @@ export const CheckInScannerScreen = () => {
           const checkedIn = item.checkInStatus === 'checked_in';
           const statusColor = checkedIn ? theme.colors.success : theme.colors.warning;
           return (
-            <GlassCard style={styles.recordCard} variant={checkedIn ? 'neonPurple' : 'dark'}>
+            <GlassCard style={styles.recordCard} variant={checkedIn ? 'primary' : 'dark'}>
               <View style={styles.recordHeader}>
                 <Text style={styles.recordName}>{item.attendeeName}</Text>
                 <View style={[styles.statusBadge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   },
   eventChipSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: theme.colors.glass,
   },
   eventChipText: {
     ...theme.typography.caption,

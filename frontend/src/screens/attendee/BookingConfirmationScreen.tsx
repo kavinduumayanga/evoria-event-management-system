@@ -47,7 +47,7 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
     <GradientBackground>
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
-          <CheckCircle size={80} color={theme.colors.success} style={{ alignSelf: 'center', marginBottom: 20 }} />
+          <CheckCircle size={80} color={theme.colors.success} style={{ alignSelf: 'center', marginBottom: theme.spacing.xl }} />
           <Text style={styles.title}>{isWaitlisted ? 'Waitlist Joined' : 'Booking Confirmed!'}</Text>
           <Text style={styles.subtitle}>
             {isWaitlisted
@@ -56,7 +56,7 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
           </Text>
 
           {booking && (
-            <GlassCard style={styles.card}>
+            <GlassCard style={styles.card} variant="dark">
               {(() => {
                 const approvalStatus = booking.approvalStatus || 'approved';
                 const rsvpStatus = booking.rsvpStatus || 'going';
@@ -96,12 +96,12 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
                 ? navigation.navigate('HomeStack', { screen: 'MyWaitlist' })
                 : navigation.navigate('MyRegistrations')
             )}
-            style={{ marginTop: 20 }}
+            style={{ marginTop: theme.spacing.xl }}
           />
           <SecondaryButton 
             title="Back to Home" 
             onPress={() => navigation.navigate('HomeStack', { screen: 'EventList' })} 
-            style={{ marginTop: 10 }}
+            style={{ marginTop: theme.spacing.s }}
           />
         </View>
       </SafeAreaView>
@@ -112,9 +112,9 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, padding: theme.spacing.xl, justifyContent: 'center' },
-  title: { ...theme.typography.h1, color: theme.colors.text, textAlign: 'center', marginBottom: 10 },
-  subtitle: { ...theme.typography.body, color: theme.colors.textMuted, textAlign: 'center', marginBottom: 30 },
-  card: { padding: theme.spacing.l },
-  label: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: 5 },
-  value: { ...theme.typography.h3, color: theme.colors.text, marginBottom: 15 },
+  title: { ...theme.typography.h1, color: theme.colors.text, textAlign: 'center', marginBottom: theme.spacing.s },
+  subtitle: { ...theme.typography.body, color: theme.colors.textMuted, textAlign: 'center', marginBottom: theme.spacing.xl },
+  card: { padding: theme.spacing.xl },
+  label: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: 4 },
+  value: { ...theme.typography.h3, color: theme.colors.text, marginBottom: theme.spacing.m },
 });

@@ -505,7 +505,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
 
             {canManageEvent ? (
-              <GlassCard style={styles.managePanel} variant="neonPurple" animateEntrance>
+              <GlassCard style={styles.managePanel} variant="primary" animateEntrance>
                 <Text style={styles.manageTitle}>Manager Actions</Text>
                 <View style={styles.manageActionGrid}>
                   <SecondaryButton title="Edit Event" onPress={handleOpenEditEvent} />
@@ -602,7 +602,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Text style={styles.description}>This is a free event. Tap Register to reserve your spot.</Text>
               ) : tickets.length > 0 ? (
                 tickets.map((ticket) => (
-                  <GlassCard key={ticket.id} style={styles.ticketCard} variant="light">
+                  <GlassCard key={ticket.id} style={styles.ticketCard} variant="dark">
                     <View style={styles.ticketInfo}>
                       <Text style={styles.ticketName}>{ticket.name}</Text>
                       <Text style={styles.ticketPrice}>

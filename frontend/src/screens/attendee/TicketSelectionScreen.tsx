@@ -294,7 +294,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
 
             return (
               <TouchableOpacity key={ticket.id} onPress={() => setSelectedTicket(ticket)} disabled={available === 0 && !isEventFull}>
-                <GlassCard style={[styles.ticketCard, isSelected && styles.selectedCard]} variant={isSelected ? 'neonPurple' : 'dark'}>
+                <GlassCard style={[styles.ticketCard, isSelected && styles.selectedCard]} variant={isSelected ? 'primary' : 'dark'}>
                   <View style={styles.ticketTopRow}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
                     <View style={[styles.badge, { backgroundColor: ticket.isFree ? `${theme.colors.success}20` : `${theme.colors.secondary}20` }]}>
@@ -349,7 +349,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
               )}
 
               {promoPreview && (
-                <GlassCard style={styles.promoResult} variant="neonPurple">
+                <GlassCard style={styles.promoResult} variant="primary">
                   <Text style={styles.promoText}>
                     Discount Applied: {promoPreview.currency} {promoPreview.discountAmount.toFixed(2)}
                   </Text>
@@ -426,7 +426,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: theme.spacing.l,
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.glassBorder,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -442,10 +444,10 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: theme.borderRadius.round,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
   },
   qtyBtnText: {
     ...theme.typography.h2,
