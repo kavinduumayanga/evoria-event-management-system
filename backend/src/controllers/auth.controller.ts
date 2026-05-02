@@ -6,9 +6,18 @@ import { UserModel } from '../models/User';
 import { Role } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
+import { sendEmail } from '../services/email.service';
 
 const MIN_PASSWORD_LENGTH = 6;
-const RESET_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
+const OTP_DIGITS = 6;
+
+const resolveOtpExpiryMinutes = () => {
+  const value = Number.parseInt(String(process.env.OTP_EXPIRY_MINUTES || '10').trim(), 10);
+  if (!Number.isFinite(value) || value < 1) return 10;
+  return value;
+};
+
+const RESET_TOKEN_EXPIRY_MS = resolveOtpExpiryMinutes() * 60 * 1000;
 
 const signToken = (id: string, role?: Role) => {
   return jwt.sign({ id, role, tokenVersion: 2 }, process.env.JWT_SECRET as string, {
@@ -17,6 +26,11 @@ const signToken = (id: string, role?: Role) => {
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const generateOtpCode = () => {
+  const min = 10 ** (OTP_DIGITS - 1);
+  const max = (10 ** OTP_DIGITS) - 1;
+  return String(Math.floor(Math.random() * ((max - min) + 1)) + min);
+};
 
 const toSafeUser = (userDoc: any) => {
   const user = userDoc?.toJSON ? userDoc.toJSON() : { ...userDoc };
@@ -175,25 +189,48 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+resetPasswordToken +resetPasswordExpires +isActive +isSuspended');
 
-    let resetToken: string | undefined;
-
     if (userDoc && userDoc.isActive && !userDoc.isSuspended) {
-      resetToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+      const otpCode = generateOtpCode();
+      const hashedToken = crypto.createHash('sha256').update(otpCode).digest('hex');
+      const otpExpiryMinutes = resolveOtpExpiryMinutes();
 
       userDoc.resetPasswordToken = hashedToken;
       userDoc.resetPasswordExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
       await userDoc.save();
+
+      const emailResult = await sendEmail({
+        to: normalizedEmail,
+        subject: 'Evoria Password Reset OTP',
+        html: [
+          '<div style="font-family:Arial,sans-serif;color:#111;">',
+          '<h2>Reset Your Evoria Password</h2>',
+          `<p>Use this OTP code to reset your password:</p>`,
+          `<p style="font-size:28px;font-weight:700;letter-spacing:2px;">${otpCode}</p>`,
+          `<p>This code expires in ${otpExpiryMinutes} minutes.</p>`,
+          '<p>If you did not request this, you can ignore this email.</p>',
+          '</div>',
+        ].join(''),
+        text: `Your Evoria password reset OTP is ${otpCode}. This code expires in ${otpExpiryMinutes} minutes.`,
+        type: 'system',
+        recipientUserId: userDoc.id,
+        metadata: {
+          purpose: 'password_reset_otp',
+          expiryMinutes: otpExpiryMinutes,
+        },
+      });
+
+      if (emailResult.status === 'failed') {
+        userDoc.resetPasswordToken = undefined;
+        userDoc.resetPasswordExpires = undefined;
+        await userDoc.save();
+        return next(new AppError('Unable to send password reset OTP email right now.', 500));
+      }
     }
 
     const responsePayload: Record<string, unknown> = {
       status: 'success',
-      message: 'If an account with that email exists, a password reset token was generated.',
+      message: 'If an account with that email exists, a reset OTP was sent.',
     };
-
-    if (process.env.NODE_ENV !== 'production' && resetToken) {
-      responsePayload.data = { resetToken };
-    }
 
     res.status(200).json(responsePayload);
   } catch (error) {

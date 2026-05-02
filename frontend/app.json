@@ -22,11 +22,15 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#6A0DAD"
       },
+      "package": "com.anonymous.frontend",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-notifications"
+    ]
   }
 }

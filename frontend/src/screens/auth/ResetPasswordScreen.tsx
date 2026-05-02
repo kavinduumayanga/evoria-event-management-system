@@ -36,7 +36,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleResetPassword = async () => {
     if (!token.trim()) {
-      Alert.alert('Validation', 'Please enter the reset token.');
+      Alert.alert('Validation', 'Please enter the OTP code.');
       return;
     }
     if (newPassword.length < 6) {
@@ -86,7 +86,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.titleSection}>
               <Text style={styles.title}>Reset password</Text>
               <Text style={styles.subtitle}>
-                Paste your reset token and choose a new password.
+                Enter your OTP code and choose a new password.
               </Text>
               {prefetchedEmail && (
                 <Text style={styles.prefillText}>For: {prefetchedEmail}</Text>
@@ -94,8 +94,8 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
 
             <Input
-              label="Reset token"
-              placeholder="Paste the reset token"
+              label="OTP code"
+              placeholder="Enter the 6-digit OTP"
               autoCapitalize="none"
               autoCorrect={false}
               value={token}

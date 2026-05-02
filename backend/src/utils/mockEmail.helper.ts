@@ -1,8 +1,8 @@
 import { Request } from 'express';
 import { EmailLogModel } from '../models/EmailLog';
 
-type EmailLogType = 'registration_pending' | 'registration_confirmed' | 'registration_declined' | 'invite' | 'blast' | 'system';
-type EmailLogStatus = 'queued' | 'sent' | 'failed';
+type EmailLogType = 'registration_pending' | 'registration_confirmed' | 'registration_declined' | 'invite' | 'blast' | 'reminder' | 'system';
+type EmailLogStatus = 'queued' | 'sent' | 'failed' | 'mock';
 
 interface MockEmailInput {
   recipientEmail: string;
@@ -49,7 +49,9 @@ export const recordMockEmail = async (input: MockEmailInput) => {
     subject: input.subject.trim(),
     message: input.message.trim(),
     type: input.type || 'system',
-    status: input.status || 'sent',
+    status: input.status || 'mock',
+    provider: 'mock',
+    sentAt: new Date(),
     metadata: input.metadata || null,
     createdBy: input.createdBy || null,
   });
@@ -65,7 +67,9 @@ export const recordMockEmails = async (inputs: MockEmailInput[]) => {
     subject: input.subject.trim(),
     message: input.message.trim(),
     type: input.type || 'system',
-    status: input.status || 'sent',
+    status: input.status || 'mock',
+    provider: 'mock',
+    sentAt: new Date(),
     metadata: input.metadata || null,
     createdBy: input.createdBy || null,
   }));

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
@@ -10,7 +10,7 @@ import {
 import { theme } from '../../../constants/theme';
 import { EventRegistrationStatus } from '../../../types';
 import { GuestRecord, GuestService } from '../../../api/services';
-import { ArrowLeft, UserCheck, CheckCircle2, XCircle, Ban, Search, Users } from 'lucide-react-native';
+import { ArrowLeft, UserCheck, Search, Users, Download } from 'lucide-react-native';
 
 type ManageRegistrationsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
 type ManageRegistrationsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
@@ -75,6 +75,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
   const setGuestStatus = async (guestId: string, status: EventRegistrationStatus) => {
     try {
       await GuestService.updateGuestStatus(guestId, status);
+      Alert.alert('Success', 'Status updated. Email sent successfully.');
       fetchGuests();
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || `Failed to set status to ${status}`);
@@ -87,6 +88,17 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
       fetchGuests();
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || 'Failed to check in guest');
+    }
+  };
+
+  const exportCsv = async () => {
+    try {
+      const csv = await GuestService.exportEventGuests(eventId, queryParams);
+      const dataUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+      await Linking.openURL(dataUrl);
+      Alert.alert('Export Ready', 'Guest CSV exported successfully.');
+    } catch (err: any) {
+      Alert.alert('Export Failed', err?.response?.data?.message || 'Unable to export guest CSV.');
     }
   };
 
@@ -119,6 +131,14 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
                   <Text style={styles.guestCount}>{guests.length} registered</Text>
                 </View>
               </View>
+              <Button
+                title="Export CSV"
+                onPress={exportCsv}
+                variant="secondary"
+                size="sm"
+                icon={<Download size={14} color={theme.colors.text} />}
+                fullWidth={false}
+              />
             </View>
 
             {/* Search + Date */}

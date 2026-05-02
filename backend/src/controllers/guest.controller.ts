@@ -2,7 +2,10 @@ import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { RegistrationModel } from '../models/Registration';
+import { BookingModel } from '../models/Booking';
 import { EventModel } from '../models/Event';
+import { TicketTypeModel } from '../models/TicketType';
+import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
 import { canManageEvent } from '../utils/eventPermissions';
 import { sendRegistrationStatusCommunications } from '../utils/registrationCommunication.helper';
@@ -350,18 +353,90 @@ export const exportEventGuestsCsv = async (req: Request, res: Response, next: Ne
     const registrations = await RegistrationModel.find(buildGuestQuery(eventId, req.query))
       .sort({ registeredAt: -1, createdAt: -1 });
 
-    const header = ['name', 'email', 'mobile', 'nic', 'status', 'registered_at', 'checked_in_at'];
-    const rows = registrations.map((registration) => [
-      escapeCsvValue(registration.name),
-      escapeCsvValue(registration.email),
-      escapeCsvValue(registration.mobile),
-      escapeCsvValue(registration.nic),
-      escapeCsvValue(registration.status),
-      escapeCsvValue(new Date(registration.registeredAt).toISOString()),
-      escapeCsvValue(registration.checkedInAt ? new Date(registration.checkedInAt).toISOString() : ''),
-    ].join(','));
+    const bookings = await BookingModel.find({ eventId }).select(
+      'id userId ticketTypeId quantity bookingStatus approvalStatus rsvpStatus checkInStatus createdAt checkedInAt',
+    );
+    const userIds = Array.from(new Set(bookings.map((booking) => booking.userId)));
+    const ticketIds = Array.from(new Set(bookings.map((booking) => booking.ticketTypeId)));
 
-    const csv = [header.join(','), ...rows].join('\n');
+    const [users, tickets] = await Promise.all([
+      userIds.length
+        ? UserModel.find({ _id: { $in: userIds } }).select('id name email')
+        : [],
+      ticketIds.length
+        ? TicketTypeModel.find({ _id: { $in: ticketIds } }).select('id name')
+        : [],
+    ]);
+
+    const bookingByUserId = new Map(bookings.map((booking) => [booking.userId, booking]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const ticketMap = new Map(tickets.map((ticket) => [ticket.id, ticket]));
+
+    const formatCustomAnswers = (customAnswers: Array<{ questionId: string; answer: string }>) => {
+      if (!customAnswers?.length) return '';
+      return customAnswers
+        .map((answer) => `${answer.questionId}: ${answer.answer}`)
+        .join(' | ');
+    };
+
+    const header = [
+      'Name',
+      'Email',
+      'Mobile',
+      'NIC',
+      'Status',
+      'Ticket Type',
+      'Registered At',
+      'Checked In At',
+      'Custom Answers',
+    ];
+
+    const registrationRows = registrations.map((registration) => {
+      const linkedBooking = registration.userId ? bookingByUserId.get(registration.userId) : null;
+      const ticketName = linkedBooking ? (ticketMap.get(linkedBooking.ticketTypeId)?.name || 'General') : 'General';
+
+      return [
+        escapeCsvValue(registration.name),
+        escapeCsvValue(registration.email),
+        escapeCsvValue(registration.mobile),
+        escapeCsvValue(registration.nic),
+        escapeCsvValue(registration.status),
+        escapeCsvValue(ticketName),
+        escapeCsvValue(new Date(registration.registeredAt).toISOString()),
+        escapeCsvValue(registration.checkedInAt ? new Date(registration.checkedInAt).toISOString() : ''),
+        escapeCsvValue(formatCustomAnswers(registration.customAnswers || [])),
+      ].join(',');
+    });
+
+    const bookingRows = registrations.length > 0
+      ? []
+      : bookings.map((booking) => {
+          const user = userMap.get(booking.userId);
+          const ticketName = ticketMap.get(booking.ticketTypeId)?.name || 'Ticket';
+          const status = booking.checkInStatus === 'checked_in'
+            ? 'checked_in'
+            : booking.rsvpStatus === 'not_going'
+              ? 'not_going'
+              : booking.approvalStatus === 'pending'
+                ? 'pending'
+                : booking.approvalStatus === 'rejected'
+                  ? 'declined'
+                  : 'going';
+
+          return [
+            escapeCsvValue(user?.name || 'Guest'),
+            escapeCsvValue(user?.email || ''),
+            escapeCsvValue(''),
+            escapeCsvValue(''),
+            escapeCsvValue(status),
+            escapeCsvValue(ticketName),
+            escapeCsvValue(new Date(booking.createdAt).toISOString()),
+            escapeCsvValue(booking.checkedInAt ? new Date(booking.checkedInAt).toISOString() : ''),
+            escapeCsvValue(''),
+          ].join(',');
+        });
+
+    const csv = [header.join(','), ...registrationRows, ...bookingRows].join('\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=\"guests-${eventId}.csv\"`);

@@ -599,6 +599,13 @@ const resolvePublicApiBaseUrl = (req: Request): string => {
   return `${protocol}://${host}/api`;
 };
 
+const resolveEventPublicUrl = (req: Request, event: any): string => {
+  const slug = String(event.publicSlug || '').trim();
+  if (!slug) return '';
+
+  return `${resolvePublicApiBaseUrl(req)}/public/events/${slug}`;
+};
+
 const isInvitedUserForPrivateEvent = async (userId: string, eventId: string): Promise<boolean> => {
   const inviteExists = await BookingModel.exists({
     userId,
@@ -798,6 +805,8 @@ export const getEventCalendar = async (req: Request, res: Response, next: NextFu
       }
     }
 
+    const publicEventUrl = resolveEventPublicUrl(req, event);
+
     const ics = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -811,6 +820,7 @@ export const getEventCalendar = async (req: Request, res: Response, next: NextFu
       `SUMMARY:${escapeIcsText(event.title)}`,
       `DESCRIPTION:${escapeIcsText(event.description)}`,
       `LOCATION:${escapeIcsText(location)}`,
+      ...(publicEventUrl ? [`URL:${escapeIcsText(publicEventUrl)}`] : []),
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n');
@@ -830,9 +840,59 @@ export const getEventCalendar = async (req: Request, res: Response, next: NextFu
         startTime: startDate.toISOString(),
         endTime: endDate.toISOString(),
         location,
+        url: publicEventUrl,
         ics,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadEventCalendarIcs = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.id as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    const requester = await resolveRequester(req);
+    ensureEventReadableByUser(event, requester);
+
+    const startDate = combineDateAndTime(event.date, event.startTime);
+    const endDate = combineDateAndTime(event.date, event.endTime);
+    let location = event.type === 'online'
+      ? (event.meetingLink || 'Online')
+      : (event.city || 'Venue');
+
+    if (event.type !== 'online' && event.venueId) {
+      const venue = await VenueModel.findById(event.venueId);
+      if (venue) {
+        location = `${venue.name}, ${venue.city}`;
+      }
+    }
+
+    const publicEventUrl = resolveEventPublicUrl(req, event);
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Evoria//Event Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      `UID:${event.id}@evoria.local`,
+      `DTSTAMP:${toIcsDateTime(new Date())}`,
+      `DTSTART:${toIcsDateTime(startDate)}`,
+      `DTEND:${toIcsDateTime(endDate)}`,
+      `SUMMARY:${escapeIcsText(event.title)}`,
+      `DESCRIPTION:${escapeIcsText(event.description)}`,
+      `LOCATION:${escapeIcsText(location)}`,
+      ...(publicEventUrl ? [`URL:${escapeIcsText(publicEventUrl)}`] : []),
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=\"event-${event.id}.ics\"`);
+    res.status(200).send(ics);
   } catch (error) {
     next(error);
   }

@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -96,7 +97,8 @@ export const EditProfileScreen = () => {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.8,
+        aspect: [1, 1],
+        quality: 0.72,
       });
 
       if (pickerResult.canceled || !pickerResult.assets.length) return;
@@ -164,6 +166,7 @@ export const EditProfileScreen = () => {
               leftIcon={<ImageIcon size={18} color={theme.colors.textMuted} />}
               hint="Upload an image or paste a direct URL."
             />
+            {profileImage ? <Image source={{ uri: profileImage }} style={styles.profilePreview} /> : null}
             <Button
               title={isUploadingImage ? 'Uploading Image...' : 'Upload Profile Image'}
               onPress={handleUploadProfileImage}
@@ -214,5 +217,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.base,
     paddingBottom: theme.spacing.l,
     paddingTop: theme.spacing.m,
+  },
+  profilePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignSelf: 'center',
+    marginBottom: theme.spacing.m,
   },
 });
