@@ -130,6 +130,8 @@ const processReminder = async (
 
   let emailSent = 0;
   let emailFailed = 0;
+  let pushSent = 0;
+  let pushFailed = 0;
 
   if (reminder.channels.includes('email')) {
     for (const recipient of recipients) {
@@ -162,21 +164,27 @@ const processReminder = async (
 
 
   if (recipients.length > 0) {
-    const userIds = Array.from(new Set(recipients.map(r => r.userId).filter((id): id is string => !!id)));
+    const userIds = Array.from(new Set(recipients.map((r) => r.userId).filter((id): id is string => !!id)));
     if (userIds.length > 0) {
-      await createNotificationsForUsers(userIds, {
-      eventId: reminder.eventId,
-      title: reminder.title,
-      message: reminder.message,
-      type: 'reminder',
-      channel: 'in_app',
-      status: 'sent',
-      sentAt: new Date(),
-      createdBy: reminder.createdBy,
-    });
+      try {
+        const createdNotifications = await createNotificationsForUsers(userIds, {
+          eventId: reminder.eventId,
+          title: reminder.title,
+          message: reminder.message,
+          type: 'reminder',
+          channel: 'in_app',
+          status: 'sent',
+          sentAt: new Date(),
+          createdBy: reminder.createdBy,
+        });
+        pushSent = createdNotifications.length;
+      } catch {
+        pushFailed = userIds.length;
+      }
+    }
   }
 
-  const hasFailures = emailFailed > 0;
+  const hasFailures = emailFailed > 0 || pushFailed > 0;
 
   await ReminderModel.findByIdAndUpdate(reminder.id, {
     status: hasFailures ? 'failed' : 'sent',
@@ -190,6 +198,8 @@ const processReminder = async (
     recipients: recipients.length,
     emailSent,
     emailFailed,
+    pushSent,
+    pushFailed,
   };
 };
 
