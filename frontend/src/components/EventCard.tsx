@@ -1,195 +1,276 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, StyleProp, ViewStyle } from 'react-native';
-import { GlassCard } from './GlassCard';
+import { Card } from './Card';
 import { AnimatedPressable } from './AnimatedPressable';
 import { StatusBadge } from './StatusBadge';
 import { Event } from '../types';
 import { theme } from '../constants/theme';
-import { Calendar, Users, Clock } from 'lucide-react-native';
+import { Calendar, MapPin, Users } from 'lucide-react-native';
+import { resolveImageUrl } from '../utils/imageUrl';
+
+// ============================================================
+// EVENT CARD — Luma-style event cards
+//
+// featured: Large card with image, gradient overlay, info at bottom
+//           Used in horizontal discovery carousels
+//
+// list:     Compact card with thumbnail + details
+//           Used in vertical event lists
+// ============================================================
 
 interface EventCardProps {
   event: Event;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  variant?: 'featured' | 'list';
   actions?: React.ReactNode;
 }
 
-export const EventCard: React.FC<EventCardProps> = ({ event, onPress, style, actions }) => {
-  const isCancelled = event.status === 'cancelled';
-  const isPublished = event.status === 'published';
-  const moderationStatus = event.moderationStatus || 'approved';
+const getStatusType = (status: string): any => {
+  switch (status) {
+    case 'published': return 'success';
+    case 'draft': return 'warning';
+    case 'cancelled': return 'error';
+    default: return 'neutral';
+  }
+};
 
-  const getStatus = (): any => {
-    switch (event.status) {
-      case 'published': return 'success';
-      case 'draft': return 'warning';
-      case 'cancelled': return 'error';
-      default: return 'neutral';
-    }
-  };
+// ------ Featured variant ------
+const FeaturedCard: React.FC<EventCardProps> = ({ event, style }) => {
+  const imageUri = resolveImageUrl(event.coverImage);
+  const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
-  const getModerationStatus = (): any => {
-    switch (moderationStatus) {
-      case 'approved': return 'success';
-      case 'pending': return 'warning';
-      case 'rejected': return 'error';
-      default: return 'neutral';
-    }
-  };
-
-  const CardContent = (
-    <GlassCard
-      style={[
-        styles.container,
-        isPublished && styles.publishedContainer,
-        isCancelled && styles.cancelledContainer,
-        style,
-      ]}
-      variant={event.isFeatured ? 'neonPurple' : 'dark'}
-      animateEntrance
-    >
-      {event.coverImage ? (
-        <Image source={{ uri: event.coverImage }} style={styles.image} />
+  return (
+    <View style={[styles.featuredCard, style]}>
+      {/* Cover image */}
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={styles.featuredImage} />
       ) : (
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.placeholderText}>No Image</Text>
+        <View style={styles.featuredImagePlaceholder}>
+          <Calendar size={32} color={theme.colors.textMuted} />
         </View>
       )}
-      
-      <View style={styles.content}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-          <StatusBadge status={getStatus()} label={event.status} />
-        </View>
 
-        <View style={styles.badgeRow}>
-          {event.isFeatured && (
-            <StatusBadge status="warning" label="FEATURED" />
-          )}
-          <StatusBadge status="neutral" label={event.type || 'physical'} />
-          <StatusBadge status="neutral" label={event.visibility} />
-          <StatusBadge status={getModerationStatus()} label={moderationStatus} />
+      {/* Gradient overlay + content */}
+      <View style={styles.featuredOverlay}>
+        <View style={styles.featuredMeta}>
+          <StatusBadge status={getStatusType(event.status)} label={event.status} />
+          {event.isFeatured && <StatusBadge status="warning" label="Featured" />}
         </View>
+        <View style={styles.featuredBottom}>
+          <Text style={styles.featuredTitle} numberOfLines={2}>{event.title}</Text>
+          <View style={styles.featuredDetailRow}>
+            <Calendar size={13} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.featuredDetail}>{formattedDate}</Text>
+            {event.city && (
+              <>
+                <View style={styles.dot} />
+                <MapPin size={13} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.featuredDetail}>{event.city}</Text>
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
 
-        <View style={styles.detailsContainer}>
-          <View style={styles.detailRow}>
-            <Calendar size={14} color={theme.colors.primaryLight} />
-            <Text style={styles.detailText}>{new Date(event.date).toLocaleDateString()}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Clock size={14} color={theme.colors.secondary} />
-            <Text style={styles.detailText}>{event.startTime} - {event.endTime}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Users size={14} color={theme.colors.accent} />
-            <Text style={styles.detailText}>Capacity: {event.capacity}</Text>
-          </View>
-        </View>
-        
-        {actions && (
-          <View style={styles.actionsContainer}>
-            {actions}
+// ------ List variant ------
+const ListCard: React.FC<EventCardProps> = ({ event, style, actions }) => {
+  const imageUri = resolveImageUrl(event.coverImage);
+  const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+  const isCancelled = event.status === 'cancelled';
+
+  return (
+    <View
+      style={[styles.listCard, isCancelled && styles.listCardCancelled, style]}
+    >
+      {/* Thumbnail */}
+      <View style={styles.listThumbnail}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.listImage} />
+        ) : (
+          <View style={styles.listImagePlaceholder}>
+            <Calendar size={20} color={theme.colors.textMuted} />
           </View>
         )}
       </View>
-    </GlassCard>
+
+      {/* Content */}
+      <View style={styles.listContent}>
+        <Text style={styles.listTitle} numberOfLines={1}>{event.title}</Text>
+        <View style={styles.listMeta}>
+          <Calendar size={12} color={theme.colors.textMuted} />
+          <Text style={styles.listMetaText}>{formattedDate}</Text>
+          {event.startTime && (
+            <>
+              <View style={styles.dot} />
+              <Text style={styles.listMetaText}>{event.startTime}</Text>
+            </>
+          )}
+        </View>
+        {event.city && (
+          <View style={styles.listMeta}>
+            <MapPin size={12} color={theme.colors.textMuted} />
+            <Text style={styles.listMetaText}>{event.city}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Optional actions */}
+      {actions && (
+        <View style={styles.listActions}>{actions}</View>
+      )}
+    </View>
+  );
+};
+
+// ------ Main export ------
+export const EventCard: React.FC<EventCardProps> = ({
+  event,
+  onPress,
+  style,
+  variant = 'list',
+  actions,
+}) => {
+  const CardComponent = variant === 'featured' ? FeaturedCard : ListCard;
+
+  const content = (
+    <CardComponent event={event} style={style} actions={actions} />
   );
 
   if (onPress) {
-    return <AnimatedPressable onPress={onPress}>{CardContent}</AnimatedPressable>;
+    return (
+      <AnimatedPressable onPress={onPress} style={styles.pressable}>
+        {content}
+      </AnimatedPressable>
+    );
   }
-  return CardContent;
+  return content;
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 0,
+  pressable: {},
+
+  // Featured card — Luma city-card style
+  featuredCard: {
+    borderRadius: theme.borderRadius.xl,
     marginBottom: theme.spacing.m,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surface,
   },
-  publishedContainer: {
-    borderColor: `${theme.colors.success}66`,
-    borderWidth: 1,
-  },
-  cancelledContainer: {
-    opacity: 0.6,
-  },
-  image: {
+  featuredImage: {
     width: '100%',
-    height: 140,
+    aspectRatio: 16 / 9,
   },
-  imagePlaceholder: {
+  featuredImagePlaceholder: {
     width: '100%',
-    height: 140,
-    backgroundColor: theme.colors.surfaceLight,
+    aspectRatio: 16 / 9,
+    backgroundColor: theme.colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderText: {
-    color: theme.colors.textMuted,
-    ...theme.typography.caption,
-  },
-  content: {
-    padding: theme.spacing.m,
-  },
-  headerRow: {
-    flexDirection: 'row',
+  featuredOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.s,
+    padding: theme.spacing.m,
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
-  title: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    flex: 1,
-    marginRight: theme.spacing.s,
-  },
-  statusBadge: {
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.s,
-    borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  detailsContainer: {
-    marginTop: theme.spacing.xs,
-  },
-  badgeRow: {
+  featuredMeta: {
     flexDirection: 'row',
-    marginBottom: theme.spacing.s,
-    gap: theme.spacing.s,
-    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
   },
-  metaBadge: {
+  featuredBottom: {
+    gap: theme.spacing.xs,
+  },
+  featuredTitle: {
+    ...theme.typography.h3,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  featuredDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  featuredDetail: {
+    ...theme.typography.caption,
+    color: 'rgba(255,255,255,0.8)',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+
+  // List card — Luma calendar-list-item style
+  listCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.l,
+    marginBottom: theme.spacing.sm,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
   },
-  metaBadgeText: {
-    ...theme.typography.small,
-    color: theme.colors.textMuted,
-    fontWeight: '600',
+  listCardCancelled: {
+    opacity: 0.5,
   },
-  detailRow: {
+  listThumbnail: {
+    width: 68,
+    height: 68,
+    flexShrink: 0,
+  },
+  listImage: {
+    width: 68,
+    height: 68,
+  },
+  listImagePlaceholder: {
+    width: 68,
+    height: 68,
+    backgroundColor: theme.colors.surfaceRaised,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.s,
+    gap: 3,
+  },
+  listTitle: {
+    ...theme.typography.h3,
+    fontSize: 15,
+    color: theme.colors.text,
+  },
+  listMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 4,
   },
-  detailText: {
+  listMetaText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    marginLeft: theme.spacing.s,
   },
-  actionsContainer: {
-    marginTop: theme.spacing.m,
-    paddingTop: theme.spacing.m,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  listActions: {
+    paddingRight: theme.spacing.sm,
+  },
+
+  // Shared
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: theme.colors.textMuted,
+    marginHorizontal: 2,
   },
 });

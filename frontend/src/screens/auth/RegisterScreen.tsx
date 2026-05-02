@@ -11,12 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft, User, Mail, Lock } from 'lucide-react-native';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, PrimaryButton, FormInput, GlassCard, IconButton } from '../../components';
+import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
-import { ArrowLeft, User, Mail, Lock } from 'lucide-react-native';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
@@ -59,10 +60,15 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         email: normalizedEmail,
         password,
       });
-      
-      const { token, data } = response;
-      await login(data.user, token);
-      
+
+      const { token, user, data } = response;
+      const resolvedUser = user || data?.user;
+
+      if (!token || !resolvedUser) {
+        throw new Error('Invalid registration response from server');
+      }
+
+      await login(resolvedUser, token);
     } catch (error: any) {
       Alert.alert('Registration Failed', getApiErrorMessage(error, 'Unable to create account. Please try again.'));
     } finally {
@@ -71,122 +77,149 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={styles.container}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        {/* Header */}
         <View style={styles.header}>
-          <IconButton 
-            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
-            onPress={() => navigation.goBack()} 
-            variant="solid" 
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={22} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={40}
           />
         </View>
 
         <KeyboardAvoidingView
-          style={styles.keyboardContainer}
+          style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="always"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join Evoria to start your journey</Text>
+            {/* Title */}
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>Create account</Text>
+              <Text style={styles.subtitle}>Join thousands of event creators</Text>
+            </View>
 
-            <GlassCard style={styles.card} variant="dark" animateEntrance>
-              <FormInput
-                label="Full Name"
-                placeholder="Enter your full name"
+            {/* Form */}
+            <View style={styles.form}>
+              <Input
+                label="Full name"
+                placeholder="Your name"
+                autoCapitalize="words"
+                autoCorrect={false}
                 value={name}
                 onChangeText={setName}
-                leftIcon={<User size={20} color={theme.colors.textMuted} />}
+                leftIcon={<User size={18} color={theme.colors.textMuted} />}
               />
-
-              <FormInput
-                label="Email Address"
-                placeholder="Enter your email"
+              <Input
+                label="Email address"
+                placeholder="name@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
                 value={email}
                 onChangeText={setEmail}
-                leftIcon={<Mail size={20} color={theme.colors.textMuted} />}
+                leftIcon={<Mail size={18} color={theme.colors.textMuted} />}
               />
-
-              <FormInput
+              <Input
                 label="Password"
-                placeholder="Create a password"
+                placeholder="At least 6 characters"
                 isPassword
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="done"
                 value={password}
                 onChangeText={setPassword}
-                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+                leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+                hint="Minimum 6 characters"
               />
-
-              <PrimaryButton
-                title="Sign Up"
-                onPress={handleRegister}
-                isLoading={isLoading}
-                style={styles.button}
-              />
-            </GlassCard>
-
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                <Text style={styles.footerLink}>Sign In</Text>
-              </TouchableOpacity>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {/* Sticky bottom CTA */}
+        <View style={styles.bottomZone}>
+          <Button
+            title="Create Account"
+            onPress={handleRegister}
+            isLoading={isLoading}
+            variant="primary"
+            size="lg"
+          />
+          <View style={styles.footerRow}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.footerLink}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  flex: {
     flex: 1,
   },
   header: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    alignItems: 'flex-start',
-  },
-  keyboardContainer: {
-    flex: 1,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.s,
   },
   scrollContent: {
-    padding: theme.spacing.xl,
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.xl,
+  },
+  titleSection: {
+    marginBottom: theme.spacing.xl,
   },
   title: {
     ...theme.typography.h1,
     color: theme.colors.text,
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
     ...theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xl,
+    color: theme.colors.textSecondary,
   },
-  card: {
-    padding: theme.spacing.l,
+  form: {},
+  bottomZone: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: theme.spacing.l,
+    paddingTop: theme.spacing.m,
+    gap: theme.spacing.m,
   },
-  button: {
-    marginTop: theme.spacing.l,
-  },
-  footer: {
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: theme.spacing.xl,
+    alignItems: 'center',
   },
   footerText: {
     ...theme.typography.body,
     color: theme.colors.textMuted,
   },
   footerLink: {
-    ...theme.typography.body,
+    ...theme.typography.bodyMedium,
     color: theme.colors.primary,
-    fontWeight: 'bold',
   },
 });

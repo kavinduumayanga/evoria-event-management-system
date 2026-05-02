@@ -60,6 +60,7 @@ export const Select: React.FC<SelectProps> = ({
             <FlatList
               data={options}
               keyExtractor={(item) => item.value}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity 
                   style={styles.optionRow}
@@ -88,18 +89,18 @@ const styles = StyleSheet.create({
   },
   label: {
     ...theme.typography.caption,
-    color: theme.colors.text,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.s,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
+    borderColor: theme.colors.glassBorder,
+    borderRadius: theme.borderRadius.l,
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.m,
   },
@@ -121,12 +122,13 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
   modalCard: {
     maxHeight: '80%',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
+    paddingBottom: theme.spacing.xxl,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -144,7 +146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: theme.spacing.m,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: theme.colors.glassBorder,
   },
   optionText: {
     ...theme.typography.body,
@@ -152,6 +154,6 @@ const styles = StyleSheet.create({
   },
   optionSelectedText: {
     color: theme.colors.primary,
-    fontWeight: 'bold',
+    fontWeight: '700',
   }
 });

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
-import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, SecondaryButton, GlassCard } from '../../components';
+import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, Button, Card } from '../../components';
 import { theme } from '../../constants/theme';
 import { RegistrationService } from '../../api/services';
 import { Booking } from '../../types';
@@ -58,69 +58,75 @@ export const MyBookingsScreen = () => {
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchBookings} /></ScreenContainer>;
 
   return (
-    <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Registrations</Text>
-        <SecondaryButton
-          title="My Waitlist"
-          onPress={() =>
-            navigation.navigate('HomeStack', {
-              screen: 'MyWaitlist',
-            })
-          }
-        />
-      </View>
-
+    <ScreenContainer>
       <FlatList
         data={bookings}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+        }
+        ListHeaderComponent={
+          <View style={styles.pageHeader}>
+            <Text style={styles.pageTitle}>My Registrations</Text>
+            <Button
+              title="Waitlist"
+              onPress={() => navigation.navigate('HomeStack', { screen: 'MyWaitlist' })}
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
+            />
+          </View>
+        }
         renderItem={({ item }) => (
           <BookingCard
             booking={item}
             actions={
               <View style={styles.actionsWrapper}>
                 {item.isWaitlisted ? (
-                  <GlassCard style={styles.waitingBanner} variant="dark">
+                  <Card variant="warning" style={styles.waitingBanner} noPadding>
                     <Text style={styles.waitingBannerText}>
                       Waiting in queue{item.waitlistPosition ? ` (#${item.waitlistPosition})` : ''}
                     </Text>
-                  </GlassCard>
+                  </Card>
                 ) : (
                   <View style={styles.rsvpActions}>
-                    <SecondaryButton
+                    <Button
                       title="Going"
                       onPress={() => handleRsvpUpdate(item.id, 'going')}
-                      style={{ flex: 1, ...(item.rsvpStatus === 'going' ? { backgroundColor: theme.colors.primary } : {}) }}
+                      variant={item.rsvpStatus === 'going' ? 'primary' : 'secondary'}
+                      size="sm"
+                      style={{ flex: 1 }}
                     />
-                    <SecondaryButton
+                    <Button
                       title="Not Going"
                       onPress={() => handleRsvpUpdate(item.id, 'not_going')}
-                      style={{ flex: 1, ...(item.rsvpStatus === 'not_going' ? { backgroundColor: theme.colors.error } : {}) }}
+                      variant={item.rsvpStatus === 'not_going' ? 'danger' : 'secondary'}
+                      size="sm"
+                      style={{ flex: 1 }}
                     />
                   </View>
                 )}
 
                 {item.bookingStatus === 'confirmed' && !item.isWaitlisted && (
-                  <SecondaryButton
-                    title="View QR"
-                    icon={<QrCode size={16} color={theme.colors.text} />}
+                  <Button
+                    title="View QR Ticket"
+                    icon={<QrCode size={16} color={theme.colors.textOnPrimary} />}
                     onPress={() =>
                       navigation.navigate('HomeStack', {
                         screen: 'MyTicketQR',
                         params: { bookingId: item.id },
                       })
                     }
+                    variant="primary"
+                    size="sm"
                   />
                 )}
               </View>
             }
           />
         )}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
-        }
         ListEmptyComponent={<EmptyState title="No Registrations" message="You have not registered for any events yet." />}
       />
     </ScreenContainer>
@@ -128,44 +134,27 @@ export const MyBookingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 0,
+  listContent: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
-  header: {
-    padding: theme.spacing.m,
-    paddingTop: theme.spacing.xl,
+  pageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: theme.spacing.xl,
+    marginBottom: theme.spacing.l,
   },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-  },
-  listContainer: {
-    padding: theme.spacing.m,
-    paddingBottom: theme.spacing.xxl,
-    flexGrow: 1,
-  },
-  actionsWrapper: {
-    width: '100%',
-    gap: theme.spacing.s,
-  },
-  rsvpActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.s,
-    width: '100%',
-  },
+  pageTitle: { ...theme.typography.h1, color: theme.colors.text },
+  actionsWrapper: { width: '100%', gap: theme.spacing.s },
+  rsvpActions: { flexDirection: 'row', gap: theme.spacing.s, width: '100%' },
   waitingBanner: {
     width: '100%',
     paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
     alignItems: 'center',
-    borderColor: theme.colors.warning,
-    borderWidth: 1,
+    borderRadius: theme.borderRadius.s,
   },
-  waitingBannerText: {
-    ...theme.typography.caption,
-    color: theme.colors.warning,
-    fontWeight: '700',
-  },
+  waitingBannerText: { ...theme.typography.caption, color: theme.colors.warning, fontWeight: '700' },
 });
