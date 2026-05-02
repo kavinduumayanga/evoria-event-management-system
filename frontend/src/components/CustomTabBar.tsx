@@ -18,6 +18,13 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const scaleAnims = useRef(state.routes.map(() => new Animated.Value(1))).current;
+  const activeRouteOptions = descriptors[state.routes[state.index].key]?.options;
+  const flattenedTabBarStyle = StyleSheet.flatten(activeRouteOptions?.tabBarStyle) as { display?: string } | undefined;
+  const shouldHideTabBar = flattenedTabBarStyle?.display === 'none';
+
+  if (shouldHideTabBar) {
+    return null;
+  }
 
   const handlePress = (index: number, routeName: string, isFocused: boolean) => {
     Animated.sequence([
