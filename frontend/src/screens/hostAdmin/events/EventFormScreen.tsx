@@ -12,6 +12,7 @@ import { EventService, UploadService, VenueService } from '../../../api/services
 import { Event, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode, Venue } from '../../../types';
 import { resolveImageUrl } from '../../../utils/imageUrl';
 import { useAuthStore } from '../../../store/auth.store';
+import { safeUpper } from '../../../utils/safeText';
 
 type EventFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'EventForm'>;
 type EventFormRouteProp = RouteProp<HostAdminEventStackParamList, 'EventForm'>;
@@ -337,7 +338,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {isEditing ? (
           <Card variant="raised" style={styles.statusCard}>
-            <Text style={styles.statusLabel}>Status: {status.toUpperCase()}</Text>
+            <Text style={styles.statusLabel}>Status: {safeUpper(status)}</Text>
             {status === 'cancelled' ? <Text style={styles.warningText}>Cancelled events cannot be edited.</Text> : null}
           </Card>
         ) : null}
@@ -406,7 +407,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 if (eventType === 'online') setVenueId('');
               }}
             >
-              <Text style={[styles.segmentText, type === eventType && styles.segmentTextSelected]}>{eventType.toUpperCase()}</Text>
+              <Text style={[styles.segmentText, type === eventType && styles.segmentTextSelected]}>{safeUpper(eventType)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -419,7 +420,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
               style={[styles.segment, pricingMode === modeOption && styles.segmentSelected]}
               onPress={() => setPricingMode(modeOption)}
             >
-              <Text style={[styles.segmentText, pricingMode === modeOption && styles.segmentTextSelected]}>{modeOption.toUpperCase()}</Text>
+              <Text style={[styles.segmentText, pricingMode === modeOption && styles.segmentTextSelected]}>{safeUpper(modeOption)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -432,7 +433,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
               style={[styles.segment, visibility === option && styles.segmentSelected]}
               onPress={() => setVisibility(option)}
             >
-              <Text style={[styles.segmentText, visibility === option && styles.segmentTextSelected]}>{option.toUpperCase()}</Text>
+              <Text style={[styles.segmentText, visibility === option && styles.segmentTextSelected]}>{safeUpper(option)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -547,7 +548,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={styles.questionInfo}>
                   <Text style={styles.questionText}>{customQuestion.question}</Text>
                   <Text style={styles.questionMeta}>
-                    {customQuestion.type.toUpperCase()} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
+                    {safeUpper(customQuestion.type)} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
                   </Text>
                 </View>
                 <IconButton
@@ -579,7 +580,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 onPress={() => setQuestionType(typeOption)}
               >
                 <Text style={[styles.segmentText, questionType === typeOption && styles.segmentTextSelected]}>
-                  {typeOption.toUpperCase()}
+                  {safeUpper(typeOption)}
                 </Text>
               </TouchableOpacity>
             ))}

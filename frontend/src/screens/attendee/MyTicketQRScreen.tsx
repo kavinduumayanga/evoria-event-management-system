@@ -10,6 +10,7 @@ import { theme } from '../../constants/theme';
 import { ScreenContainer, LoadingState, ErrorState, Card, IconButton, StatusBadge } from '../../components';
 import { BookingService, CheckInService, EventService, TicketService } from '../../api/services';
 import { LinearGradient } from 'expo-linear-gradient';
+import { formatSafeDate, logDevMissing, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
 
 type MyTicketQRRouteProp = RouteProp<AttendeeHomeStackParamList, 'MyTicketQR'>;
 type MyTicketQRNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'MyTicketQR'>;
@@ -17,7 +18,7 @@ type MyTicketQRNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParam
 interface Props { route: MyTicketQRRouteProp; navigation: MyTicketQRNavigationProp; }
 
 export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { bookingId } = route.params;
+  const bookingId = route.params?.bookingId;
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -29,19 +30,20 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       setIsLoading(true);
       setError(null);
+      if (!bookingId) return;
       const [bookingRes, qrRes] = await Promise.all([
         BookingService.getBooking(bookingId),
         CheckInService.getBookingQr(bookingId),
       ]);
       const bookingData = bookingRes.data.booking as Booking;
       setBooking(bookingData);
-      setQrCodeValue(qrRes.data.qrCodeValue || qrRes.data.qrData);
+      setQrCodeValue(qrRes.data.qrCodeValue || qrRes.data.qrData || '');
       const [eventRes, ticketRes] = await Promise.all([
         EventService.getEvent(bookingData.eventId),
         TicketService.getTicket(bookingData.ticketTypeId),
       ]);
-      setEventTitle(eventRes.data.event.title);
-      setTicketName(ticketRes.data.ticket.name);
+      setEventTitle(safeTitle(eventRes.data.event?.title, 'Untitled Event'));
+      setTicketName(safeTitle(ticketRes.data.ticket?.name, 'Ticket'));
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load ticket QR');
     } finally { setIsLoading(false); }
@@ -49,11 +51,22 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
 
   useEffect(() => { fetchTicketQr(); }, [bookingId]);
 
+  if (!bookingId) {
+    logDevMissing('ticket-qr-missing-id', 'MyTicketQRScreen missing bookingId route param.');
+    return (
+      <ScreenContainer>
+        <ErrorState message="Missing ticket details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+      </ScreenContainer>
+    );
+  }
+
   if (isLoading) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchTicketQr} /></ScreenContainer>;
   if (!booking || !qrCodeValue) return <ScreenContainer><ErrorState message="No QR data available" onRetry={fetchTicketQr} /></ScreenContainer>;
 
   const checkedIn = booking.checkInStatus === 'checked_in';
+  const bookingIdLabel = safeString(booking.id, '').slice(-8);
+  const bookingStatusLabel = safeUpper(safeStatus(booking.bookingStatus, 'unknown'), 'UNKNOWN');
 
   return (
     <View style={styles.screen}>
@@ -91,9 +104,9 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
 
           {/* Event name */}
           <View style={styles.ticketBody}>
-            <Text style={styles.eventTitle}>{eventTitle}</Text>
-            <Text style={styles.bookingId}>Booking #{booking.id.slice(-8).toUpperCase()}</Text>
-            <Text style={styles.bookingStatus}>Status: {booking.bookingStatus.toUpperCase()}</Text>
+            <Text style={styles.eventTitle}>{safeTitle(eventTitle, 'Untitled Event')}</Text>
+            <Text style={styles.bookingId}>Booking #{safeUpper(bookingIdLabel || '—', '—')}</Text>
+            <Text style={styles.bookingStatus}>Status: {bookingStatusLabel}</Text>
           </View>
 
           {/* Divider */}
@@ -117,7 +130,7 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.checkedInBanner}>
               <CheckCircle2 size={14} color={theme.colors.success} />
               <Text style={styles.checkedInText}>
-                Verified {new Date(booking.checkedInAt).toLocaleString('en-US', {
+                Verified {formatSafeDate(booking.checkedInAt, 'Time unavailable', {
                   month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
                 })}
               </Text>

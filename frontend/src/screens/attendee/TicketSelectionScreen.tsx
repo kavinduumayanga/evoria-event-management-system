@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'rea
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { ScreenContainer, Card, Button, LoadingState, Input, StatusBadge, IconButton } from '../../components';
+import { ScreenContainer, Card, Button, LoadingState, ErrorState, Input, StatusBadge, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { Event, EventCustomQuestion, TicketType } from '../../types';
 import { ArrowLeft, Tag, Minus, Plus, AlertTriangle } from 'lucide-react-native';
 import { BookingService, TicketService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
+import { logDevMissing, safeStatus, safeString, safeTitle } from '../../utils/safeText';
 
 type TicketSelectionNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'TicketSelection'>;
 type TicketSelectionRouteProp = RouteProp<AttendeeHomeStackParamList, 'TicketSelection'>;
@@ -47,7 +48,7 @@ const validateRequiredQuestions = (
 };
 
 export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId } = route.params;
+  const eventId = route.params?.eventId;
   const currentUser = useAuthStore((state) => state.user);
 
   const [tickets, setTickets] = useState<TicketType[]>([]);
@@ -70,6 +71,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
     try {
       setIsLoading(true);
       setError(null);
+      if (!eventId) return;
       const [eventRes, ticketRes] = await Promise.all([
         apiClient.get(`/events/${eventId}`),
         apiClient.get(`/tickets/event/${eventId}`),
@@ -78,7 +80,9 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       const eventData: Event = eventRes.data.data.event;
       setEvent(eventData);
 
-      if (eventData.status !== 'published' || eventData.visibility === 'private') {
+      const eventStatus = safeStatus(eventData.status, 'draft');
+      const eventVisibility = safeString(eventData.visibility, 'private');
+      if (eventStatus !== 'published' || eventVisibility === 'private') {
         setTickets([]);
         setError('This event is currently unavailable for booking.');
         return;
@@ -165,7 +169,9 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       Alert.alert('Sold Out', 'Sold Out / Capacity Full');
       return;
     }
-    if (event.status !== 'published' || event.visibility === 'private') {
+    const eventStatus = safeStatus(event.status, 'draft');
+    const eventVisibility = safeString(event.visibility, 'private');
+    if (eventStatus !== 'published' || eventVisibility === 'private') {
       Alert.alert('Booking Blocked', 'This event is currently unavailable for booking.');
       return;
     }
@@ -213,12 +219,21 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       quantity,
       promoCode: promoCode.trim() || undefined,
       unlockCode: unlockCode.trim() || undefined,
-      ticketName: selectedTicket.name,
-      currency: selectedTicket.currency || 'LKR',
+      ticketName: safeTitle(selectedTicket.name, 'Ticket'),
+      currency: safeString(selectedTicket.currency, 'LKR'),
       unitPrice: selectedTicket.price,
       customAnswers,
     });
   };
+
+  if (!eventId) {
+    logDevMissing('ticket-selection-missing-id', 'TicketSelectionScreen missing eventId route param.');
+    return (
+      <ScreenContainer>
+        <ErrorState message="Missing event details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+      </ScreenContainer>
+    );
+  }
 
   if (isLoading) return <LoadingState />;
 
@@ -252,7 +267,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <Card variant="primary" style={styles.eventCard}>
-            <Text style={styles.eventTitle}>{event?.title || 'Event'}</Text>
+            <Text style={styles.eventTitle}>{safeTitle(event?.title, 'Untitled Event')}</Text>
             <Text style={styles.freeLabel}>Free to attend</Text>
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>Capacity: {event?.capacity || 0}</Text>
@@ -318,7 +333,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
                   <StatusBadge status={ticket.isFree ? 'success' : 'info'} label={ticket.isFree ? 'Free' : 'Paid'} />
                 </View>
                 <Text style={styles.ticketPrice}>
-                  {ticket.isFree ? 'Free' : `${ticket.currency || 'LKR'} ${ticket.price.toFixed(2)}`}
+                  {ticket.isFree ? 'Free' : `${safeString(ticket.currency, 'LKR')} ${Number(ticket.price || 0).toFixed(2)}`}
                 </Text>
                 <View style={styles.ticketMetaRow}>
                   <Text style={styles.ticketMeta}>Remaining: {available}</Text>

@@ -4,13 +4,14 @@ import { GlassCard } from './Card';
 import { StatusBadge } from './StatusBadge';
 import { theme } from '../constants/theme';
 import { Mail, Phone } from 'lucide-react-native';
+import { safeStatus, safeString, safeTitle, safeUpper } from '../utils/safeText';
 
 interface GuestCardProps {
-  name: string;
-  email: string;
+  name?: string;
+  email?: string;
   phone?: string;
   role?: string;
-  status?: 'arrived' | 'expected' | 'no_show';
+  status?: 'arrived' | 'expected' | 'no_show' | string;
   avatarUrl?: string;
   style?: StyleProp<ViewStyle>;
   actions?: React.ReactNode;
@@ -28,6 +29,13 @@ export const GuestCard: React.FC<GuestCardProps> = ({
     }
   };
 
+  const displayName = safeTitle(name, 'Guest');
+  const displayEmail = safeString(email, 'Unknown email');
+  const displayPhone = safeString(phone, '');
+  const displayRole = safeString(role, '');
+  const statusLabel = safeStatus(status, 'unknown').replace('_', ' ');
+  const initial = safeUpper(displayName.trim().charAt(0), 'G');
+
   return (
     <GlassCard style={[styles.container, style]} variant="dark" animateEntrance>
       <View style={styles.row}>
@@ -35,32 +43,32 @@ export const GuestCard: React.FC<GuestCardProps> = ({
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{initial}</Text>
           </View>
         )}
         
         <View style={styles.infoContainer}>
           <View style={styles.headerRow}>
-            <Text style={styles.name} numberOfLines={1}>{name}</Text>
-            {role && <StatusBadge status="neutral" label={role} />}
+            <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
+            {displayRole ? <StatusBadge status="neutral" label={displayRole} /> : null}
           </View>
           
           <View style={styles.contactRow}>
             <Mail size={12} color={theme.colors.textMuted} />
-            <Text style={styles.contactText} numberOfLines={1}>{email}</Text>
+            <Text style={styles.contactText} numberOfLines={1}>{displayEmail}</Text>
           </View>
           
-          {phone && (
+          {displayPhone ? (
             <View style={styles.contactRow}>
               <Phone size={12} color={theme.colors.textMuted} />
-              <Text style={styles.contactText}>{phone}</Text>
+              <Text style={styles.contactText}>{displayPhone}</Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
 
       <View style={styles.footerRow}>
-        {status && <StatusBadge status={getStatus()} label={status.replace('_', ' ')} />}
+        {statusLabel ? <StatusBadge status={getStatus()} label={statusLabel} /> : null}
         {actions && (
           <View style={styles.actionsContainer}>
             {actions}

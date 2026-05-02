@@ -8,6 +8,7 @@ import { theme } from '../../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
 import { Venue, VenueType } from '../../../types';
+import { safeUpper } from '../../../utils/safeText';
 
 type VenueFormNavigationProp = NativeStackNavigationProp<HostAdminVenueStackParamList, 'VenueForm'>;
 type VenueFormRouteProp = RouteProp<HostAdminVenueStackParamList, 'VenueForm'>;
@@ -118,7 +119,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
                   onPress={() => setType(t)}
                 >
                   <Text style={[styles.segmentButtonText, type === t && styles.segmentButtonTextSelected]}>
-                    {t.toUpperCase()}
+                    {safeUpper(t)}
                   </Text>
                 </TouchableOpacity>
               ))}

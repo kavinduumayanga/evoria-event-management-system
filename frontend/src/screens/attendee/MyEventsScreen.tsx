@@ -9,6 +9,7 @@ import { EventService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button } from '../../components';
 import { theme } from '../../constants/theme';
+import { logDevMissing, safeString } from '../../utils/safeText';
 
 type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyEvents'>;
 
@@ -56,41 +57,49 @@ export const MyEventsScreen = () => {
     <ScreenContainer>
       <FlatList
         data={events}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.eventBlock}>
-            <EventCard
-              event={item}
-              variant="list"
-              onPress={() => navigation.navigate('HomeStack', {
-                screen: 'EventDetails',
-                params: { eventId: item.id, publicSlug: item.publicSlug },
-              })}
-            />
-            <View style={styles.eventActions}>
-              <Button
-                title="Event Dashboard"
-                onPress={() => navigation.navigate('HomeStack', {
-                  screen: 'EventDashboard',
-                  params: { eventId: item.id },
-                })}
-                variant="secondary"
-                size="sm"
-                style={{ flex: 1 }}
+        keyExtractor={(item, index) => safeString(item.id, String(index))}
+        renderItem={({ item }) => {
+          const eventId = safeString(item.id, '');
+          if (!eventId) {
+            logDevMissing('my-events-id', 'Managed event missing id; actions disabled.');
+          }
+          return (
+            <View style={styles.eventBlock}>
+              <EventCard
+                event={item}
+                variant="list"
+                onPress={eventId ? () => navigation.navigate('HomeStack', {
+                  screen: 'EventDetails',
+                  params: { eventId, publicSlug: item.publicSlug },
+                }) : undefined}
               />
-              <Button
-                title="Guest List"
-                onPress={() => navigation.navigate('HomeStack', {
-                  screen: 'ManageRegistrations',
-                  params: { eventId: item.id },
-                })}
-                variant="ghost"
-                size="sm"
-                style={{ flex: 1 }}
-              />
+              <View style={styles.eventActions}>
+                <Button
+                  title="Event Dashboard"
+                  onPress={() => eventId && navigation.navigate('HomeStack', {
+                    screen: 'EventDashboard',
+                    params: { eventId },
+                  })}
+                  variant="secondary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  disabled={!eventId}
+                />
+                <Button
+                  title="Guest List"
+                  onPress={() => eventId && navigation.navigate('HomeStack', {
+                    screen: 'ManageRegistrations',
+                    params: { eventId },
+                  })}
+                  variant="ghost"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  disabled={!eventId}
+                />
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

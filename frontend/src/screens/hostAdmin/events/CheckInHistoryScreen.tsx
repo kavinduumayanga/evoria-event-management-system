@@ -22,6 +22,7 @@ import {
 } from '../../../components';
 import { CheckInService } from '../../../api/services';
 import { CheckInHistoryRecord } from '../../../types';
+import { safeUpper } from '../../../utils/safeText';
 
 interface Props {
   navigation: NativeStackNavigationProp<HostAdminEventStackParamList, 'CheckInHistory'>;
@@ -128,7 +129,7 @@ export const CheckInHistoryScreen: React.FC<Props> = ({ navigation, route }) => 
                     <Text style={styles.guestEmail}>{item.guest?.email || item.reason}</Text>
                   </View>
                   <View style={[styles.resultPill, badgeStyle]}>
-                    <Text style={styles.resultText}>{item.result.toUpperCase()}</Text>
+                    <Text style={styles.resultText}>{safeUpper(item.result)}</Text>
                   </View>
                 </View>
 

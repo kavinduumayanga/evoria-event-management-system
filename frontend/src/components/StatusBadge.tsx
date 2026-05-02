@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../constants/theme';
+import { safeLower, safeString, safeUpper, safeStatus } from '../utils/safeText';
 
 // ============================================================
 // STATUS BADGE — Semantic-only status indicators
@@ -19,8 +20,8 @@ import { theme } from '../constants/theme';
 export type BadgeStatus = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 interface StatusBadgeProps {
-  status: BadgeStatus;
-  label: string;
+  status?: BadgeStatus | string | null;
+  label?: string | null;
 }
 
 const CONFIG: Record<BadgeStatus, { bg: string; dot: string; text: string }> = {
@@ -52,13 +53,21 @@ const CONFIG: Record<BadgeStatus, { bg: string; dot: string; text: string }> = {
 };
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
-  const config = CONFIG[status] ?? CONFIG.neutral;
+  const normalizedStatus = safeLower(status, '');
+  const resolvedStatus = (Object.prototype.hasOwnProperty.call(CONFIG, normalizedStatus)
+    ? normalizedStatus
+    : 'neutral') as BadgeStatus;
+  const config = CONFIG[resolvedStatus] ?? CONFIG.neutral;
+  const isKnownStatus = resolvedStatus !== 'neutral' || normalizedStatus === 'neutral';
+  const resolvedLabel = isKnownStatus
+    ? safeString(label ?? safeStatus(status, 'unknown'), 'Unknown')
+    : 'Unknown';
 
   return (
     <View style={[styles.badge, { backgroundColor: config.bg }]}>
       <View style={[styles.dot, { backgroundColor: config.dot }]} />
       <Text style={[styles.label, { color: config.text }]}>
-        {label.toUpperCase()}
+        {safeUpper(resolvedLabel, 'UNKNOWN')}
       </Text>
     </View>
   );

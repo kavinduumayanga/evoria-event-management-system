@@ -9,13 +9,14 @@ import { Button, Card, ErrorState, IconButton, Input, LoadingState, ScreenContai
 import { EventService, PublicEventDetails, RegistrationService } from '../../api/services';
 import { theme } from '../../constants/theme';
 import { useAuthStore } from '../../store/auth.store';
+import { formatSafeDate, formatSafeTime, logDevMissing, safeLower, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
 
 type PublicEventNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
 type PublicEventRouteProp = RouteProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
 interface Props { navigation: PublicEventNavigationProp; route: PublicEventRouteProp; }
 
 export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { slug } = route.params;
+  const slug = route.params?.slug;
   const currentUser = useAuthStore((s) => s.user);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +33,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const [reviewSummary, setReviewSummary] = useState<{ averageRating: number; totalReviews: number } | null>(null);
 
   const fetchPublicEvent = async () => {
+    if (!slug) return;
     try {
       setError(null);
       const res = await EventService.getPublicEventBySlug(slug);
@@ -82,12 +84,13 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
 
   const handleContact = async () => {
     if (!event) return;
-    const phone = (event.contactDetails?.phone || event.host?.phone || '').trim();
+    const host = typeof event.host === 'object' && event.host ? event.host : null;
+    const phone = safeString(event.contactDetails?.phone || host?.phone, '').trim();
     if (phone) {
       const url = `tel:${phone}`;
       if (await Linking.canOpenURL(url)) { await Linking.openURL(url); return; }
     }
-    const em = (event.contactDetails?.email || event.host?.email || '').trim();
+    const em = safeString(event.contactDetails?.email || host?.email, '').trim();
     if (em) {
       const url = `mailto:${em}`;
       if (await Linking.canOpenURL(url)) { await Linking.openURL(url); return; }
@@ -135,7 +138,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
       const status = res.data.registration.status;
       setRegistrationStatus(status);
       await fetchPublicEvent();
-      Alert.alert('Registration Submitted', `Your registration status is ${status.toUpperCase()}.`);
+      Alert.alert('Registration Submitted', `Your registration status is ${safeUpper(safeStatus(status, 'unknown'), 'UNKNOWN')}.`);
     } catch (err: any) {
       const msg = err?.response?.data?.message || 'Unable to submit registration';
       Alert.alert(err?.response?.status === 409 ? 'Already Registered' : 'Registration Failed', msg);
@@ -144,13 +147,32 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
     }
   };
 
+  if (!slug) {
+    logDevMissing('public-event-missing-slug', 'PublicEventDetailsScreen missing slug route param.');
+    return (
+      <ScreenContainer>
+        <ErrorState message="Missing event details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+      </ScreenContainer>
+    );
+  }
+
   if (isLoading) return <LoadingState />;
   if (error || !event) {
     return <ScreenContainer><ErrorState message={error || 'Event not found'} onRetry={fetchPublicEvent} /></ScreenContainer>;
   }
 
-  const isSoldOut = tickets.every((t) => t.remaining <= 0);
-  const isTicketedEvent = event.pricingMode === 'ticketed';
+  const eventType = safeLower(event.type, 'physical');
+  const host = typeof event.host === 'object' && event.host ? event.host : null;
+  const hostName = safeTitle(host?.name, 'Host unavailable');
+  const locationLabel = safeString(event.location?.label, eventType === 'online' ? 'Online' : 'Location not specified');
+  const dateLabel = formatSafeDate(event.date, 'Date unavailable');
+  const startTimeLabel = formatSafeTime(event.startTime, 'Time unavailable');
+  const endTimeLabel = formatSafeTime(event.endTime, 'Time unavailable');
+  const titleLabel = safeTitle(event.title, 'Untitled Event');
+  const topicLabel = safeString(event.topic, '');
+  const aboutLabel = safeString(event.about, '');
+  const isSoldOut = tickets.every((t) => (Number.isFinite(Number(t.remaining)) ? Number(t.remaining) : 0) <= 0);
+  const isTicketedEvent = safeString(event.pricingMode, 'ticketed') === 'ticketed';
 
   return (
     <ScreenContainer style={styles.screen}>
@@ -180,30 +202,30 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
 
         <View style={styles.content}>
           {/* Title + topic */}
-          <Text style={styles.eventTitle}>{event.title}</Text>
-          {event.topic && <Text style={styles.topic}>{event.topic}</Text>}
+          <Text style={styles.eventTitle}>{titleLabel}</Text>
+          {topicLabel ? <Text style={styles.topic}>{topicLabel}</Text> : null}
 
           {/* Meta card */}
           <Card variant="raised" style={styles.metaCard} noPadding>
             <View style={styles.metaCardInner}>
               <View style={styles.metaRow}>
                 <CalendarIcon size={14} color={theme.colors.primary} />
-                <Text style={styles.metaText}>{event.date}</Text>
+                <Text style={styles.metaText}>{dateLabel}</Text>
               </View>
               <View style={styles.metaRow}>
                 <Clock size={14} color={theme.colors.secondary} />
-                <Text style={styles.metaText}>{event.startTime} – {event.endTime}</Text>
+                <Text style={styles.metaText}>{startTimeLabel} – {endTimeLabel}</Text>
               </View>
               <View style={styles.metaRow}>
                 <MapPin size={14} color={theme.colors.accent} />
-                <Text style={styles.metaText}>{event.location.label}</Text>
+                <Text style={styles.metaText}>{locationLabel}</Text>
               </View>
               <View style={styles.metaDivider} />
               <View style={styles.metaTagRow}>
-                <StatusBadge status="info" label={event.type.toUpperCase()} />
-                <StatusBadge status={event.visibility === 'public' ? 'success' : 'warning'} label={event.visibility.toUpperCase()} />
+                <StatusBadge status="info" label={safeString(event.type, 'unknown')} />
+                <StatusBadge status={event.visibility === 'public' ? 'success' : 'warning'} label={safeString(event.visibility, 'unknown')} />
               </View>
-              {event.host && <Text style={styles.hostText}>Hosted by {event.host.name}</Text>}
+              {hostName ? <Text style={styles.hostText}>Hosted by {hostName}</Text> : null}
             </View>
           </Card>
 
@@ -253,7 +275,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
           {/* About */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.sectionText}>{event.about}</Text>
+            <Text style={styles.sectionText}>{aboutLabel}</Text>
           </View>
 
           {/* Agenda */}
@@ -281,12 +303,12 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                   <View style={{ flex: 1 }}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
                     <Text style={styles.ticketPrice}>
-                      {ticket.isFree ? 'Free' : `${ticket.currency} ${ticket.price.toFixed(2)}`}
+                        {ticket.isFree ? 'Free' : `${safeString(ticket.currency, 'LKR')} ${Number(ticket.price || 0).toFixed(2)}`}
                     </Text>
                   </View>
                   <StatusBadge
-                    status={ticket.remaining > 0 ? 'success' : 'error'}
-                    label={ticket.remaining > 0 ? `${ticket.remaining} left` : 'Sold out'}
+                      status={(Number(ticket.remaining || 0) > 0) ? 'success' : 'error'}
+                      label={(Number(ticket.remaining || 0) > 0) ? `${Number(ticket.remaining || 0)} left` : 'Sold out'}
                   />
                 </View>
               </Card>
@@ -334,7 +356,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                       <Text style={styles.statusLabel}>Registration Status</Text>
                       <StatusBadge
                         status={registrationStatus === 'approved' ? 'success' : registrationStatus === 'pending' ? 'warning' : 'error'}
-                        label={registrationStatus.toUpperCase()}
+                        label={safeStatus(registrationStatus, 'unknown')}
                       />
                     </View>
                   )}

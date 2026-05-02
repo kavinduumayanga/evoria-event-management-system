@@ -14,7 +14,7 @@ export type VenueType = 'physical' | 'online' | 'hybrid';
 export type SessionStatus = 'scheduled' | 'cancelled' | 'completed';
 export type CustomQuestionType = 'text' | 'number' | 'choice';
 export type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
-export type NotificationChannel = 'in_app' | 'push' | 'email_mock' | 'sms_mock';
+export type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
 export type NotificationStatus = 'sent' | 'scheduled' | 'failed';
 export type EventRegistrationStatus = 'pending' | 'going' | 'checked_in' | 'not_going' | 'declined';
 
@@ -215,7 +215,7 @@ export interface EventReminder {
   title: string;
   message: string;
   scheduledAt: string;
-  channels: Array<'email' | 'push'>;
+  channels: Array<'email'>;
   status: 'scheduled' | 'sent' | 'failed';
   createdBy: string;
   sentAt?: string | null;

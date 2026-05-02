@@ -8,6 +8,7 @@ import { Booking } from '../../types';
 import { ListOrdered, Calendar, Clock, ArrowLeft } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
+import { formatSafeDate, formatSafeTime, safeTitle } from '../../utils/safeText';
 
 interface WaitlistItem extends Booking {
   status: 'waiting' | 'promoted';
@@ -83,7 +84,7 @@ export const MyWaitlistScreen = () => {
               <View style={styles.cardContent}>
                 {/* Title + badge */}
                 <View style={styles.titleRow}>
-                  <Text style={styles.eventTitle} numberOfLines={2}>{item.event?.title || 'Event'}</Text>
+                  <Text style={styles.eventTitle} numberOfLines={2}>{safeTitle(item.event?.title, 'Untitled Event')}</Text>
                   <StatusBadge
                     status={isWaiting ? 'warning' : 'success'}
                     label={isWaiting ? 'Waiting' : 'Promoted'}
@@ -94,12 +95,14 @@ export const MyWaitlistScreen = () => {
                 <View style={styles.metaRow}>
                   <Calendar size={12} color={theme.colors.textMuted} />
                   <Text style={styles.metaText}>
-                    {item.event?.date ? new Date(item.event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+                    {formatSafeDate(item.event?.date, 'Date unavailable', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </Text>
                 </View>
                 <View style={styles.metaRow}>
                   <Clock size={12} color={theme.colors.textMuted} />
-                  <Text style={styles.metaText}>{item.event?.startTime || '--'} – {item.event?.endTime || '--'}</Text>
+                  <Text style={styles.metaText}>
+                    {formatSafeTime(item.event?.startTime, 'Time unavailable')} – {formatSafeTime(item.event?.endTime, 'Time unavailable')}
+                  </Text>
                 </View>
                 <Text style={styles.quantityText}>Qty: {item.quantity}</Text>
               </View>
