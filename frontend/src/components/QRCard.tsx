@@ -18,7 +18,7 @@ export const QRCard: React.FC<QRCardProps> = ({
   style 
 }) => {
   return (
-    <GlassCard style={[styles.container, style]} variant="neonCyan" animateEntrance>
+    <GlassCard style={[styles.container, style]} variant="primary" animateEntrance>
       <View style={styles.qrWrapper}>
         <View style={styles.qrContainer}>
           <QRCode

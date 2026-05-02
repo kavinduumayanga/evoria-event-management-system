@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity } from 'react-native';
-import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState } from '../../components';
+import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, Button } from '../../components';
 import { theme } from '../../constants/theme';
 import { BookingService, CheckInService } from '../../api/services';
 import { Booking } from '../../types';
@@ -77,14 +77,20 @@ export const ManageBookingsScreen = () => {
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchBookings} /></ScreenContainer>;
 
   return (
-    <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Manage Bookings</Text>
-      </View>
-
+    <ScreenContainer>
       <FlatList
         data={bookings}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+        }
+        ListHeaderComponent={
+          <View style={styles.pageHeader}>
+            <Text style={styles.pageTitle}>Manage Bookings</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <BookingCard
             booking={item}
@@ -112,11 +118,6 @@ export const ManageBookingsScreen = () => {
             }
           />
         )}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
-        }
         ListEmptyComponent={<EmptyState title="No Bookings Yet" message="When attendees book your events, they will appear here." />}
       />
     </ScreenContainer>
@@ -124,22 +125,16 @@ export const ManageBookingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 0,
-  },
-  header: {
-    padding: theme.spacing.m,
-    paddingTop: theme.spacing.xl,
-  },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-  },
-  listContainer: {
-    padding: theme.spacing.m,
+  listContent: {
+    paddingHorizontal: theme.spacing.base,
     paddingBottom: theme.spacing.xxl,
     flexGrow: 1,
   },
+  pageHeader: {
+    paddingTop: theme.spacing.xl,
+    marginBottom: theme.spacing.l,
+  },
+  pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   actionBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -149,14 +144,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.error,
     borderRadius: theme.borderRadius.s,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)'
+    backgroundColor: theme.colors.errorSubtle,
   },
-  actionText: {
-    ...theme.typography.button,
-    marginLeft: theme.spacing.s,
-  },
-  checkInBtn: {
-    borderColor: theme.colors.success,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-  },
+  actionText: { ...theme.typography.button, marginLeft: theme.spacing.s },
+  checkInBtn: { borderColor: theme.colors.success, backgroundColor: theme.colors.successSubtle },
 });

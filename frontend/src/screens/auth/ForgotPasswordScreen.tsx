@@ -10,10 +10,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, PrimaryButton, SecondaryButton, FormInput, GlassCard, IconButton } from '../../components';
-import { theme } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Mail } from 'lucide-react-native';
+import { AuthStackParamList } from '../../types/navigation';
+import { Input, Button, IconButton, Card } from '../../components';
+import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -55,8 +56,6 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
       if (resetToken) {
         setDevResetToken(resetToken);
       }
-
-      Alert.alert('Success', 'Password reset request processed.');
     } catch (error: any) {
       Alert.alert('Request Failed', getApiErrorMessage(error, 'Unable to process forgot password request.'));
     } finally {
@@ -65,78 +64,98 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={styles.container}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        {/* Header */}
         <View style={styles.header}>
-          <IconButton 
-            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
-            onPress={() => navigation.goBack()} 
-            variant="solid" 
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={22} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={40}
           />
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
-            contentContainerStyle={styles.content}
+            contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.title}>Forgot Password</Text>
-            <Text style={styles.subtitle}>Enter your email to generate a reset token.</Text>
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>Forgot password?</Text>
+              <Text style={styles.subtitle}>
+                Enter your email address and we'll generate a reset token for you.
+              </Text>
+            </View>
 
-            <GlassCard style={styles.card} variant="dark" animateEntrance>
-              <FormInput
-                label="Email Address"
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={setEmail}
-                leftIcon={<Mail size={20} color={theme.colors.textMuted} />}
-              />
+            <Input
+              label="Email address"
+              placeholder="name@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              leftIcon={<Mail size={18} color={theme.colors.textMuted} />}
+            />
 
-              <PrimaryButton
-                title="Generate Reset Token"
-                onPress={handleForgotPassword}
-                isLoading={isLoading}
-                style={styles.button}
-              />
+            {message && (
+              <Text style={styles.infoText}>{message}</Text>
+            )}
 
-              <SecondaryButton
-                title="Go to Reset Password"
-                onPress={() => navigation.navigate('ResetPassword', { email: email.trim().toLowerCase() || undefined })}
-                style={styles.secondaryButton}
-              />
-            </GlassCard>
-
-            {message ? <Text style={styles.infoText}>{message}</Text> : null}
-
-            {devResetToken ? (
-              <GlassCard style={styles.tokenCard} variant="neonPurple" animateEntrance>
+            {devResetToken && (
+              <Card variant="primary" style={styles.tokenCard} animateEntrance>
                 <Text style={styles.tokenLabel}>Development Reset Token</Text>
-                <Text style={styles.tokenValue}>{devResetToken}</Text>
-              </GlassCard>
-            ) : null}
+                <Text style={styles.tokenValue} selectable>{devResetToken}</Text>
+              </Card>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {/* Bottom CTAs */}
+        <View style={styles.bottomZone}>
+          <Button
+            title="Generate Reset Token"
+            onPress={handleForgotPassword}
+            isLoading={isLoading}
+            variant="primary"
+            size="lg"
+          />
+          <Button
+            title="Go to Reset Password"
+            onPress={() => navigation.navigate('ResetPassword', { email: email.trim().toLowerCase() || undefined })}
+            variant="ghost"
+            size="md"
+          />
+        </View>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
   header: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    alignItems: 'flex-start',
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.s,
   },
-  content: {
+  scrollContent: {
     flexGrow: 1,
-    padding: theme.spacing.xl,
-    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.xl,
+  },
+  titleSection: {
+    marginBottom: theme.spacing.xl,
   },
   title: {
     ...theme.typography.h1,
@@ -145,30 +164,19 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xl,
-  },
-  card: {
-    padding: theme.spacing.l,
-  },
-  button: {
-    marginTop: theme.spacing.s,
-  },
-  secondaryButton: {
-    marginTop: theme.spacing.m,
+    color: theme.colors.textSecondary,
+    lineHeight: 24,
   },
   infoText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    marginTop: theme.spacing.l,
-    textAlign: 'center',
+    marginTop: theme.spacing.m,
   },
   tokenCard: {
-    marginTop: theme.spacing.l,
-    padding: theme.spacing.m,
+    marginTop: theme.spacing.m,
   },
   tokenLabel: {
-    ...theme.typography.caption,
+    ...theme.typography.label,
     color: theme.colors.primaryLight,
     fontWeight: '600',
     marginBottom: theme.spacing.s,
@@ -176,5 +184,11 @@ const styles = StyleSheet.create({
   tokenValue: {
     ...theme.typography.body,
     color: theme.colors.text,
+  },
+  bottomZone: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: theme.spacing.l,
+    paddingTop: theme.spacing.m,
+    gap: theme.spacing.sm,
   },
 });

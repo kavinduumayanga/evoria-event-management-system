@@ -1,50 +1,108 @@
 import React from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle, ScrollView, RefreshControlProps } from 'react-native';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GradientBackground } from './GradientBackground';
 import { theme } from '../constants/theme';
+
+// ============================================================
+// SCREEN CONTAINER — Base layout wrapper for all screens
+//
+// Provides:
+//   - Safe area (top + bottom)
+//   - Background color
+//   - Optional scrollable mode
+//   - Consistent horizontal inset (20dp)
+//   - RefreshControl support
+//
+// Usage:
+//   <ScreenContainer>...</ScreenContainer>
+//   <ScreenContainer scrollable inset>...</ScreenContainer>
+//   <ScreenContainer scrollable refreshing={...} onRefresh={...}>
+// ============================================================
 
 interface ScreenContainerProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   scrollable?: boolean;
-  refreshControl?: React.ReactElement<RefreshControlProps>;
+  inset?: boolean;         // Apply standard 20dp horizontal inset
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  scrollRef?: React.RefObject<ScrollView>;
+  // Legacy props
+  refreshControl?: React.ReactElement;
 }
 
-export const ScreenContainer: React.FC<ScreenContainerProps> = ({ 
-  children, 
-  style, 
+export const ScreenContainer: React.FC<ScreenContainerProps> = ({
+  children,
+  style,
   scrollable = false,
+  inset = false,
+  refreshing,
+  onRefresh,
+  scrollRef,
   refreshControl,
 }) => {
-  return (
-    <GradientBackground>
-      <SafeAreaView style={styles.safeArea}>
-        {scrollable ? (
-          <ScrollView 
-            contentContainerStyle={[styles.container, style]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={refreshControl}
-          >
-            {children}
-          </ScrollView>
-        ) : (
-          <View style={[styles.container, style]}>
-            {children}
-          </View>
-        )}
+  const inner = inset ? [styles.inset] : [];
+
+  if (scrollable) {
+    const refreshCtrl = refreshControl
+      ?? (onRefresh
+        ? <RefreshControl
+            refreshing={refreshing ?? false}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        : undefined);
+
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, ...inner, style]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={refreshCtrl}
+        >
+          {children}
+        </ScrollView>
       </SafeAreaView>
-    </GradientBackground>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.safeArea, style]} edges={['top']}>
+      <View style={[styles.flex, ...inner]}>
+        {children}
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
-  container: {
+  flex: {
+    flex: 1,
+  },
+  scroll: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
     flexGrow: 1,
-    padding: theme.spacing.m,
+    paddingBottom: theme.spacing.xxl,
+  },
+  inset: {
+    paddingHorizontal: theme.spacing.base,
   },
 });

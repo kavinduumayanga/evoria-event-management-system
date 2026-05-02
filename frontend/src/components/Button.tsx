@@ -1,117 +1,230 @@
-import React from 'react';
-import { 
-  TouchableOpacity, 
-  Text, 
-  StyleSheet, 
-  ActivityIndicator, 
-  ViewStyle, 
-  TextStyle, 
-  TouchableOpacityProps 
+import React, { useRef } from 'react';
+import {
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  StyleProp,
+  ViewStyle,
+  Animated,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { theme } from '../constants/theme';
 
-interface ButtonProps extends TouchableOpacityProps {
+// ============================================================
+// BUTTON — Luma-style button system
+//
+// Variants:  primary | secondary | ghost | danger | outline
+// Sizes:     sm (34) | md (44) | lg (52)
+// ============================================================
+
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+export type ButtonSize = 'sm' | 'md' | 'lg';
+
+interface ButtonProps {
   title: string;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'small' | 'medium' | 'large';
+  onPress: () => void;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   isLoading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  disabled?: boolean;
   icon?: React.ReactNode;
+  iconRight?: boolean;
+  style?: StyleProp<ViewStyle>;
+  fullWidth?: boolean;
 }
+
+const HEIGHT_MAP: Record<ButtonSize, number> = {
+  sm: 34,
+  md: 44,
+  lg: 52,
+};
+
+const FONT_MAP: Record<ButtonSize, number> = {
+  sm: 13,
+  md: 14,
+  lg: 15,
+};
+
+const H_PAD_MAP: Record<ButtonSize, number> = {
+  sm: 14,
+  md: 20,
+  lg: 24,
+};
 
 export const Button: React.FC<ButtonProps> = ({
   title,
+  onPress,
   variant = 'primary',
-  size = 'medium',
+  size = 'md',
   isLoading = false,
-  style,
-  textStyle,
+  disabled = false,
   icon,
-  disabled,
-  ...props
+  iconRight = false,
+  style,
+  fullWidth = true,
 }) => {
-  const getBackgroundColor = () => {
-    if (disabled) return theme.colors.surfaceLight;
-    switch (variant) {
-      case 'primary': return theme.colors.primary;
-      case 'secondary': return theme.colors.secondary;
-      case 'outline': return 'transparent';
-      case 'ghost': return 'transparent';
-      default: return theme.colors.primary;
-    }
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 0.97,
+      duration: 70,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const getTextColor = () => {
-    if (disabled) return theme.colors.textMuted;
-    switch (variant) {
-      case 'primary': return theme.colors.background; // Dark text on light bg for primary
-      case 'secondary': return theme.colors.text;
-      case 'outline': return theme.colors.primary;
-      case 'ghost': return theme.colors.text;
-      default: return theme.colors.background;
-    }
+  const handlePressOut = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 1,
+      duration: 120,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const getPadding = () => {
-    switch (size) {
-      case 'small': return { paddingVertical: theme.spacing.s, paddingHorizontal: theme.spacing.m };
-      case 'large': return { paddingVertical: theme.spacing.l, paddingHorizontal: theme.spacing.xl };
-      case 'medium':
-      default: return { paddingVertical: theme.spacing.m, paddingHorizontal: theme.spacing.l };
-    }
-  };
+  const isDisabled = disabled || isLoading;
+  const height = HEIGHT_MAP[size];
+  const fontSize = FONT_MAP[size];
+  const hPad = H_PAD_MAP[size];
 
-  const getBorder = () => {
-    if (variant === 'outline') {
-      return { borderWidth: 1, borderColor: disabled ? theme.colors.border : theme.colors.primary };
-    }
-    return {};
-  };
+  const containerStyle = [
+    styles.base,
+    styles[variant] || styles.primary,
+    { height, paddingHorizontal: hPad },
+    fullWidth && styles.fullWidth,
+    isDisabled && styles.disabled,
+    style,
+  ];
+
+  const textStyle = [
+    styles.label,
+    styles[`${variant}Label` as keyof typeof styles],
+    { fontSize },
+    isDisabled && styles.disabledLabel,
+  ];
+
+  const loaderColor =
+    variant === 'primary' || variant === 'danger'
+      ? theme.colors.textOnPrimary
+      : theme.colors.primary;
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.container,
-        { backgroundColor: getBackgroundColor() },
-        getPadding(),
-        getBorder(),
-        style,
-        (variant === 'primary' || variant === 'secondary') && !disabled ? theme.shadows.premium : {},
-      ]}
-      disabled={disabled || isLoading}
-      activeOpacity={0.8}
-      {...props}
-    >
-      {isLoading ? (
-        <ActivityIndicator color={getTextColor()} />
-      ) : (
-        <>
-          {icon && icon}
-          <Text
-            style={[
-              styles.text,
-              { color: getTextColor(), marginLeft: icon ? theme.spacing.s : 0 },
-              textStyle,
-            ]}
-          >
-            {title}
-          </Text>
-        </>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }], ...(fullWidth ? { width: '100%' } : {}) }}>
+      <TouchableOpacity
+        style={containerStyle}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isDisabled}
+        activeOpacity={1}
+      >
+        {isLoading ? (
+          <ActivityIndicator color={loaderColor} size="small" />
+        ) : (
+          <View style={styles.content}>
+            {icon && !iconRight && <View style={styles.iconLeft}>{icon}</View>}
+            <Text style={textStyle}>{title}</Text>
+            {icon && iconRight && <View style={styles.iconRight}>{icon}</View>}
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
+// ============================================================
+// Legacy aliases
+// ============================================================
+
+interface LegacyButtonProps {
+  title: string;
+  onPress: () => void;
+  isLoading?: boolean;
+  disabled?: boolean;
+  icon?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}
+
+export const PrimaryButton: React.FC<LegacyButtonProps> = (props) => (
+  <Button {...props} variant="primary" />
+);
+
+export const SecondaryButton: React.FC<LegacyButtonProps> = (props) => (
+  <Button {...props} variant="secondary" />
+);
+
+export const GhostButton: React.FC<LegacyButtonProps> = (props) => (
+  <Button {...props} variant="ghost" />
+);
+
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: theme.borderRadius.l,
-    flexDirection: 'row',
+  base: {
+    borderRadius: theme.borderRadius.s,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
   },
-  text: {
-    ...theme.typography.h3,
-    textAlign: 'center',
+  fullWidth: {
+    width: '100%',
+    alignSelf: 'stretch',
   },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconLeft: {
+    marginRight: 8,
+  },
+  iconRight: {
+    marginLeft: 8,
+  },
+
+  // === VARIANT BACKGROUNDS ===
+  primary: {
+    backgroundColor: theme.colors.primary,
+    ...theme.shadows.glow,
+  },
+  secondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+  },
+  danger: {
+    backgroundColor: theme.colors.error,
+  },
+
+  // === VARIANT LABELS ===
+  label: {
+    ...theme.typography.button,
+    fontWeight: '600',
+  },
+  primaryLabel: {
+    color: theme.colors.textOnPrimary,
+  },
+  secondaryLabel: {
+    color: theme.colors.text,
+  },
+  outlineLabel: {
+    color: theme.colors.text,
+  },
+  ghostLabel: {
+    color: theme.colors.primary,
+  },
+  dangerLabel: {
+    color: theme.colors.textOnPrimary,
+  },
+
+  // === DISABLED ===
+  disabled: {
+    opacity: 0.45,
+  },
+  disabledLabel: {},
 });

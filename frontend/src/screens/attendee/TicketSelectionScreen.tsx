@@ -1,23 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { GradientBackground, PrimaryButton, SecondaryButton, GlassCard, LoadingState, FormInput } from '../../components';
+import { ScreenContainer, Card, Button, LoadingState, Input, StatusBadge, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { Event, TicketType } from '../../types';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Tag, Minus, Plus, AlertTriangle } from 'lucide-react-native';
 import { BookingService, TicketService } from '../../api/services';
 
 type TicketSelectionNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'TicketSelection'>;
 type TicketSelectionRouteProp = RouteProp<AttendeeHomeStackParamList, 'TicketSelection'>;
-
-interface Props {
-  navigation: TicketSelectionNavigationProp;
-  route: TicketSelectionRouteProp;
-}
+interface Props { navigation: TicketSelectionNavigationProp; route: TicketSelectionRouteProp; }
 
 interface PromoPreview {
   originalAmount: number;
@@ -42,37 +37,27 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
   const [unlockCode, setUnlockCode] = useState('');
   const [promoPreview, setPromoPreview] = useState<PromoPreview | null>(null);
 
-  useEffect(() => {
-    fetchTickets();
-  }, [eventId]);
-
-  useEffect(() => {
-    // quantity or ticket change invalidates previous preview
-    setPromoPreview(null);
-  }, [quantity, selectedTicket?.id]);
+  useEffect(() => { fetchTickets(); }, [eventId]);
+  useEffect(() => { setPromoPreview(null); }, [quantity, selectedTicket?.id]);
 
   const fetchTickets = async () => {
     try {
       setIsLoading(true);
       setError(null);
-
       const [eventRes, ticketRes] = await Promise.all([
         apiClient.get(`/events/${eventId}`),
         apiClient.get(`/tickets/event/${eventId}`),
       ]);
-
       const eventData: Event = eventRes.data.data.event;
       setEvent(eventData);
-
       if (eventData.status !== 'published' || eventData.visibility === 'private') {
         setTickets([]);
         setError('This event is currently unavailable for booking.');
         return;
       }
-
-      setTickets(ticketRes.data.data.tickets.filter((ticket: TicketType) => ticket.isActive));
-    } catch (fetchError: any) {
-      setError(fetchError.response?.data?.message || 'Failed to fetch tickets');
+      setTickets(ticketRes.data.data.tickets.filter((t: TicketType) => t.isActive));
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch tickets');
     } finally {
       setIsLoading(false);
     }
@@ -88,136 +73,63 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
 
   const applyPromoCode = async () => {
     if (!selectedTicket) return;
-    if (!promoCode.trim()) {
-      Alert.alert('Promo Code', 'Enter a promo code first.');
-      return;
-    }
-
+    if (!promoCode.trim()) { Alert.alert('Promo Code', 'Enter a promo code first.'); return; }
     try {
       setIsApplyingPromo(true);
-      const response = await TicketService.applyPromo({
-        ticketTypeId: selectedTicket.id,
-        quantity,
-        promoCode: promoCode.trim(),
-        unlockCode: unlockCode.trim() || undefined,
-      });
-
-      setPromoPreview(response.data);
-    } catch (applyError: any) {
+      const res = await TicketService.applyPromo({ ticketTypeId: selectedTicket.id, quantity, promoCode: promoCode.trim(), unlockCode: unlockCode.trim() || undefined });
+      setPromoPreview(res.data);
+    } catch (err: any) {
       setPromoPreview(null);
-      Alert.alert('Promo Error', applyError.response?.data?.message || 'Failed to apply promo code');
-    } finally {
-      setIsApplyingPromo(false);
-    }
+      Alert.alert('Promo Error', err.response?.data?.message || 'Failed to apply promo code');
+    } finally { setIsApplyingPromo(false); }
   };
 
   const handleFreeRegister = async () => {
     if (!event) return;
-
     try {
       setIsBooking(true);
-      const response = await BookingService.createBooking({
-        eventId,
-        quantity: 1,
-      });
-
-      const booking = response?.data?.booking;
-      if (!booking?.id) {
-        Alert.alert('Registered', 'Free event registration submitted.');
-        return;
-      }
-
+      const res = await BookingService.createBooking({ eventId, quantity: 1 });
+      const booking = res?.data?.booking;
+      if (!booking?.id) { Alert.alert('Registered', 'Free event registration submitted.'); return; }
       if (booking.isWaitlisted) {
-        Alert.alert(
-          'Added to Waitlist',
-          booking.waitlistPosition
-            ? `Event full - you are now #${booking.waitlistPosition} on the waitlist.`
-            : 'Event full - you were added to waitlist.',
-        );
-      } else {
-        Alert.alert('Registered', 'Free event registration confirmed.');
-      }
-
+        Alert.alert('Added to Waitlist', booking.waitlistPosition ? `Event full - you are now #${booking.waitlistPosition} on the waitlist.` : 'Event full - you were added to waitlist.');
+      } else { Alert.alert('Registered', 'Free event registration confirmed.'); }
       navigation.navigate('BookingConfirmation', { bookingId: booking.id });
-    } catch (registrationError: any) {
-      const message = registrationError?.response?.data?.message || 'Unable to register for this free event.';
-      if (registrationError?.response?.status === 409) {
-        Alert.alert('Already Registered', message);
-      } else {
-        Alert.alert('Registration Failed', message);
-      }
-    } finally {
-      setIsBooking(false);
-    }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Unable to register for this free event.';
+      Alert.alert(err?.response?.status === 409 ? 'Already Registered' : 'Registration Failed', msg);
+    } finally { setIsBooking(false); }
   };
 
   const handleContinue = async () => {
     if (!selectedTicket || !event) return;
-
-    if (event.status !== 'published' || event.visibility === 'private') {
-      Alert.alert('Booking Blocked', 'This event is currently unavailable for booking.');
-      return;
-    }
-
-    if (!isEventFull && remainingForSelected <= 0) {
-      Alert.alert('Sold Out', 'This ticket is sold out.');
-      return;
-    }
-
-    if (quantity > selectedTicket.maxPerUser) {
-      Alert.alert('Limit Exceeded', `You can only book up to ${selectedTicket.maxPerUser} tickets.`);
-      return;
-    }
+    if (event.status !== 'published' || event.visibility === 'private') { Alert.alert('Booking Blocked', 'This event is currently unavailable for booking.'); return; }
+    if (!isEventFull && remainingForSelected <= 0) { Alert.alert('Sold Out', 'This ticket is sold out.'); return; }
+    if (quantity > selectedTicket.maxPerUser) { Alert.alert('Limit Exceeded', `You can only book up to ${selectedTicket.maxPerUser} tickets.`); return; }
 
     if (isEventFull) {
       try {
         setIsBooking(true);
-        const response = await BookingService.createBooking({
-          eventId,
-          ticketTypeId: selectedTicket.id,
-          quantity,
-          unlockCode: unlockCode.trim() || undefined,
-        });
-
-        const waitlistPosition = response.data?.booking?.waitlistPosition;
-        Alert.alert(
-          'Added to Waitlist',
-          waitlistPosition ? `Event full - you are now #${waitlistPosition} on the waitlist.` : 'Event full - you were added to waitlist.',
-        );
-        navigation.navigate('BookingConfirmation', { bookingId: response.data.booking.id });
-      } catch (waitlistError: any) {
-        const message = waitlistError?.response?.data?.message || 'Unable to join waitlist';
-        if (waitlistError?.response?.status === 409) {
-          Alert.alert('Already Registered', message);
-        } else {
-          Alert.alert('Waitlist Failed', message);
-        }
-      } finally {
-        setIsBooking(false);
-      }
+        const res = await BookingService.createBooking({ eventId, ticketTypeId: selectedTicket.id, quantity, unlockCode: unlockCode.trim() || undefined });
+        const pos = res.data?.booking?.waitlistPosition;
+        Alert.alert('Added to Waitlist', pos ? `Event full - you are now #${pos} on the waitlist.` : 'Event full - you were added to waitlist.');
+        navigation.navigate('BookingConfirmation', { bookingId: res.data.booking.id });
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || 'Unable to join waitlist';
+        Alert.alert(err?.response?.status === 409 ? 'Already Registered' : 'Waitlist Failed', msg);
+      } finally { setIsBooking(false); }
       return;
     }
 
     if (selectedTicket.isFree) {
       try {
         setIsBooking(true);
-        const response = await BookingService.createBooking({
-          eventId,
-          ticketTypeId: selectedTicket.id,
-          quantity,
-          unlockCode: unlockCode.trim() || undefined,
-        });
-        navigation.navigate('BookingConfirmation', { bookingId: response.data.booking.id });
-      } catch (bookingError: any) {
-        const message = bookingError?.response?.data?.message || 'Unable to confirm booking';
-        if (bookingError?.response?.status === 409) {
-          Alert.alert('Already Registered', message);
-        } else {
-          Alert.alert('Booking Failed', message);
-        }
-      } finally {
-        setIsBooking(false);
-      }
+        const res = await BookingService.createBooking({ eventId, ticketTypeId: selectedTicket.id, quantity, unlockCode: unlockCode.trim() || undefined });
+        navigation.navigate('BookingConfirmation', { bookingId: res.data.booking.id });
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || 'Unable to confirm booking';
+        Alert.alert(err?.response?.status === 409 ? 'Already Registered' : 'Booking Failed', msg);
+      } finally { setIsBooking(false); }
       return;
     }
 
@@ -235,232 +147,205 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
 
   if (isLoading) return <LoadingState />;
 
+  // ─── FREE EVENT MODE ──────────────────────────────────────────────────────
   if (isFreeEventMode) {
     return (
-      <GradientBackground>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <ArrowLeft color={theme.colors.text} size={24} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Free Registration</Text>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            {error && <Text style={styles.errorText}>{error}</Text>}
-            <GlassCard style={styles.ticketCard} variant="dark">
-              <Text style={styles.ticketName}>{event?.title || 'Event'}</Text>
-              <Text style={styles.ticketPrice}>This event is free to attend.</Text>
-              <Text style={styles.ticketMeta}>Capacity: {event?.capacity || 0}</Text>
-              <Text style={styles.ticketMeta}>Booked: {event?.bookingCount || 0}</Text>
-            </GlassCard>
-
-            {isEventFull && (
-              <Text style={styles.waitlistMessage}>
-                Event full - register to join the waitlist.
-              </Text>
-            )}
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <PrimaryButton
-              title={isEventFull ? 'Join Waitlist' : 'Register'}
-              onPress={handleFreeRegister}
-              isLoading={isBooking}
-              disabled={Boolean(error)}
-            />
-          </View>
-        </SafeAreaView>
-      </GradientBackground>
+      <ScreenContainer>
+        <View style={styles.header}>
+          <IconButton icon={<ArrowLeft size={20} color={theme.colors.text} />} onPress={() => navigation.goBack()} variant="surface" size={36} />
+          <Text style={styles.headerTitle}>Free Registration</Text>
+        </View>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {error && <Text style={styles.errorText}>{error}</Text>}
+          <Card variant="primary" style={styles.eventCard} noPadding>
+            <View style={styles.cardInner}>
+              <Text style={styles.eventTitle}>{event?.title || 'Event'}</Text>
+              <Text style={styles.freeLabel}>Free to attend</Text>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaText}>Capacity: {event?.capacity || 0}</Text>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={styles.metaText}>Booked: {event?.bookingCount || 0}</Text>
+              </View>
+              {isEventFull && (
+                <View style={styles.fullBanner}>
+                  <AlertTriangle size={14} color={theme.colors.warning} />
+                  <Text style={styles.fullText}>Event full — register to join the waitlist</Text>
+                </View>
+              )}
+            </View>
+          </Card>
+        </ScrollView>
+        <View style={styles.footer}>
+          <Button title={isEventFull ? 'Join Waitlist' : 'Register Free'} onPress={handleFreeRegister} isLoading={isBooking} disabled={Boolean(error)} variant="primary" size="lg" />
+        </View>
+      </ScreenContainer>
     );
   }
 
+  // ─── TICKETED MODE ────────────────────────────────────────────────────────
   return (
-    <GradientBackground>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Select Ticket</Text>
-        </View>
+    <ScreenContainer>
+      <View style={styles.header}>
+        <IconButton icon={<ArrowLeft size={20} color={theme.colors.text} />} onPress={() => navigation.goBack()} variant="surface" size={36} />
+        <Text style={styles.headerTitle}>Select Ticket</Text>
+      </View>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {error && <Text style={styles.errorText}>{error}</Text>}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
+        {isEventFull && (
+          <View style={styles.waitlistBanner}>
+            <AlertTriangle size={14} color={theme.colors.warning} />
+            <Text style={styles.waitlistText}>Event full — continue to join the waitlist (FIFO)</Text>
+          </View>
+        )}
+
+        {/* Ticket list */}
         {tickets.map((ticket) => {
           const available = Math.max(0, ticket.quantity - ticket.soldCount);
           const isSelected = selectedTicket?.id === ticket.id;
-
-            return (
-              <TouchableOpacity key={ticket.id} onPress={() => setSelectedTicket(ticket)} disabled={available === 0 && !isEventFull}>
-                <GlassCard style={[styles.ticketCard, isSelected && styles.selectedCard]} variant={isSelected ? 'neonPurple' : 'dark'}>
+          const isSoldOut = available === 0 && !isEventFull;
+          return (
+            <TouchableOpacity key={ticket.id} onPress={() => setSelectedTicket(ticket)} disabled={isSoldOut} activeOpacity={0.8}>
+              <Card
+                variant={isSelected ? 'primary' : 'raised'}
+                style={[styles.ticketCard, isSelected && styles.ticketCardSelected]}
+                noPadding
+              >
+                <View style={styles.ticketInner}>
                   <View style={styles.ticketTopRow}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
-                    <View style={[styles.badge, { backgroundColor: ticket.isFree ? `${theme.colors.success}20` : `${theme.colors.secondary}20` }]}>
-                      <Text style={[styles.badgeText, { color: ticket.isFree ? theme.colors.success : theme.colors.secondary }]}>
-                        {ticket.isFree ? 'FREE' : 'PAID'}
-                      </Text>
-                    </View>
+                    <StatusBadge status={ticket.isFree ? 'success' : 'info'} label={ticket.isFree ? 'Free' : 'Paid'} />
                   </View>
                   <Text style={styles.ticketPrice}>
                     {ticket.isFree ? 'Free' : `${ticket.currency || 'LKR'} ${ticket.price.toFixed(2)}`}
                   </Text>
-                  <Text style={styles.ticketMeta}>Remaining: {available}</Text>
-                  <Text style={styles.ticketMeta}>Max per user: {ticket.maxPerUser}</Text>
-                  {available === 0 && <Text style={styles.soldOutText}>{isEventFull ? 'Sold Out (waitlist available)' : 'Sold Out'}</Text>}
-                </GlassCard>
-              </TouchableOpacity>
-            );
-          })}
+                  <View style={styles.ticketMetaRow}>
+                    <Text style={styles.ticketMeta}>Remaining: {available}</Text>
+                    <Text style={styles.ticketMetaDot}>·</Text>
+                    <Text style={styles.ticketMeta}>Max/person: {ticket.maxPerUser}</Text>
+                  </View>
+                  {isSoldOut && <Text style={styles.soldOutText}>Sold Out</Text>}
+                </View>
+              </Card>
+            </TouchableOpacity>
+          );
+        })}
 
-          {isEventFull && (
-            <Text style={styles.waitlistMessage}>
-              Event full - continue to join the waitlist. We will promote bookings in FIFO order when seats open.
-            </Text>
-          )}
-
-          {selectedTicket && (
-            <>
-              {selectedTicket.unlockCode && (
-                <FormInput
-                  label="Unlock Code (Required)"
-                  value={unlockCode}
-                  onChangeText={setUnlockCode}
-                  placeholder="Enter unlock code"
+        {/* Unlock + Promo codes */}
+        {selectedTicket && (
+          <View style={styles.codesSection}>
+            {selectedTicket.unlockCode && (
+              <Input
+                label="Unlock Code (required)"
+                value={unlockCode}
+                onChangeText={setUnlockCode}
+                placeholder="Enter unlock code"
+              />
+            )}
+            {!selectedTicket.isFree && !isEventFull && (
+              <View style={styles.promoRow}>
+                <Input
+                  label="Promo code"
+                  value={promoCode}
+                  onChangeText={(v) => { setPromoCode(v); setPromoPreview(null); }}
+                  placeholder="SAVE20"
+                  autoCapitalize="characters"
+                  containerStyle={styles.promoInput}
                 />
-              )}
-
-              {!selectedTicket.isFree && !isEventFull && (
-                <>
-                  <FormInput
-                    label="Promo Code"
-                    value={promoCode}
-                    onChangeText={setPromoCode}
-                    placeholder="Enter promo code"
-                    autoCapitalize="characters"
-                  />
-                  <SecondaryButton
-                    title="Apply Promo"
-                    onPress={applyPromoCode}
-                    isLoading={isApplyingPromo}
-                  />
-                </>
-              )}
-
-              {promoPreview && (
-                <GlassCard style={styles.promoResult} variant="neonPurple">
-                  <Text style={styles.promoText}>
-                    Discount Applied: {promoPreview.currency} {promoPreview.discountAmount.toFixed(2)}
-                  </Text>
-                  <Text style={styles.promoText}>
-                    Final Amount: {promoPreview.currency} {promoPreview.finalAmount.toFixed(2)}
-                  </Text>
-                </GlassCard>
-              )}
-            </>
-          )}
-        </ScrollView>
-
-        {selectedTicket && !error && (
-          <View style={styles.footer}>
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => setQuantity(Math.max(1, quantity - 1))}>
-                <Text style={styles.qtyBtnText}>-</Text>
-              </TouchableOpacity>
-              <Text style={styles.quantity}>{quantity}</Text>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => {
-                const maxQuantity = isEventFull
-                  ? selectedTicket.maxPerUser
-                  : Math.min(selectedTicket.maxPerUser, remainingForSelected);
-                setQuantity(Math.min(maxQuantity, quantity + 1));
-              }}>
-                <Text style={styles.qtyBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
-            <PrimaryButton
-              title={isEventFull ? 'Join Waitlist' : (selectedTicket.isFree ? 'Book Free Ticket' : 'Continue to Payment')}
-              onPress={handleContinue}
-              isLoading={isBooking}
-              disabled={!isEventFull && remainingForSelected === 0}
-            />
+                <Button
+                  title="Apply"
+                  onPress={applyPromoCode}
+                  isLoading={isApplyingPromo}
+                  variant="secondary"
+                  size="sm"
+                  icon={<Tag size={14} color={theme.colors.text} />}
+                  style={styles.applyBtn}
+                />
+              </View>
+            )}
+            {promoPreview && (
+              <Card variant="primary" style={styles.promoResult} noPadding>
+                <View style={styles.promoResultInner}>
+                  <Text style={styles.promoSaving}>✓ Saving {promoPreview.currency} {promoPreview.discountAmount.toFixed(2)}</Text>
+                  <Text style={styles.promoFinal}>Final: {promoPreview.currency} {promoPreview.finalAmount.toFixed(2)}</Text>
+                </View>
+              </Card>
+            )}
           </View>
         )}
-      </SafeAreaView>
-    </GradientBackground>
+      </ScrollView>
+
+      {/* Footer: qty + CTA */}
+      {selectedTicket && !error && (
+        <View style={styles.footer}>
+          <View style={styles.qtyRow}>
+            <Text style={styles.qtyLabel}>Quantity</Text>
+            <View style={styles.qtyControls}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => setQuantity(Math.max(1, quantity - 1))}>
+                <Minus size={16} color={theme.colors.text} />
+              </TouchableOpacity>
+              <Text style={styles.qtyNum}>{quantity}</Text>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => {
+                const max = isEventFull ? selectedTicket.maxPerUser : Math.min(selectedTicket.maxPerUser, remainingForSelected);
+                setQuantity(Math.min(max, quantity + 1));
+              }}>
+                <Plus size={16} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <Button
+            title={isEventFull ? 'Join Waitlist' : (selectedTicket.isFree ? 'Book Free Ticket' : 'Continue to Payment')}
+            onPress={handleContinue}
+            isLoading={isBooking}
+            disabled={!isEventFull && remainingForSelected === 0}
+            variant="primary"
+            size="lg"
+          />
+        </View>
+      )}
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', padding: theme.spacing.m },
-  backButton: { marginRight: theme.spacing.m },
-  headerTitle: { ...theme.typography.h2, color: theme.colors.text },
-  content: { padding: theme.spacing.m, paddingBottom: theme.spacing.xl },
-  ticketCard: { marginBottom: theme.spacing.m },
-  selectedCard: { borderColor: theme.colors.primary },
-  ticketTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  ticketName: { ...theme.typography.h3, color: theme.colors.text },
-  ticketPrice: { ...theme.typography.body, color: theme.colors.primaryLight, marginTop: 4, fontWeight: 'bold' },
-  ticketMeta: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 2 },
-  soldOutText: { ...theme.typography.caption, color: theme.colors.error, marginTop: 6, fontWeight: '700' },
-  badge: {
-    borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    ...theme.typography.small,
-    fontWeight: '700',
-  },
-  promoResult: {
-    marginTop: theme.spacing.m,
-    marginBottom: theme.spacing.s,
-    padding: theme.spacing.m,
-  },
-  promoText: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-    marginBottom: 2,
-    fontWeight: '600'
-  },
-  footer: {
-    padding: theme.spacing.l,
-    backgroundColor: theme.colors.surfaceLight,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.m,
-    gap: theme.spacing.xl,
-  },
-  qtyBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.round,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-  },
-  qtyBtnText: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
-    lineHeight: 28,
-  },
-  quantity: { ...theme.typography.h2, color: theme.colors.text, minWidth: 30, textAlign: 'center' },
-  errorText: {
-    ...theme.typography.body,
-    color: theme.colors.error,
-    marginBottom: theme.spacing.m,
-  },
-  waitlistMessage: {
-    ...theme.typography.caption,
-    color: theme.colors.warning,
-    marginBottom: theme.spacing.m,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.m, paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.xl, marginBottom: theme.spacing.m },
+  headerTitle: { ...theme.typography.h1, color: theme.colors.text },
+  content: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xl },
+  errorText: { ...theme.typography.body, color: theme.colors.error, marginBottom: theme.spacing.m },
+  waitlistBanner: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s, backgroundColor: theme.colors.warningSubtle, borderRadius: theme.borderRadius.m, padding: theme.spacing.m, marginBottom: theme.spacing.m },
+  waitlistText: { ...theme.typography.caption, color: theme.colors.warning, flex: 1 },
+  eventCard: { borderRadius: theme.borderRadius.l, overflow: 'hidden', marginBottom: theme.spacing.xl },
+  cardInner: { padding: theme.spacing.xl },
+  eventTitle: { ...theme.typography.h2, color: theme.colors.text, marginBottom: 4 },
+  freeLabel: { ...theme.typography.body, color: theme.colors.success, fontWeight: '600', marginBottom: theme.spacing.m },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { ...theme.typography.caption, color: theme.colors.textMuted },
+  metaDot: { ...theme.typography.caption, color: theme.colors.textMuted },
+  fullBanner: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s, marginTop: theme.spacing.m },
+  fullText: { ...theme.typography.caption, color: theme.colors.warning },
+  ticketCard: { borderRadius: theme.borderRadius.l, marginBottom: theme.spacing.sm, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
+  ticketCardSelected: { borderColor: theme.colors.primary },
+  ticketInner: { padding: theme.spacing.m },
+  ticketTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  ticketName: { ...theme.typography.bodyMedium, color: theme.colors.text, flex: 1, marginRight: theme.spacing.s },
+  ticketPrice: { ...theme.typography.h3, color: theme.colors.primary, marginBottom: 6 },
+  ticketMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  ticketMeta: { ...theme.typography.caption, color: theme.colors.textMuted },
+  ticketMetaDot: { ...theme.typography.caption, color: theme.colors.textMuted },
+  soldOutText: { ...theme.typography.caption, color: theme.colors.error, fontWeight: '700', marginTop: 4 },
+  codesSection: { marginTop: theme.spacing.m, gap: theme.spacing.s },
+  promoRow: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.s },
+  promoInput: { flex: 1, marginBottom: 0 },
+  applyBtn: { marginBottom: 0, flexShrink: 0 },
+  promoResult: { borderRadius: theme.borderRadius.m, overflow: 'hidden', marginTop: theme.spacing.xs },
+  promoResultInner: { padding: theme.spacing.m },
+  promoSaving: { ...theme.typography.caption, color: theme.colors.success, fontWeight: '600' },
+  promoFinal: { ...theme.typography.bodyMedium, color: theme.colors.text },
+  footer: { paddingHorizontal: theme.spacing.base, paddingVertical: theme.spacing.l, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface, gap: theme.spacing.m },
+  qtyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  qtyLabel: { ...theme.typography.bodyMedium, color: theme.colors.text },
+  qtyControls: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xl },
+  qtyBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: theme.colors.border, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.surface },
+  qtyNum: { ...theme.typography.h3, color: theme.colors.text, minWidth: 28, textAlign: 'center' },
 });
