@@ -1,56 +1,19 @@
-import React, { useRef } from 'react';
-import {
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  StyleProp,
-  ViewStyle,
-  Animated,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React from 'react';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, View } from 'react-native';
 import { theme } from '../constants/theme';
-
-// ============================================================
-// BUTTON — Luma-style button system
-//
-// Variants:  primary | secondary | ghost | danger | outline
-// Sizes:     sm (34) | md (44) | lg (52)
-// ============================================================
-
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
-export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: ButtonVariant;
-  size?: ButtonSize;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   disabled?: boolean;
+  style?: ViewStyle;
+  textStyle?: TextStyle;
   icon?: React.ReactNode;
-  iconRight?: boolean;
-  style?: StyleProp<ViewStyle>;
   fullWidth?: boolean;
 }
-
-const HEIGHT_MAP: Record<ButtonSize, number> = {
-  sm: 34,
-  md: 44,
-  lg: 52,
-};
-
-const FONT_MAP: Record<ButtonSize, number> = {
-  sm: 13,
-  md: 14,
-  lg: 15,
-};
-
-const H_PAD_MAP: Record<ButtonSize, number> = {
-  sm: 14,
-  md: 20,
-  lg: 24,
-};
 
 export const Button: React.FC<ButtonProps> = ({
   title,
@@ -59,172 +22,151 @@ export const Button: React.FC<ButtonProps> = ({
   size = 'md',
   isLoading = false,
   disabled = false,
-  icon,
-  iconRight = false,
   style,
+  textStyle,
+  icon,
   fullWidth = true,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () => {
-    Animated.timing(scaleAnim, {
-      toValue: 0.97,
-      duration: 70,
-      useNativeDriver: true,
-    }).start();
+  const getVariantStyles = () => {
+    switch (variant) {
+      case 'primary':
+        return {
+          container: [styles.primary, disabled && styles.disabled],
+          text: styles.primaryText,
+        };
+      case 'secondary':
+        return {
+          container: [styles.secondary, disabled && styles.disabled],
+          text: styles.secondaryText,
+        };
+      case 'outline':
+        return {
+          container: [styles.outline, disabled && styles.disabledOutline],
+          text: [styles.outlineText, disabled && styles.disabledText],
+        };
+      case 'danger':
+        return {
+          container: [styles.danger, disabled && styles.disabled],
+          text: styles.dangerText,
+        };
+      case 'ghost':
+        return {
+          container: [styles.ghost, disabled && styles.disabledGhost],
+          text: [styles.ghostText, disabled && styles.disabledText],
+        };
+    }
   };
 
-  const handlePressOut = () => {
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: 120,
-      useNativeDriver: true,
-    }).start();
+  const getSizeStyles = () => {
+    switch (size) {
+      case 'sm':
+        return { container: styles.sizeSm, text: styles.textSm };
+      case 'md':
+        return { container: styles.sizeMd, text: styles.textMd };
+      case 'lg':
+        return { container: styles.sizeLg, text: styles.textLg };
+    }
   };
 
-  const isDisabled = disabled || isLoading;
-  const height = HEIGHT_MAP[size];
-  const fontSize = FONT_MAP[size];
-  const hPad = H_PAD_MAP[size];
-
-  const containerStyle = [
-    styles.base,
-    styles[variant] || styles.primary,
-    { height, paddingHorizontal: hPad },
-    fullWidth && styles.fullWidth,
-    isDisabled && styles.disabled,
-    style,
-  ];
-
-  const textStyle = [
-    styles.label,
-    styles[`${variant}Label` as keyof typeof styles],
-    { fontSize },
-    isDisabled && styles.disabledLabel,
-  ];
-
-  const loaderColor =
-    variant === 'primary' || variant === 'danger'
-      ? theme.colors.textOnPrimary
-      : theme.colors.primary;
+  const variantStyles = getVariantStyles();
+  const sizeStyles = getSizeStyles();
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }], ...(fullWidth ? { width: '100%' } : {}) }}>
-      <TouchableOpacity
-        style={containerStyle}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={isDisabled}
-        activeOpacity={1}
-      >
-        {isLoading ? (
-          <ActivityIndicator color={loaderColor} size="small" />
-        ) : (
-          <View style={styles.content}>
-            {icon && !iconRight && <View style={styles.iconLeft}>{icon}</View>}
-            <Text style={textStyle}>{title}</Text>
-            {icon && iconRight && <View style={styles.iconRight}>{icon}</View>}
-          </View>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity
+      style={[
+        styles.base,
+        variantStyles.container,
+        sizeStyles.container,
+        fullWidth && styles.fullWidth,
+        style,
+      ]}
+      onPress={onPress}
+      disabled={disabled || isLoading}
+      activeOpacity={0.7}
+    >
+      {isLoading ? (
+        <ActivityIndicator 
+          color={variant === 'outline' || variant === 'ghost' ? theme.colors.primary : '#FFF'} 
+          size="small" 
+        />
+      ) : (
+        <View style={styles.content}>
+          {icon && <View style={styles.iconWrapper}>{icon}</View>}
+          <Text style={[styles.baseText, variantStyles.text, sizeStyles.text, textStyle]}>
+            {title}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
   );
 };
 
-// ============================================================
-// Legacy aliases
-// ============================================================
-
-interface LegacyButtonProps {
-  title: string;
-  onPress: () => void;
-  isLoading?: boolean;
-  disabled?: boolean;
-  icon?: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-}
-
-export const PrimaryButton: React.FC<LegacyButtonProps> = (props) => (
-  <Button {...props} variant="primary" />
-);
-
-export const SecondaryButton: React.FC<LegacyButtonProps> = (props) => (
-  <Button {...props} variant="secondary" />
-);
-
-export const GhostButton: React.FC<LegacyButtonProps> = (props) => (
-  <Button {...props} variant="ghost" />
-);
-
 const styles = StyleSheet.create({
   base: {
-    borderRadius: theme.borderRadius.round, // Fully rounded buttons
-    alignItems: 'center',
+    borderRadius: theme.borderRadius.xl,
     justifyContent: 'center',
+    alignItems: 'center',
     flexDirection: 'row',
+    borderCurve: 'continuous',
   },
   fullWidth: {
     width: '100%',
-    alignSelf: 'stretch',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconLeft: {
+  iconWrapper: {
     marginRight: 8,
   },
-  iconRight: {
-    marginLeft: 8,
+  baseText: {
+    ...theme.typography.button,
   },
-
-  // === VARIANT BACKGROUNDS ===
+  // Sizes
+  sizeSm: { paddingVertical: 8, paddingHorizontal: 16, height: 36 },
+  sizeMd: { paddingVertical: 12, paddingHorizontal: 24, height: 48 },
+  sizeLg: { paddingVertical: 16, paddingHorizontal: 32, height: 56 },
+  textSm: { fontSize: 14 },
+  textMd: { fontSize: 16 },
+  textLg: { fontSize: 18 },
+  // Variants
   primary: {
     backgroundColor: theme.colors.primary,
     ...theme.shadows.glow,
   },
+  primaryText: { color: theme.colors.textOnPrimary },
   secondary: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceLight,
   },
+  secondaryText: { color: theme.colors.primaryDark },
   outline: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
   },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
+  outlineText: { color: theme.colors.primary },
   danger: {
     backgroundColor: theme.colors.error,
   },
-
-  // === VARIANT LABELS ===
-  label: {
-    ...theme.typography.button,
-    fontWeight: '600',
+  dangerText: { color: theme.colors.textOnPrimary },
+  ghost: {
+    backgroundColor: 'transparent',
   },
-  primaryLabel: {
-    color: theme.colors.textOnPrimary,
-  },
-  secondaryLabel: {
-    color: theme.colors.text,
-  },
-  outlineLabel: {
-    color: theme.colors.text,
-  },
-  ghostLabel: {
-    color: theme.colors.primary,
-  },
-  dangerLabel: {
-    color: theme.colors.textOnPrimary,
-  },
-
-  // === DISABLED ===
+  ghostText: { color: theme.colors.textSecondary },
+  // Disabled
   disabled: {
-    opacity: 0.45,
+    backgroundColor: theme.colors.borderStrong,
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  disabledLabel: {},
+  disabledOutline: {
+    borderColor: theme.colors.borderStrong,
+  },
+  disabledGhost: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: theme.colors.textMuted,
+  },
 });

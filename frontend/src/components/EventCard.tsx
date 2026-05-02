@@ -1,181 +1,161 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, StyleProp, ViewStyle } from 'react-native';
-import { Card } from './Card';
-import { AnimatedPressable } from './AnimatedPressable';
-import { StatusBadge } from './StatusBadge';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { Calendar, MapPin, Clock } from 'lucide-react-native';
+import { format } from 'date-fns';
 import { Event } from '../types';
 import { theme } from '../constants/theme';
-import { Calendar, Clock, MapPin, Users } from 'lucide-react-native';
-import { formatSafeDate, formatSafeTime, safeLower, safeString, safeTitle, safeStatus } from '../utils/safeText';
-import { resolveImageUrl } from '../utils/imageUrl';
+import { safeString } from '../utils/safeText';
+import { Card } from './Card';
 
 interface EventCardProps {
-  event: Partial<Event>;
+  event: Event;
   onPress?: () => void;
-  style?: StyleProp<ViewStyle>;
-  actions?: React.ReactNode;
-  variant?: 'default' | 'list' | 'compact';
 }
 
-export const EventCard: React.FC<EventCardProps> = ({
-  event,
-  onPress,
-  style,
-  actions,
-  variant = 'default',
-}) => {
-  const bookingCount = Number.isFinite(Number(event.bookingCount)) ? Number(event.bookingCount) : 0;
-  const capacity = Number.isFinite(Number(event.capacity)) ? Number(event.capacity) : 0;
-  const isSoldOut = capacity > 0 && bookingCount >= capacity;
-  const eventStatusLabel = safeStatus(event.status, 'pending');
-  const eventTypeLabel = safeString(event.type, 'physical');
-  const eventVisibilityLabel = safeString(event.visibility, 'public');
-  const eventTitle = safeTitle(event.title, 'Untitled Event');
-  const eventType = safeLower(event.type, 'physical');
-  const locationLabel = eventType === 'online'
-    ? 'Online'
-    : safeString(event.city, 'Location not specified');
-  const dateLabel = formatSafeDate(event.date, 'Date unavailable', { weekday: 'short', month: 'short', day: 'numeric' });
-  const startTimeLabel = formatSafeTime(event.startTime, 'Time unavailable');
-  const endTimeLabel = formatSafeTime(event.endTime, 'Time unavailable');
-  const coverImage = resolveImageUrl(event.coverImage);
-  const containerStyle = [
-    styles.container,
-    variant === 'compact' && styles.compactContainer,
-    style,
-  ];
+export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
+  const imageUrl = safeString(event.bannerImage);
+  const title = safeString(event.title, 'Untitled Event');
+  const location = safeString(event.location?.name, 'TBA');
+  
+  let dateStr = '';
+  let timeStr = '';
+  try {
+    const d = new Date(event.startDate);
+    dateStr = format(d, 'MMM d, yyyy');
+    timeStr = format(d, 'h:mm a');
+  } catch (e) {
+    dateStr = 'TBA';
+  }
 
-  const cardContent = (
-    <Card variant="raised" style={containerStyle} noPadding>
-      {coverImage ? (
-        <Image source={{ uri: coverImage }} style={[styles.image, variant === 'compact' && styles.compactImage]} />
-      ) : (
-        <View style={[styles.image, styles.placeholder, variant === 'compact' && styles.compactImage]}>
-          <Text style={styles.placeholderText}>No image</Text>
+  return (
+    <Card style={styles.card} noPadding onPress={onPress} variant="elevated">
+      <View style={styles.imageContainer}>
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.image} />
+        ) : (
+          <View style={[styles.image, styles.placeholderImage]}>
+            <Text style={styles.placeholderText}>EVORIA</Text>
+          </View>
+        )}
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryText}>{safeString(event.category, 'General')}</Text>
         </View>
-      )}
-
+      </View>
       <View style={styles.content}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={2}>{eventTitle}</Text>
-          {isSoldOut ? (
-            <StatusBadge status="error" label="Sold Out" />
-          ) : (
-            <StatusBadge status="success" label={eventStatusLabel} />
-          )}
-        </View>
-
-        <View style={styles.row}>
-          <Calendar size={14} color={theme.colors.primary} />
-          <Text style={styles.rowText}>{dateLabel}</Text>
-          <Clock size={14} color={theme.colors.secondary} />
-          <Text style={styles.rowText}>{startTimeLabel} - {endTimeLabel}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <MapPin size={14} color={theme.colors.accent} />
-          <Text style={styles.rowText} numberOfLines={1}>
-            {locationLabel}
-          </Text>
-        </View>
-
-        <View style={styles.metaRow}>
-          <StatusBadge status="neutral" label={eventTypeLabel} />
-          <StatusBadge status="neutral" label={eventVisibilityLabel} />
-          <View style={styles.attendeeMeta}>
-            <Users size={12} color={theme.colors.textMuted} />
-            <Text style={styles.attendeeMetaText}>{bookingCount}/{capacity || '--'}</Text>
+        <View style={styles.dateRow}>
+          <View style={styles.dateBadge}>
+            <Text style={styles.dateMonth}>{format(new Date(event.startDate), 'MMM').toUpperCase()}</Text>
+            <Text style={styles.dateDay}>{format(new Date(event.startDate), 'dd')}</Text>
+          </View>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title} numberOfLines={2}>{title}</Text>
           </View>
         </View>
-
-        {actions ? <View style={styles.actions}>{actions}</View> : null}
+        
+        <View style={styles.detailsRow}>
+          <View style={styles.detailItem}>
+            <Clock size={16} color={theme.colors.textMuted} />
+            <Text style={styles.detailText}>{timeStr}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <MapPin size={16} color={theme.colors.textMuted} />
+            <Text style={styles.detailText} numberOfLines={1}>{location}</Text>
+          </View>
+        </View>
       </View>
     </Card>
   );
-
-  if (!onPress) return cardContent;
-  return <AnimatedPressable onPress={onPress}>{cardContent}</AnimatedPressable>;
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: theme.spacing.m,
-    borderRadius: theme.borderRadius.l,
-    overflow: 'hidden',
+  card: {
+    marginBottom: theme.spacing.xl,
+    borderRadius: theme.borderRadius.xl,
   },
-  compactContainer: {
-    marginBottom: theme.spacing.s,
+  imageContainer: {
+    height: 180,
+    width: '100%',
+    position: 'relative',
   },
   image: {
     width: '100%',
-    height: 190,
+    height: '100%',
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+  },
+  placeholderImage: {
     backgroundColor: theme.colors.surfaceLight,
-  },
-  compactImage: {
-    height: 150,
-  },
-  placeholder: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderText: {
-    ...theme.typography.caption,
+    ...theme.typography.h2,
     color: theme.colors.textMuted,
+    opacity: 0.5,
+  },
+  categoryBadge: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.round,
+    backdropFilter: 'blur(10px)',
+  },
+  categoryText: {
+    ...theme.typography.caption,
+    color: '#FFF',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   content: {
     padding: theme.spacing.m,
-    gap: theme.spacing.s,
   },
-  titleRow: {
+  dateRow: {
     flexDirection: 'row',
-    gap: theme.spacing.s,
-    alignItems: 'flex-start',
+    marginBottom: theme.spacing.m,
+  },
+  dateBadge: {
+    backgroundColor: theme.colors.primarySubtle,
+    borderRadius: theme.borderRadius.sm,
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 56,
+    height: 56,
+    marginRight: 12,
+  },
+  dateMonth: {
+    ...theme.typography.overline,
+    color: theme.colors.primary,
+  },
+  dateDay: {
+    ...theme.typography.h2,
+    color: theme.colors.primary,
+    marginTop: -2,
+  },
+  titleContainer: {
+    flex: 1,
+    justifyContent: 'center',
   },
   title: {
     ...theme.typography.h2,
     color: theme.colors.text,
-    flex: 1,
-    lineHeight: 26,
   },
-  row: {
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
   },
-  rowText: {
-    ...theme.typography.caption,
+  detailText: {
+    ...theme.typography.bodyMedium,
     color: theme.colors.textSecondary,
-    marginRight: theme.spacing.s,
-  },
-  metaRow: {
-    marginTop: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: theme.spacing.s,
-  },
-  attendeeMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  attendeeMetaText: {
-    ...theme.typography.small,
-    color: theme.colors.textMuted,
-    fontWeight: '600',
-  },
-  actions: {
-    marginTop: theme.spacing.s,
-    paddingTop: theme.spacing.s,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    gap: theme.spacing.s,
   },
 });

@@ -9,7 +9,6 @@ import { Booking } from '../../types';
 import { theme } from '../../constants/theme';
 import { ScreenContainer, LoadingState, ErrorState, Card, IconButton, StatusBadge } from '../../components';
 import { BookingService, CheckInService, EventService, TicketService } from '../../api/services';
-import { LinearGradient } from 'expo-linear-gradient';
 import { formatSafeDate, logDevMissing, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
 
 type MyTicketQRRouteProp = RouteProp<AttendeeHomeStackParamList, 'MyTicketQR'>;
@@ -70,11 +69,7 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <View style={styles.screen}>
-      <LinearGradient
-        colors={['#3D2E1E', '#2A1F14', '#121212']}
-        locations={[0, 0.3, 0.7]}
-        style={StyleSheet.absoluteFillObject}
-      />
+      
       <ScreenContainer scrollable style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

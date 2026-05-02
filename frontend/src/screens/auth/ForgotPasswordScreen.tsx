@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Mail } from 'lucide-react-native';
 import { AuthStackParamList } from '../../types/navigation';
 import { Input, Button, IconButton } from '../../components';
@@ -59,10 +58,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={['#111111', '#1A1714', '#111111']}
-        style={StyleSheet.absoluteFillObject}
-      />
+      
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={styles.header}>

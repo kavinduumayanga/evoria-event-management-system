@@ -1,52 +1,33 @@
 import React from 'react';
-import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { Button } from './Button';
+import { View, Text, StyleSheet } from 'react-native';
+import { Inbox } from 'lucide-react-native';
 import { theme } from '../constants/theme';
-
-// ============================================================
-// EMPTY STATE — Shown when a list/section has no data
-//
-// Usage:
-//   <EmptyState
-//     icon={<CalendarDays size={48} color={theme.colors.textMuted} />}
-//     title="No Events Yet"
-//     message="Create your first event to get started."
-//     action={{ label: "Create Event", onPress: () => {} }}  // optional
-//   />
-// ============================================================
+import { Button } from './Button';
 
 interface EmptyStateProps {
-  icon?: React.ReactNode;
   title: string;
-  message?: string;
-  action?: {
-    label: string;
-    onPress: () => void;
-  };
-  style?: StyleProp<ViewStyle>;
+  message: string;
+  actionTitle?: string;
+  onAction?: () => void;
+  icon?: React.ReactNode;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon,
   title,
   message,
-  action,
-  style,
+  actionTitle,
+  onAction,
+  icon,
 }) => {
   return (
-    <View style={[styles.container, style]}>
-      {icon && <View style={styles.iconWrapper}>{icon}</View>}
+    <View style={styles.container}>
+      <View style={styles.iconContainer}>
+        {icon || <Inbox size={48} color={theme.colors.primary} />}
+      </View>
       <Text style={styles.title}>{title}</Text>
-      {message && <Text style={styles.message}>{message}</Text>}
-      {action && (
-        <Button
-          title={action.label}
-          onPress={action.onPress}
-          variant="secondary"
-          size="sm"
-          style={styles.action}
-          fullWidth={false}
-        />
+      <Text style={styles.message}>{message}</Text>
+      {actionTitle && onAction && (
+        <Button title={actionTitle} onPress={onAction} style={styles.actionBtn} />
       )}
     </View>
   );
@@ -57,26 +38,31 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.xxl,
-    paddingHorizontal: theme.spacing.xl,
+    padding: theme.spacing.xxl,
+    backgroundColor: theme.colors.background,
   },
-  iconWrapper: {
-    marginBottom: theme.spacing.l,
-    opacity: 0.5,
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: theme.colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.xl,
   },
   title: {
-    ...theme.typography.h3,
+    ...theme.typography.h1,
     color: theme.colors.text,
     textAlign: 'center',
     marginBottom: theme.spacing.s,
   },
   message: {
     ...theme.typography.body,
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    marginBottom: theme.spacing.xl,
   },
-  action: {
-    marginTop: theme.spacing.l,
+  actionBtn: {
+    minWidth: 200,
   },
 });
