@@ -1,20 +1,15 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard } from '../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatusBadge } from '../../components';
 import { theme } from '../../constants/theme';
 import { WaitlistService } from '../../api/services';
 import { Booking } from '../../types';
+import { ListOrdered, Calendar, Clock } from 'lucide-react-native';
 
 interface WaitlistItem extends Booking {
   status: 'waiting' | 'promoted';
-  event?: {
-    id: string;
-    title: string;
-    date: string;
-    startTime: string;
-    endTime: string;
-  } | null;
+  event?: { id: string; title: string; date: string; startTime: string; endTime: string } | null;
 }
 
 export const MyWaitlistScreen = () => {
@@ -26,139 +21,95 @@ export const MyWaitlistScreen = () => {
   const fetchWaitlist = async () => {
     try {
       setError(null);
-      const response = await WaitlistService.getMyWaitlist();
-      setItems(response.data.waitlist || []);
-    } catch (fetchError) {
-      console.error(fetchError);
-      setError('Failed to load waitlist status');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
+      const res = await WaitlistService.getMyWaitlist();
+      setItems(res.data.waitlist || []);
+    } catch { setError('Failed to load waitlist status'); }
+    finally { setIsLoading(false); setIsRefreshing(false); }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchWaitlist();
-    }, []),
-  );
-
-  const onRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    fetchWaitlist();
-  }, []);
+  useFocusEffect(useCallback(() => { fetchWaitlist(); }, []));
+  const onRefresh = useCallback(() => { setIsRefreshing(true); fetchWaitlist(); }, []);
 
   if (isLoading && !isRefreshing) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchWaitlist} /></ScreenContainer>;
 
   return (
-    <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Waitlist</Text>
-        <Text style={styles.subtitle}>Track waiting and promoted entries</Text>
-      </View>
-
+    <ScreenContainer>
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => {
-          const isWaiting = item.status === 'waiting';
-          return (
-            <GlassCard style={styles.card} variant="dark">
-              <View style={styles.cardHeader}>
-                <Text style={styles.eventTitle}>{item.event?.title || 'Event'}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  { borderColor: isWaiting ? theme.colors.warning : theme.colors.success },
-                  { backgroundColor: isWaiting ? `${theme.colors.warning}22` : `${theme.colors.success}22` },
-                ]}>
-                  <Text style={[
-                    styles.statusText,
-                    { color: isWaiting ? theme.colors.warning : theme.colors.success },
-                  ]}>
-                    {isWaiting ? 'WAITING' : 'PROMOTED'}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.metaText}>
-                Date: {item.event?.date ? new Date(item.event.date).toLocaleDateString() : 'TBD'}
-              </Text>
-              <Text style={styles.metaText}>
-                Time: {item.event?.startTime || '--'} - {item.event?.endTime || '--'}
-              </Text>
-              <Text style={styles.metaText}>Quantity: {item.quantity}</Text>
-              <Text style={styles.metaText}>
-                Position: {item.waitlistPosition !== null ? `#${item.waitlistPosition}` : 'Cleared'}
-              </Text>
-            </GlassCard>
-          );
-        }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+        }
+        ListHeaderComponent={
+          <View style={styles.pageHeader}>
+            <Text style={styles.pageTitle}>My Waitlist</Text>
+            <Text style={styles.pageSubtitle}>Track your waiting and promoted entries</Text>
+          </View>
+        }
         ListEmptyComponent={
           <EmptyState
+            icon={<ListOrdered size={48} color={theme.colors.textMuted} />}
             title="No Waitlist Entries"
             message="You are not currently waiting for any full events."
           />
         }
+        renderItem={({ item }) => {
+          const isWaiting = item.status === 'waiting';
+          return (
+            <Card variant="raised" style={styles.card} noPadding>
+              {/* Position strip */}
+              <View style={[styles.positionStrip, { backgroundColor: isWaiting ? theme.colors.warningSubtle : theme.colors.successSubtle }]}>
+                <Text style={[styles.positionNum, { color: isWaiting ? theme.colors.warning : theme.colors.success }]}>
+                  {item.waitlistPosition !== null ? `#${item.waitlistPosition}` : '✓'}
+                </Text>
+              </View>
+
+              <View style={styles.cardContent}>
+                {/* Title + badge */}
+                <View style={styles.titleRow}>
+                  <Text style={styles.eventTitle} numberOfLines={2}>{item.event?.title || 'Event'}</Text>
+                  <StatusBadge
+                    status={isWaiting ? 'warning' : 'success'}
+                    label={isWaiting ? 'Waiting' : 'Promoted'}
+                  />
+                </View>
+
+                {/* Meta */}
+                <View style={styles.metaRow}>
+                  <Calendar size={12} color={theme.colors.textMuted} />
+                  <Text style={styles.metaText}>
+                    {item.event?.date ? new Date(item.event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+                  </Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Clock size={12} color={theme.colors.textMuted} />
+                  <Text style={styles.metaText}>{item.event?.startTime || '--'} – {item.event?.endTime || '--'}</Text>
+                </View>
+                <Text style={styles.quantityText}>Qty: {item.quantity}</Text>
+              </View>
+            </Card>
+          );
+        }}
       />
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 0,
-  },
-  header: {
-    paddingHorizontal: theme.spacing.m,
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.s,
-  },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-  },
-  subtitle: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.xs,
-  },
-  listContent: {
-    padding: theme.spacing.m,
-    paddingBottom: theme.spacing.xxl,
-    flexGrow: 1,
-  },
-  card: {
-    marginBottom: theme.spacing.m,
-    padding: theme.spacing.m,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.s,
-    gap: theme.spacing.s,
-  },
-  eventTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    flex: 1,
-  },
-  statusBadge: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
-  },
-  statusText: {
-    ...theme.typography.small,
-    fontWeight: '700',
-  },
-  metaText: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
+  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
+  pageHeader: { paddingTop: theme.spacing.xl, marginBottom: theme.spacing.l },
+  pageTitle: { ...theme.typography.h1, color: theme.colors.text },
+  pageSubtitle: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 4 },
+  card: { flexDirection: 'row', borderRadius: theme.borderRadius.l, marginBottom: theme.spacing.sm, overflow: 'hidden' },
+  positionStrip: { width: 52, justifyContent: 'center', alignItems: 'center', paddingVertical: theme.spacing.m },
+  positionNum: { ...theme.typography.h2, fontWeight: '800' },
+  cardContent: { flex: 1, padding: theme.spacing.m, gap: 4 },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: theme.spacing.s, marginBottom: theme.spacing.xs },
+  eventTitle: { ...theme.typography.bodyMedium, color: theme.colors.text, flex: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaText: { ...theme.typography.caption, color: theme.colors.textMuted },
+  quantityText: { ...theme.typography.caption, color: theme.colors.primary, fontWeight: '600', marginTop: 2 },
 });

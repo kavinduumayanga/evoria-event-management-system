@@ -12,7 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { Camera, RefreshCw, QrCode, UserCheck } from 'lucide-react-native';
 import { theme } from '../../constants/theme';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, PrimaryButton, SecondaryButton, FormInput } from '../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, Button, Input } from '../../components';
 import { CheckInService, EventService, UserService } from '../../api/services';
 import { Event } from '../../types';
 
@@ -241,26 +241,30 @@ export const CheckInScannerScreen = () => {
         />
       </View>
 
-      <GlassCard style={styles.summaryCard} variant="primary">
-        <Text style={styles.summaryLabel}>Attendance Summary</Text>
-        <Text style={styles.summaryValue}>{summary.checkedIn}/{summary.total} checked in</Text>
-        <Text style={styles.summaryMeta}>{summary.notCheckedIn} pending check-in</Text>
-      </GlassCard>
+      <Card variant="primary" style={styles.summaryCard} noPadding>
+        <View style={styles.summaryInner}>
+          <Text style={styles.summaryLabel}>Attendance Summary</Text>
+          <Text style={styles.summaryValue}>{summary.checkedIn}/{summary.total} checked in</Text>
+          <Text style={styles.summaryMeta}>{summary.notCheckedIn} pending check-in</Text>
+        </View>
+      </Card>
 
       <View style={styles.scannerActions}>
-        <PrimaryButton
+        <Button
           title={isScannerOpen ? 'Close Scanner' : 'Open QR Scanner'}
           onPress={() => (isScannerOpen ? setIsScannerOpen(false) : openScanner())}
-          icon={<Camera size={18} color={theme.colors.surface} />}
+          variant="primary"
+          size="lg"
+          icon={<Camera size={18} color={theme.colors.textOnPrimary} />}
         />
       </View>
 
       {isScannerOpen && (
-        <GlassCard style={styles.cameraWrap} variant="dark">
+        <Card variant="raised" style={styles.cameraWrap} noPadding>
           {!permission?.granted || hasCameraPermission === false ? (
             <View style={styles.permissionFallback}>
               <Text style={styles.permissionText}>Camera access is required to scan QR codes.</Text>
-              <PrimaryButton title="Grant Camera Access" onPress={openScanner} />
+              <Button title="Grant Camera Access" onPress={openScanner} variant="primary" size="md" />
             </View>
           ) : (
             <>
@@ -276,7 +280,7 @@ export const CheckInScannerScreen = () => {
               </View>
             </>
           )}
-        </GlassCard>
+        </Card>
       )}
 
       <Text style={styles.sectionTitle}>Guest Check-in Queue</Text>
@@ -291,44 +295,48 @@ export const CheckInScannerScreen = () => {
           const checkedIn = item.checkInStatus === 'checked_in';
           const statusColor = checkedIn ? theme.colors.success : theme.colors.warning;
           return (
-            <GlassCard style={styles.recordCard} variant={checkedIn ? 'primary' : 'dark'}>
-              <View style={styles.recordHeader}>
-                <Text style={styles.recordName}>{item.attendeeName}</Text>
-                <View style={[styles.statusBadge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
-                  <Text style={[styles.statusText, { color: statusColor }]}>
-                    {checkedIn ? 'Checked In' : 'Not Checked In'}
+            <Card variant={checkedIn ? 'primary' : 'raised'} style={styles.recordCard} noPadding>
+              <View style={styles.recordInner}>
+                <View style={styles.recordHeader}>
+                  <Text style={styles.recordName}>{item.attendeeName}</Text>
+                  <View style={[styles.statusBadge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
+                    <Text style={[styles.statusText, { color: statusColor }]}>
+                      {checkedIn ? 'Checked In' : 'Pending'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.recordMeta}>{item.attendeeEmail}</Text>
+                {item.mobile ? <Text style={styles.recordMeta}>Mobile: {item.mobile}</Text> : null}
+                {item.nic ? <Text style={styles.recordMeta}>NIC: {item.nic}</Text> : null}
+                {item.guestStatus ? <Text style={styles.recordMeta}>Status: {item.guestStatus.toUpperCase()}</Text> : null}
+                {item.checkedInAt ? (
+                  <Text style={styles.recordMeta}>
+                    At: {new Date(item.checkedInAt).toLocaleString()} ({item.checkInMethod || 'manual'})
                   </Text>
-                </View>
-              </View>
-              <Text style={styles.recordMeta}>{item.attendeeEmail}</Text>
-              {item.mobile ? <Text style={styles.recordMeta}>Mobile: {item.mobile}</Text> : null}
-              {item.nic ? <Text style={styles.recordMeta}>NIC: {item.nic}</Text> : null}
-              {item.guestStatus ? <Text style={styles.recordMeta}>Status: {item.guestStatus.toUpperCase()}</Text> : null}
-              {item.checkedInAt ? (
-                <Text style={styles.recordMeta}>
-                  At: {new Date(item.checkedInAt).toLocaleString()} ({item.checkInMethod || 'manual'})
-                </Text>
-              ) : null}
+                ) : null}
 
-              {!checkedIn && (
-                <View style={styles.manualRow}>
-                  <FormInput
-                    value={manualRegistrationId === item.id ? manualNote : ''}
-                    onChangeText={(text) => {
-                      setManualRegistrationId(item.id);
-                      setManualNote(text);
-                    }}
-                    placeholder="Optional attendance note"
-                  />
-                  <SecondaryButton
-                    title="Manual Check-in"
-                    onPress={() => handleManualCheckIn(item.id, manualRegistrationId === item.id ? manualNote : '')}
-                    icon={<UserCheck size={16} color={theme.colors.success} />}
-                    style={{ borderColor: theme.colors.success }}
-                  />
-                </View>
-              )}
-            </GlassCard>
+                {!checkedIn && (
+                  <View style={styles.manualRow}>
+                    <Input
+                      value={manualRegistrationId === item.id ? manualNote : ''}
+                      onChangeText={(text: string) => {
+                        setManualRegistrationId(item.id);
+                        setManualNote(text);
+                      }}
+                      placeholder="Optional attendance note"
+                      containerStyle={styles.noteInput}
+                    />
+                    <Button
+                      title="Manual Check-in"
+                      onPress={() => handleManualCheckIn(item.id, manualRegistrationId === item.id ? manualNote : '')}
+                      variant="secondary"
+                      size="sm"
+                      icon={<UserCheck size={16} color={theme.colors.success} />}
+                    />
+                  </View>
+                )}
+              </View>
+            </Card>
           );
         }}
         ListFooterComponent={
@@ -344,12 +352,12 @@ export const CheckInScannerScreen = () => {
                       ? theme.colors.secondary
                       : theme.colors.error;
                 return (
-                  <GlassCard key={scan.id} style={styles.recentCard}>
+                  <Card key={scan.id} variant="raised" style={styles.recentCard} noPadding>
                     <View style={styles.recentRow}>
                       <Text style={[styles.recentStatus, { color }]}>{scan.status.toUpperCase()}</Text>
                       <Text style={styles.recentMessage}>{scan.message}</Text>
                     </View>
-                  </GlassCard>
+                  </Card>
                 );
               })}
             </View>
@@ -421,8 +429,10 @@ const styles = StyleSheet.create({
   summaryCard: {
     marginHorizontal: theme.spacing.m,
     marginBottom: theme.spacing.s,
-    padding: theme.spacing.m,
+    overflow: 'hidden',
+    borderRadius: theme.borderRadius.l,
   },
+  summaryInner: { padding: theme.spacing.m },
   summaryLabel: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
@@ -484,8 +494,10 @@ const styles = StyleSheet.create({
   },
   recordCard: {
     marginBottom: theme.spacing.m,
-    padding: theme.spacing.m,
+    overflow: 'hidden',
+    borderRadius: theme.borderRadius.l,
   },
+  recordInner: { padding: theme.spacing.m },
   recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -517,6 +529,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.m,
     gap: theme.spacing.s,
   },
+  noteInput: { marginBottom: 0 },
   recentWrap: {
     marginBottom: theme.spacing.xl,
   },

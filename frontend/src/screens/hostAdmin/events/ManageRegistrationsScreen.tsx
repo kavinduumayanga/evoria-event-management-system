@@ -3,11 +3,14 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Ale
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { EmptyState, ErrorState, FormInput, LoadingState, GlassCard, ScreenContainer, SecondaryButton } from '../../../components';
+import {
+  EmptyState, ErrorState, Input, LoadingState,
+  Card, ScreenContainer, Button, IconButton, StatusBadge,
+} from '../../../components';
 import { theme } from '../../../constants/theme';
 import { EventRegistrationStatus } from '../../../types';
 import { GuestRecord, GuestService } from '../../../api/services';
-import { ArrowLeft, UserCheck, CheckCircle2, XCircle, Ban } from 'lucide-react-native';
+import { ArrowLeft, UserCheck, CheckCircle2, XCircle, Ban, Search, Users } from 'lucide-react-native';
 
 type ManageRegistrationsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
 type ManageRegistrationsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
@@ -19,36 +22,14 @@ interface Props {
 
 type FilterStatus = 'all' | EventRegistrationStatus;
 
-const statusOptions: FilterStatus[] = [
-  'all',
-  'pending',
-  'going',
-  'checked_in',
-  'not_going',
-  'declined',
-];
+const STATUS_OPTIONS: FilterStatus[] = ['all', 'pending', 'going', 'checked_in', 'not_going', 'declined'];
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'checked_in':
-      return theme.colors.success;
-    case 'going':
-      return theme.colors.primaryLight;
-    case 'pending':
-      return theme.colors.warning;
-    case 'declined':
-      return theme.colors.error;
-    case 'not_going':
-      return theme.colors.textMuted;
-    default:
-      return theme.colors.textMuted;
-  }
-};
-
-const getCardVariant = (status: string) => {
-  if (status === 'checked_in') return 'primary';
-  if (status === 'declined' || status === 'not_going') return 'dark';
-  return 'dark';
+const STATUS_MAP: Record<string, any> = {
+  checked_in: 'success',
+  going: 'info',
+  pending: 'warning',
+  declined: 'error',
+  not_going: 'neutral',
 };
 
 export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -73,8 +54,8 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
       setError(null);
       const response = await GuestService.getEventGuests(eventId, queryParams);
       setGuests(response.data.guests || []);
-    } catch (fetchError: any) {
-      setError(fetchError?.response?.data?.message || 'Failed to load guests');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to load guests');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -82,9 +63,8 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
   };
 
   useFocusEffect(
-    useCallback(() => {
-      fetchGuests();
-    }, [eventId, queryParams.status, queryParams.search, queryParams.date]),
+    useCallback(() => { fetchGuests(); },
+      [eventId, queryParams.status, queryParams.search, queryParams.date])
   );
 
   const onRefresh = useCallback(() => {
@@ -96,8 +76,8 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
     try {
       await GuestService.updateGuestStatus(guestId, status);
       fetchGuests();
-    } catch (statusError: any) {
-      Alert.alert('Error', statusError?.response?.data?.message || `Failed to set status to ${status}`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || `Failed to set status to ${status}`);
     }
   };
 
@@ -105,8 +85,8 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
     try {
       await GuestService.checkInGuest(guestId);
       fetchGuests();
-    } catch (checkInError: any) {
-      Alert.alert('Error', checkInError?.response?.data?.message || 'Failed to check in guest');
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to check in guest');
     }
   };
 
@@ -114,192 +94,159 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchGuests} /></ScreenContainer>;
 
   return (
-    <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft size={20} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Guest List</Text>
-      </View>
-
-      <View style={styles.filterSection}>
-        <FormInput label="Search (name/email/mobile/NIC)" value={search} onChangeText={setSearch} placeholder="Search guest" />
-        <FormInput label="Date (YYYY-MM-DD)" value={dateFilter} onChangeText={setDateFilter} placeholder="2026-12-25" />
-
-        <Text style={styles.filterLabel}>Status Filter</Text>
-        <GlassCard style={styles.statusChipsContainer}>
-          <View style={styles.statusChipsRow}>
-            {statusOptions.map((statusOption) => (
-              <TouchableOpacity
-                key={statusOption}
-                style={[styles.statusChip, statusFilter === statusOption && styles.statusChipSelected]}
-                onPress={() => setStatusFilter(statusOption)}
-              >
-                <Text style={[styles.statusChipText, statusFilter === statusOption && styles.statusChipTextSelected]}>
-                  {statusOption.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </GlassCard>
-      </View>
-
+    <ScreenContainer>
       <FlatList
         data={guests}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-        renderItem={({ item }) => {
-          const statusColor = getStatusColor(item.status);
-          return (
-            <GlassCard style={styles.guestCard} variant={getCardVariant(item.status)}>
-              <View style={styles.cardTopRow}>
-                <Text style={styles.guestName}>{item.name}</Text>
-                <View style={[styles.badge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
-                  <Text style={[styles.badgeText, { color: statusColor }]}>
-                    {item.status.toUpperCase()}
-                  </Text>
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+        }
+        ListHeaderComponent={
+          <>
+            {/* Page header */}
+            <View style={styles.pageHeader}>
+              <View style={styles.headerLeft}>
+                <IconButton
+                  icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                  onPress={() => navigation.goBack()}
+                  variant="surface"
+                  size={36}
+                />
+                <View>
+                  <Text style={styles.pageTitle}>Guest List</Text>
+                  <Text style={styles.guestCount}>{guests.length} registered</Text>
                 </View>
               </View>
+            </View>
 
+            {/* Search + Date */}
+            <View style={styles.filterWrap}>
+              <Input
+                placeholder="Search by name, email, NIC..."
+                value={search}
+                onChangeText={setSearch}
+                leftIcon={<Search size={16} color={theme.colors.textMuted} />}
+                containerStyle={styles.searchInput}
+              />
+              <Input
+                placeholder="Date (YYYY-MM-DD)"
+                value={dateFilter}
+                onChangeText={setDateFilter}
+                containerStyle={styles.dateInput}
+              />
+            </View>
+
+            {/* Status chips */}
+            <View style={styles.chipRow}>
+              {STATUS_OPTIONS.map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.chip, statusFilter === s && styles.chipActive]}
+                  onPress={() => setStatusFilter(s)}
+                >
+                  <Text style={[styles.chipText, statusFilter === s && styles.chipTextActive]}>
+                    {s === 'all' ? 'All' : s.replace('_', ' ')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon={<Users size={48} color={theme.colors.textMuted} />}
+            title="No Guests Found"
+            message="No registrations match the current filters."
+          />
+        }
+        renderItem={({ item }) => (
+          <Card variant="raised" style={styles.guestCard} noPadding>
+            <View style={styles.guestInner}>
+              {/* Title row */}
+              <View style={styles.guestTitleRow}>
+                <Text style={styles.guestName} numberOfLines={1}>{item.name}</Text>
+                <StatusBadge status={STATUS_MAP[item.status] ?? 'neutral'} label={item.status.replace('_', ' ')} />
+              </View>
+
+              {/* Meta */}
               <Text style={styles.metaText}>{item.email}</Text>
-              <Text style={styles.metaText}>Mobile: {item.mobile}</Text>
-              <Text style={styles.metaText}>NIC: {item.nic}</Text>
-              <Text style={styles.metaText}>Registered: {new Date(item.registeredAt).toLocaleString()}</Text>
-              {item.checkedInAt ? (
-                <Text style={styles.metaText}>
-                  Checked-in: {new Date(item.checkedInAt).toLocaleString()} ({item.checkInMethod || 'manual'})
+              <View style={styles.metaRow}>
+                <Text style={styles.metaText}>Mobile: {item.mobile}</Text>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={styles.metaText}>NIC: {item.nic}</Text>
+              </View>
+              {item.checkedInAt && (
+                <Text style={styles.checkedInText}>
+                  ✓ Checked in {new Date(item.checkedInAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </Text>
-              ) : null}
+              )}
 
+              {/* Actions */}
               <View style={styles.actionsRow}>
-                <SecondaryButton
+                <Button
                   title="Going"
-                  icon={<CheckCircle2 size={14} color={theme.colors.text} />}
                   onPress={() => setGuestStatus(item.id, 'going')}
+                  variant={item.status === 'going' ? 'primary' : 'secondary'}
+                  size="sm"
                   style={styles.actionBtn}
                 />
-                <SecondaryButton
+                <Button
                   title="Not Going"
-                  icon={<Ban size={14} color={theme.colors.text} />}
                   onPress={() => setGuestStatus(item.id, 'not_going')}
+                  variant={item.status === 'not_going' ? 'danger' : 'secondary'}
+                  size="sm"
                   style={styles.actionBtn}
                 />
-                <SecondaryButton
+                <Button
                   title="Decline"
-                  icon={<XCircle size={14} color={theme.colors.error} />}
                   onPress={() => setGuestStatus(item.id, 'declined')}
+                  variant={item.status === 'declined' ? 'danger' : 'ghost'}
+                  size="sm"
                   style={styles.actionBtn}
                 />
-                {item.status !== 'checked_in' ? (
-                  <SecondaryButton
-                    title="Check-in"
-                    icon={<UserCheck size={14} color={theme.colors.success} />}
+                {item.status !== 'checked_in' && (
+                  <Button
+                    title="Check In"
                     onPress={() => runManualCheckIn(item.id)}
+                    variant="secondary"
+                    size="sm"
+                    icon={<UserCheck size={13} color={theme.colors.success} />}
                     style={styles.actionBtn}
                   />
-                ) : null}
+                )}
               </View>
-            </GlassCard>
-          );
-        }}
-        ListEmptyComponent={<EmptyState title="No Guests Found" message="No guest registrations match current filters." />}
+            </View>
+          </Card>
+        )}
       />
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 0 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.s,
-  },
-  backButton: { marginRight: theme.spacing.m },
-  title: { ...theme.typography.h1, color: theme.colors.text },
-  filterSection: {
-    paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.s,
-  },
-  filterLabel: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xs,
-    marginLeft: 4,
-  },
-  statusChipsContainer: {
-    padding: 4,
-    borderRadius: theme.borderRadius.m,
-  },
-  statusChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  statusChip: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    borderRadius: theme.borderRadius.s,
-  },
-  statusChipSelected: {
-    backgroundColor: theme.colors.glass,
-  },
-  statusChipText: {
-    ...theme.typography.small,
-    color: theme.colors.textMuted,
-    fontWeight: '600',
-  },
-  statusChipTextSelected: {
-    color: theme.colors.primaryLight,
-  },
-  listContainer: {
-    padding: theme.spacing.m,
-    paddingTop: theme.spacing.s,
-    paddingBottom: theme.spacing.xxl,
-    flexGrow: 1,
-  },
-  guestCard: {
-    marginBottom: theme.spacing.m,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.s,
-  },
-  guestName: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    flex: 1,
-    marginRight: theme.spacing.s,
-  },
-  badge: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    ...theme.typography.small,
-    fontWeight: '700',
-  },
-  metaText: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginBottom: 2,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: theme.spacing.m,
-    gap: theme.spacing.s,
-  },
-  actionBtn: {
-    flexGrow: 1,
-    minWidth: '40%',
-  },
+  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
+  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: theme.spacing.xl, marginBottom: theme.spacing.m },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.m },
+  pageTitle: { ...theme.typography.h1, color: theme.colors.text },
+  guestCount: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 2 },
+  filterWrap: { marginBottom: theme.spacing.m, gap: theme.spacing.s },
+  searchInput: { marginBottom: 0 },
+  dateInput: { marginBottom: 0 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginBottom: theme.spacing.m },
+  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: theme.borderRadius.round, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  chipActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySubtle },
+  chipText: { ...theme.typography.caption, color: theme.colors.textMuted, textTransform: 'capitalize' },
+  chipTextActive: { color: theme.colors.primary, fontWeight: '700' },
+  guestCard: { borderRadius: theme.borderRadius.l, marginBottom: theme.spacing.sm, overflow: 'hidden' },
+  guestInner: { padding: theme.spacing.m, gap: 4 },
+  guestTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.xs },
+  guestName: { ...theme.typography.bodyMedium, color: theme.colors.text, flex: 1, marginRight: theme.spacing.s },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { ...theme.typography.caption, color: theme.colors.textMuted },
+  metaDot: { ...theme.typography.caption, color: theme.colors.textMuted },
+  checkedInText: { ...theme.typography.caption, color: theme.colors.success, marginTop: 2 },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginTop: theme.spacing.sm },
+  actionBtn: { flexGrow: 1, minWidth: '44%' },
 });

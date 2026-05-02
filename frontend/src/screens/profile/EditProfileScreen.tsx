@@ -1,8 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, User, Phone, Image as ImageIcon } from 'lucide-react-native';
-import { ScreenContainer, FormInput, PrimaryButton, GlassCard, LoadingState, IconButton } from '../../components';
+import { Input, Button, IconButton, LoadingState } from '../../components';
 import { theme } from '../../constants/theme';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
@@ -31,13 +41,12 @@ export const EditProfileScreen = () => {
           setPhone(user.phone || '');
           setProfileImage(user.profileImage || '');
         }
-      } catch (error) {
+      } catch {
         // Keep local auth state values as fallback.
       } finally {
         setIsBootstrapping(false);
       }
     };
-
     loadProfile();
   }, []);
 
@@ -50,7 +59,6 @@ export const EditProfileScreen = () => {
       Alert.alert('Validation', 'Name is required.');
       return;
     }
-
     if (normalizedPhone && !phoneRegex.test(normalizedPhone)) {
       Alert.alert('Validation', 'Please enter a valid phone number.');
       return;
@@ -58,23 +66,15 @@ export const EditProfileScreen = () => {
 
     try {
       setIsLoading(true);
-
       const response = await UserService.updateProfile({
         name: normalizedName,
         phone: normalizedPhone || undefined,
         profileImage: normalizedProfileImage || undefined,
       });
-
       const updatedUser = response?.data?.user;
-      if (updatedUser) {
-        await updateAuthUser(updatedUser);
-      }
-
+      if (updatedUser) await updateAuthUser(updatedUser);
       Alert.alert('Success', 'Profile updated successfully.', [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
+        { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error: any) {
       Alert.alert('Update Failed', getApiErrorMessage(error, 'Unable to update profile.'));
@@ -83,90 +83,99 @@ export const EditProfileScreen = () => {
     }
   };
 
-  if (isBootstrapping) {
-    return <LoadingState />;
-  }
+  if (isBootstrapping) return <LoadingState />;
 
   return (
-    <ScreenContainer scrollable={false}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        {/* Header */}
         <View style={styles.header}>
-          <IconButton 
-            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
-            onPress={() => navigation.goBack()} 
-            variant="solid" 
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={22} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={40}
           />
-          <Text style={styles.title}>Edit Profile</Text>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <GlassCard style={styles.card} variant="dark" animateEntrance>
-            <FormInput 
-              label="Full Name" 
-              placeholder="Enter your full name" 
-              value={name} 
-              onChangeText={setName} 
-              leftIcon={<User size={20} color={theme.colors.textMuted} />}
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Input
+              label="Full name"
+              placeholder="Enter your full name"
+              value={name}
+              onChangeText={setName}
+              leftIcon={<User size={18} color={theme.colors.textMuted} />}
             />
-
-            <FormInput
-              label="Phone"
+            <Input
+              label="Phone number"
               placeholder="Enter your phone number"
               keyboardType="phone-pad"
               value={phone}
               onChangeText={setPhone}
-              leftIcon={<Phone size={20} color={theme.colors.textMuted} />}
+              leftIcon={<Phone size={18} color={theme.colors.textMuted} />}
             />
-
-            <FormInput
-              label="Profile Image URL or Upload Path"
+            <Input
+              label="Profile image URL"
               placeholder="/uploads/your-image.jpg"
               autoCapitalize="none"
+              autoCorrect={false}
               value={profileImage}
               onChangeText={setProfileImage}
-              leftIcon={<ImageIcon size={20} color={theme.colors.textMuted} />}
+              leftIcon={<ImageIcon size={18} color={theme.colors.textMuted} />}
+              hint="Use the upload endpoint first, then paste the returned path here."
             />
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-            <Text style={styles.helperText}>
-              Use the existing upload endpoint first, then paste the returned path here.
-            </Text>
-
-            <PrimaryButton title="Save Changes" onPress={handleSave} isLoading={isLoading} style={styles.saveButton} />
-          </GlassCard>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </ScreenContainer>
+        <View style={styles.bottomZone}>
+          <Button
+            title="Save Changes"
+            onPress={handleSave}
+            isLoading={isLoading}
+            variant="primary"
+            size="lg"
+          />
+        </View>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: theme.colors.background },
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.m,
-    marginBottom: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.m,
   },
-  content: {
-    flexGrow: 1,
-    paddingBottom: theme.spacing.xxl,
-  },
-  title: {
+  headerTitle: {
     ...theme.typography.h2,
     color: theme.colors.text,
   },
-  card: {
-    padding: theme.spacing.l,
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.m,
+    paddingBottom: theme.spacing.xxl,
   },
-  helperText: {
-    ...theme.typography.small,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.xs,
-  },
-  saveButton: {
-    marginTop: theme.spacing.l,
+  bottomZone: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: theme.spacing.l,
+    paddingTop: theme.spacing.m,
   },
 });

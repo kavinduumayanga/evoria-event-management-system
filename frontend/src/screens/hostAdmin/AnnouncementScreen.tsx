@@ -1,19 +1,16 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Alert,
-  RefreshControl,
-  ScrollView,
+  View, Text, StyleSheet, TouchableOpacity,
+  FlatList, Alert, RefreshControl, ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Megaphone, MailPlus, Send, History } from 'lucide-react-native';
+import { Megaphone, MailPlus, Send, History, Radio } from 'lucide-react-native';
 import { Event } from '../../types';
 import { theme } from '../../constants/theme';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, FormInput, PrimaryButton } from '../../components';
+import {
+  ScreenContainer, LoadingState, ErrorState, EmptyState,
+  Card, Input, Button,
+} from '../../components';
 import { EventCommunicationEntry, EventService, UserService } from '../../api/services';
 
 export const AnnouncementScreen = () => {
@@ -32,18 +29,14 @@ export const AnnouncementScreen = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCommunications = useCallback(async (eventId: string) => {
-    if (!eventId) {
-      setCommunications([]);
-      return;
-    }
-
+    if (!eventId) { setCommunications([]); return; }
     try {
       setIsLoadingHistory(true);
       const response = await EventService.getEventCommunications(eventId, 80);
       setCommunications(response?.data?.communications || []);
-    } catch (historyError: any) {
+    } catch (err: any) {
       setCommunications([]);
-      Alert.alert('History Error', historyError?.response?.data?.message || 'Failed to load communication history.');
+      Alert.alert('History Error', err?.response?.data?.message || 'Failed to load communication history.');
     } finally {
       setIsLoadingHistory(false);
     }
@@ -52,128 +45,92 @@ export const AnnouncementScreen = () => {
   const fetchEvents = useCallback(async () => {
     try {
       setError(null);
-      const userResponse = await UserService.getMe();
-      const eventsResponse = await EventService.getHostEvents(userResponse.data.user.id);
-      const managedEvents = eventsResponse?.data?.events || [];
-      setEvents(managedEvents);
-
-      const hasExistingSelection = managedEvents.some((event: Event) => event.id === selectedEventId);
-      const resolvedEventId = hasExistingSelection ? selectedEventId : (managedEvents[0]?.id || '');
-      setSelectedEventId(resolvedEventId);
-
-      if (resolvedEventId) {
-        await fetchCommunications(resolvedEventId);
-      } else {
-        setCommunications([]);
-      }
-    } catch (loadError: any) {
-      setError(loadError?.response?.data?.message || 'Failed to load events');
+      const userRes = await UserService.getMe();
+      const eventsRes = await EventService.getHostEvents(userRes.data.user.id);
+      const managed = eventsRes?.data?.events || [];
+      setEvents(managed);
+      const hasSelection = managed.some((e: Event) => e.id === selectedEventId);
+      const resolved = hasSelection ? selectedEventId : (managed[0]?.id || '');
+      setSelectedEventId(resolved);
+      if (resolved) await fetchCommunications(resolved);
+      else setCommunications([]);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to load events');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, [fetchCommunications, selectedEventId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchEvents();
-    }, [fetchEvents]),
-  );
-
-  const onRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    fetchEvents();
-  }, [fetchEvents]);
+  useFocusEffect(useCallback(() => { fetchEvents(); }, [fetchEvents]));
+  const onRefresh = useCallback(() => { setIsRefreshing(true); fetchEvents(); }, [fetchEvents]);
 
   const handleSendBlast = async () => {
-    if (!selectedEventId) {
-      Alert.alert('Select Event', 'Please select an event first.');
-      return;
-    }
-    if (!blastMessage.trim()) {
-      Alert.alert('Missing Message', 'Blast message is required.');
-      return;
-    }
-
+    if (!selectedEventId) { Alert.alert('Select Event', 'Please select an event first.'); return; }
+    if (!blastMessage.trim()) { Alert.alert('Missing Message', 'Blast message is required.'); return; }
     try {
       setIsSubmittingBlast(true);
-      const response = await EventService.blastMessage(selectedEventId, {
+      const res = await EventService.blastMessage(selectedEventId, {
         subject: blastSubject.trim() || undefined,
         message: blastMessage.trim(),
       });
-      Alert.alert('Blast Sent', response?.message || 'Mock blast recorded successfully.');
-      setBlastSubject('');
-      setBlastMessage('');
+      Alert.alert('Blast Sent', res?.message || 'Blast recorded successfully.');
+      setBlastSubject(''); setBlastMessage('');
       await fetchCommunications(selectedEventId);
-    } catch (blastError: any) {
-      Alert.alert('Blast Failed', blastError?.response?.data?.message || 'Failed to send blast message.');
-    } finally {
-      setIsSubmittingBlast(false);
-    }
+    } catch (err: any) {
+      Alert.alert('Blast Failed', err?.response?.data?.message || 'Failed to send blast.');
+    } finally { setIsSubmittingBlast(false); }
   };
 
   const handleInviteGuest = async () => {
-    if (!selectedEventId) {
-      Alert.alert('Select Event', 'Please select an event first.');
-      return;
-    }
-    if (!inviteEmail.trim()) {
-      Alert.alert('Missing Email', 'Guest email is required.');
-      return;
-    }
-
+    if (!selectedEventId) { Alert.alert('Select Event', 'Please select an event first.'); return; }
+    if (!inviteEmail.trim()) { Alert.alert('Missing Email', 'Guest email is required.'); return; }
     try {
       setIsSubmittingInvite(true);
-      const response = await EventService.inviteGuest(selectedEventId, {
+      const res = await EventService.inviteGuest(selectedEventId, {
         email: inviteEmail.trim(),
         message: inviteMessage.trim() || undefined,
       });
-      Alert.alert('Invite Sent', response?.message || 'Mock invitation recorded successfully.');
-      setInviteEmail('');
-      setInviteMessage('');
+      Alert.alert('Invite Sent', res?.message || 'Invite recorded successfully.');
+      setInviteEmail(''); setInviteMessage('');
       await fetchCommunications(selectedEventId);
-    } catch (inviteError: any) {
-      Alert.alert('Invite Failed', inviteError?.response?.data?.message || 'Failed to send invite.');
-    } finally {
-      setIsSubmittingInvite(false);
-    }
+    } catch (err: any) {
+      Alert.alert('Invite Failed', err?.response?.data?.message || 'Failed to send invite.');
+    } finally { setIsSubmittingInvite(false); }
   };
 
   if (isLoading && !isRefreshing) return <LoadingState />;
-  if (error) {
-    return (
-      <ScreenContainer>
-        <ErrorState message={error} onRetry={fetchEvents} />
-      </ScreenContainer>
-    );
-  }
+  if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchEvents} /></ScreenContainer>;
 
   return (
-    <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <Megaphone size={20} color={theme.colors.accent} />
-        <Text style={styles.title}>Event Communications</Text>
+    <ScreenContainer>
+      {/* === PAGE HEADER === */}
+      <View style={styles.pageHeader}>
+        <View style={styles.headerLeft}>
+          <Radio size={20} color={theme.colors.primary} />
+          <Text style={styles.pageTitle}>Communications</Text>
+        </View>
       </View>
 
+      {/* === EVENT SELECTOR === */}
       <FlatList
         data={events}
         horizontal
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.eventList}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         showsHorizontalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+        }
         ListEmptyComponent={<EmptyState title="No Events" message="Create an event to send invites and blasts." />}
         renderItem={({ item }) => {
-          const isSelected = selectedEventId === item.id;
+          const sel = selectedEventId === item.id;
           return (
             <TouchableOpacity
-              style={[styles.eventChip, isSelected && styles.eventChipSelected]}
-              onPress={async () => {
-                setSelectedEventId(item.id);
-                await fetchCommunications(item.id);
-              }}
+              style={[styles.eventChip, sel && styles.eventChipActive]}
+              onPress={async () => { setSelectedEventId(item.id); await fetchCommunications(item.id); }}
             >
-              <Text style={[styles.eventChipText, isSelected && styles.eventChipTextSelected]} numberOfLines={1}>
+              <Text style={[styles.eventChipText, sel && styles.eventChipTextActive]} numberOfLines={1}>
                 {item.title}
               </Text>
             </TouchableOpacity>
@@ -182,177 +139,171 @@ export const AnnouncementScreen = () => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <GlassCard style={styles.formCard} variant="primary">
-          <View style={styles.formHeader}>
-            <Send size={18} color={theme.colors.primaryLight} />
-            <Text style={styles.formTitle}>Blast Message</Text>
+        {/* === BLAST CARD === */}
+        <Card variant="primary" style={styles.formCard} noPadding>
+          <View style={styles.cardInner}>
+            <View style={styles.formHeader}>
+              <Send size={16} color={theme.colors.primary} />
+              <Text style={styles.formTitle}>Blast Message</Text>
+            </View>
+            <Input
+              label="Subject (optional)"
+              value={blastSubject}
+              onChangeText={setBlastSubject}
+              placeholder="Event update..."
+              containerStyle={styles.inputNoMargin}
+            />
+            <Input
+              label="Message *"
+              value={blastMessage}
+              onChangeText={setBlastMessage}
+              placeholder="Write a message for all registered attendees"
+              multiline
+              numberOfLines={4}
+            />
+            <Button
+              title="Send Blast"
+              onPress={handleSendBlast}
+              isLoading={isSubmittingBlast}
+              variant="primary"
+              size="md"
+              icon={<Send size={15} color={theme.colors.textOnPrimary} />}
+            />
           </View>
-          <FormInput label="Subject (Optional)" value={blastSubject} onChangeText={setBlastSubject} placeholder="Event update" />
-          <FormInput
-            label="Message"
-            value={blastMessage}
-            onChangeText={setBlastMessage}
-            placeholder="Write one message for all registered users"
-            multiline
-            numberOfLines={4}
-          />
-          <PrimaryButton title="Send Blast" onPress={handleSendBlast} isLoading={isSubmittingBlast} icon={<Send size={16} color={theme.colors.surface} />} />
-        </GlassCard>
+        </Card>
 
-        <GlassCard style={styles.formCard} variant="dark">
-          <View style={styles.formHeader}>
-            <MailPlus size={18} color={theme.colors.secondary} />
-            <Text style={styles.formTitle}>Invite Guest</Text>
+        {/* === INVITE CARD === */}
+        <Card variant="raised" style={styles.formCard} noPadding>
+          <View style={styles.cardInner}>
+            <View style={styles.formHeader}>
+              <MailPlus size={16} color={theme.colors.primaryLight} />
+              <Text style={styles.formTitle}>Invite Guest</Text>
+            </View>
+            <Input
+              label="Guest email *"
+              value={inviteEmail}
+              onChangeText={setInviteEmail}
+              placeholder="guest@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              containerStyle={styles.inputNoMargin}
+            />
+            <Input
+              label="Message (optional)"
+              value={inviteMessage}
+              onChangeText={setInviteMessage}
+              placeholder="Add a personal note..."
+              multiline
+              numberOfLines={3}
+            />
+            <Button
+              title="Send Invite"
+              onPress={handleInviteGuest}
+              isLoading={isSubmittingInvite}
+              variant="secondary"
+              size="md"
+              icon={<MailPlus size={15} color={theme.colors.text} />}
+            />
           </View>
-          <FormInput
-            label="Guest Email"
-            value={inviteEmail}
-            onChangeText={setInviteEmail}
-            placeholder="guest@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <FormInput
-            label="Message (Optional)"
-            value={inviteMessage}
-            onChangeText={setInviteMessage}
-            placeholder="Add a personal invitation note"
-            multiline
-            numberOfLines={3}
-          />
-          <PrimaryButton title="Send Invite" onPress={handleInviteGuest} isLoading={isSubmittingInvite} icon={<MailPlus size={16} color={theme.colors.surface} />} />
-        </GlassCard>
+        </Card>
 
-        <GlassCard style={styles.historyCard}>
-          <View style={styles.formHeader}>
-            <History size={18} color={theme.colors.accent} />
-            <Text style={styles.formTitle}>Communication History</Text>
-          </View>
+        {/* === HISTORY CARD === */}
+        <Card variant="raised" style={styles.formCard} noPadding>
+          <View style={styles.cardInner}>
+            <View style={styles.formHeader}>
+              <History size={16} color={theme.colors.textSecondary} />
+              <Text style={styles.formTitle}>History</Text>
+            </View>
 
-          {isLoadingHistory ? (
-            <Text style={styles.historyLoading}>Loading history...</Text>
-          ) : communications.length === 0 ? (
-            <EmptyState title="No History Yet" message="Invites, blasts, and in-app alerts will appear here." />
-          ) : (
-            communications.slice(0, 40).map((item) => (
-              <GlassCard key={item.id} style={styles.historyItem} variant="dark">
-                <View style={styles.historyMetaRow}>
-                  <Text style={styles.historyType}>{item.source === 'email_log' ? 'EMAIL_MOCK' : 'IN_APP'}</Text>
-                  <Text style={styles.historyTime}>{new Date(item.createdAt).toLocaleString()}</Text>
+            {isLoadingHistory ? (
+              <Text style={styles.historyLoading}>Loading history...</Text>
+            ) : communications.length === 0 ? (
+              <EmptyState title="No History" message="Invites and blasts will appear here." />
+            ) : (
+              communications.slice(0, 40).map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <View style={styles.historyMetaRow}>
+                    <View style={styles.typePill}>
+                      <Text style={styles.historyType}>
+                        {item.source === 'email_log' ? 'EMAIL' : 'IN-APP'}
+                      </Text>
+                    </View>
+                    <Text style={styles.historyTime}>
+                      {new Date(item.createdAt).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                      })}
+                    </Text>
+                  </View>
+                  <Text style={styles.historySubject}>{item.subject}</Text>
+                  <Text style={styles.historyRecipient}>
+                    → {item.recipientEmail || item.recipientUserId || 'All attendees'}
+                  </Text>
+                  <Text style={styles.historyMessage} numberOfLines={2}>{item.message}</Text>
+                  {item !== communications[communications.length - 1] && <View style={styles.divider} />}
                 </View>
-                <Text style={styles.historySubject}>{item.subject}</Text>
-                <Text style={styles.historyRecipient}>
-                  To: {item.recipientEmail || item.recipientUserId || 'Unknown recipient'}
-                </Text>
-                <Text style={styles.historyMessage}>{item.message}</Text>
-              </GlassCard>
-            ))
-          )}
-        </GlassCard>
+              ))
+            )}
+          </View>
+        </Card>
       </ScrollView>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 0,
-  },
-  header: {
-    paddingTop: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.s,
+  pageHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: theme.spacing.s,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.m,
   },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s },
+  pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   eventList: {
-    paddingHorizontal: theme.spacing.m,
-    paddingBottom: theme.spacing.s,
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: theme.spacing.m,
   },
   eventChip: {
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.m,
-    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.round,
+    paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.m,
     marginRight: theme.spacing.s,
-    maxWidth: 220,
-    justifyContent: 'center',
+    maxWidth: 200,
+    backgroundColor: theme.colors.surface,
   },
-  eventChipSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.glass,
-  },
-  eventChipText: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    fontWeight: '600',
-  },
-  eventChipTextSelected: {
-    color: theme.colors.primaryLight,
-  },
+  eventChipActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySubtle },
+  eventChipText: { ...theme.typography.caption, color: theme.colors.textMuted, fontWeight: '600' },
+  eventChipTextActive: { color: theme.colors.primary, fontWeight: '700' },
   scrollContent: {
-    paddingHorizontal: theme.spacing.m,
+    paddingHorizontal: theme.spacing.base,
     paddingBottom: theme.spacing.xxl,
   },
   formCard: {
+    borderRadius: theme.borderRadius.l,
     marginBottom: theme.spacing.m,
-    padding: theme.spacing.m,
+    overflow: 'hidden',
   },
+  cardInner: { padding: theme.spacing.m },
+  inputNoMargin: { marginBottom: 0 },
   formHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.s,
     marginBottom: theme.spacing.m,
   },
-  formTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
-  },
-  historyCard: {
-    marginBottom: theme.spacing.m,
-    padding: theme.spacing.m,
-  },
-  historyLoading: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-  },
-  historyItem: {
-    padding: theme.spacing.m,
-    marginBottom: theme.spacing.m,
-  },
-  historyMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  historyType: {
-    ...theme.typography.small,
-    color: theme.colors.primaryLight,
-    fontWeight: '700',
-  },
-  historyTime: {
-    ...theme.typography.small,
-    color: theme.colors.textMuted,
-  },
-  historySubject: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  historyRecipient: {
-    ...theme.typography.caption,
-    color: theme.colors.secondary,
-    marginBottom: 6,
-  },
-  historyMessage: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-  },
+  formTitle: { ...theme.typography.h3, color: theme.colors.text },
+  historyLoading: { ...theme.typography.caption, color: theme.colors.textMuted },
+  historyItem: { paddingVertical: theme.spacing.sm },
+  historyMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  typePill: { backgroundColor: theme.colors.primarySubtle, borderRadius: theme.borderRadius.xs, paddingHorizontal: 6, paddingVertical: 2 },
+  historyType: { ...theme.typography.overline, color: theme.colors.primary },
+  historyTime: { ...theme.typography.caption, color: theme.colors.textMuted },
+  historySubject: { ...theme.typography.bodyMedium, color: theme.colors.text, marginBottom: 2 },
+  historyRecipient: { ...theme.typography.caption, color: theme.colors.primaryLight, marginBottom: 4 },
+  historyMessage: { ...theme.typography.caption, color: theme.colors.textMuted },
+  divider: { height: 1, backgroundColor: theme.colors.border, marginTop: theme.spacing.sm },
 });

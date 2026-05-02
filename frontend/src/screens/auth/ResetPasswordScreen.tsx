@@ -10,10 +10,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, PrimaryButton, FormInput, GlassCard, IconButton } from '../../components';
-import { theme } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Key, Lock } from 'lucide-react-native';
+import { AuthStackParamList } from '../../types/navigation';
+import { Input, Button, IconButton } from '../../components';
+import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -38,12 +39,10 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
       Alert.alert('Validation', 'Please enter the reset token.');
       return;
     }
-
     if (newPassword.length < 6) {
       Alert.alert('Validation', 'New password must be at least 6 characters long.');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       Alert.alert('Validation', 'Password confirmation does not match.');
       return;
@@ -51,17 +50,9 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       setIsLoading(true);
-
-      await AuthService.resetPassword({
-        token: token.trim(),
-        newPassword,
-      });
-
+      await AuthService.resetPassword({ token: token.trim(), newPassword });
       Alert.alert('Success', 'Password reset complete. Please sign in with your new password.', [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('Login'),
-        },
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
     } catch (error: any) {
       Alert.alert('Reset Failed', getApiErrorMessage(error, 'Unable to reset password.'));
@@ -71,83 +62,100 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={styles.container}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <IconButton 
-            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
-            onPress={() => navigation.goBack()} 
-            variant="ghost" 
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={22} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={40}
           />
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
-            contentContainerStyle={styles.content}
+            contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.title}>Reset Password</Text>
-            <Text style={styles.subtitle}>Use your reset token to set a new password.</Text>
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>Reset password</Text>
+              <Text style={styles.subtitle}>
+                Paste your reset token and choose a new password.
+              </Text>
+              {prefetchedEmail && (
+                <Text style={styles.prefillText}>For: {prefetchedEmail}</Text>
+              )}
+            </View>
 
-            {prefetchedEmail ? <Text style={styles.prefillText}>Email: {prefetchedEmail}</Text> : null}
-
-            <GlassCard style={styles.card} variant="dark" animateEntrance>
-              <FormInput
-                label="Reset Token"
-                placeholder="Paste the reset token"
-                autoCapitalize="none"
-                value={token}
-                onChangeText={setToken}
-                leftIcon={<Key size={20} color={theme.colors.textMuted} />}
-              />
-
-              <FormInput
-                label="New Password"
-                placeholder="Enter new password"
-                isPassword
-                value={newPassword}
-                onChangeText={setNewPassword}
-                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
-              />
-
-              <FormInput
-                label="Confirm New Password"
-                placeholder="Re-enter new password"
-                isPassword
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
-              />
-
-              <PrimaryButton
-                title="Reset Password"
-                onPress={handleResetPassword}
-                isLoading={isLoading}
-                style={styles.button}
-              />
-            </GlassCard>
+            <Input
+              label="Reset token"
+              placeholder="Paste the reset token"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={token}
+              onChangeText={setToken}
+              leftIcon={<Key size={18} color={theme.colors.textMuted} />}
+            />
+            <Input
+              label="New password"
+              placeholder="At least 6 characters"
+              isPassword
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+            />
+            <Input
+              label="Confirm new password"
+              placeholder="Re-enter your new password"
+              isPassword
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+            />
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <View style={styles.bottomZone}>
+          <Button
+            title="Reset Password"
+            onPress={handleResetPassword}
+            isLoading={isLoading}
+            variant="primary"
+            size="lg"
+          />
+        </View>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  root: { flex: 1, backgroundColor: theme.colors.background },
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
   header: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    alignItems: 'flex-start',
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.s,
   },
-  content: {
+  scrollContent: {
     flexGrow: 1,
-    padding: theme.spacing.xl,
-    justifyContent: 'center',
-    paddingBottom: theme.spacing.xxxl,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.xl,
+  },
+  titleSection: {
+    marginBottom: theme.spacing.xl,
   },
   title: {
     ...theme.typography.h1,
@@ -156,18 +164,17 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.m,
+    color: theme.colors.textSecondary,
+    lineHeight: 24,
   },
   prefillText: {
-    ...theme.typography.caption,
+    ...theme.typography.label,
     color: theme.colors.textMuted,
-    marginBottom: theme.spacing.l,
-  },
-  card: {
-    padding: theme.spacing.xl,
-  },
-  button: {
     marginTop: theme.spacing.s,
+  },
+  bottomZone: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: theme.spacing.l,
+    paddingTop: theme.spacing.m,
   },
 });

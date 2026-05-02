@@ -11,12 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, PrimaryButton, FormInput, GlassCard, IconButton } from '../../components';
+import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
-import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
@@ -60,7 +61,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       await login(resolvedUser, token);
-      
     } catch (error: any) {
       Alert.alert('Login Failed', getApiErrorMessage(error, 'Unable to sign in. Please try again.'));
     } finally {
@@ -69,40 +69,51 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={styles.container}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        {/* Header */}
         <View style={styles.header}>
-          <IconButton 
-            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
-            onPress={() => navigation.goBack()} 
-            variant="ghost" 
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={22} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={40}
           />
         </View>
 
         <KeyboardAvoidingView
-          style={styles.keyboardContainer}
+          style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
-            contentContainerStyle={styles.content}
+            contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to access your account</Text>
+            {/* Title */}
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>Welcome back</Text>
+              <Text style={styles.subtitle}>Sign in to your account</Text>
+            </View>
 
-            <GlassCard style={styles.card} variant="dark" animateEntrance>
-              <FormInput
-                label="Email Address"
+            {/* Form */}
+            <View style={styles.form}>
+              <Input
+                label="Email address"
                 placeholder="name@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
                 value={email}
                 onChangeText={setEmail}
-                leftIcon={<Mail size={20} color={theme.colors.textMuted} />}
+                leftIcon={<Mail size={18} color={theme.colors.textMuted} />}
               />
-
-              <FormInput
+              <Input
                 label="Password"
                 placeholder="Enter your password"
                 isPassword
@@ -113,88 +124,102 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 returnKeyType="done"
                 value={password}
                 onChangeText={setPassword}
-                leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+                leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
               />
-
-              <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
-
-              <PrimaryButton
-                title="Sign In"
-                onPress={handleLogin}
-                isLoading={isLoading}
-                style={styles.button}
-              />
-            </GlassCard>
-
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                <Text style={styles.footerLink}>Sign Up</Text>
+              <TouchableOpacity
+                style={styles.forgotBtn}
+                onPress={() => navigation.navigate('ForgotPassword')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {/* Sticky bottom CTA */}
+        <View style={styles.bottomZone}>
+          <Button
+            title="Sign In"
+            onPress={handleLogin}
+            isLoading={isLoading}
+            variant="primary"
+            size="lg"
+          />
+          <View style={styles.footerRow}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+              <Text style={styles.footerLink}>Sign up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  flex: {
     flex: 1,
   },
   header: {
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-    alignItems: 'flex-start',
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.s,
   },
-  keyboardContainer: {
-    flex: 1,
-  },
-  content: {
+  scrollContent: {
     flexGrow: 1,
-    padding: theme.spacing.xl,
-    justifyContent: 'center',
-    paddingBottom: theme.spacing.xxxl,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.xl,
+  },
+  titleSection: {
+    marginBottom: theme.spacing.xl,
   },
   title: {
     ...theme.typography.h1,
     color: theme.colors.text,
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
     ...theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xl,
+    color: theme.colors.textSecondary,
   },
-  card: {
-    padding: theme.spacing.xl,
+  form: {
+    // No wrapper card — inputs float on the background
   },
-  forgotPassword: {
+  forgotBtn: {
     alignSelf: 'flex-end',
-    marginBottom: theme.spacing.xl,
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.s,
   },
-  forgotPasswordText: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
+  forgotText: {
+    ...theme.typography.label,
+    color: theme.colors.primary,
   },
-  button: {
-    marginTop: theme.spacing.s,
+  bottomZone: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: theme.spacing.l,
+    paddingTop: theme.spacing.m,
+    gap: theme.spacing.m,
   },
-  footer: {
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: theme.spacing.xl,
+    alignItems: 'center',
   },
   footerText: {
     ...theme.typography.body,
     color: theme.colors.textMuted,
   },
   footerLink: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-    fontWeight: '700',
+    ...theme.typography.bodyMedium,
+    color: theme.colors.primary,
   },
 });

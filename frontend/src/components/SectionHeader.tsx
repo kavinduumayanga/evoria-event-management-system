@@ -1,31 +1,48 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import { theme } from '../constants/theme';
-import { ChevronRight } from 'lucide-react-native';
+
+// ============================================================
+// SECTION HEADER — Luma-style section labels
+//
+// Uses warm amber color for section labels with optional divider
+// ============================================================
 
 interface SectionHeaderProps {
   title: string;
-  actionText?: string;
-  onActionPress?: () => void;
+  action?: {
+    label: string;
+    onPress: () => void;
+  };
   style?: StyleProp<ViewStyle>;
+  variant?: 'default' | 'amber' | 'subtle';
+  showDivider?: boolean;
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({
   title,
-  actionText,
-  onActionPress,
-  style
+  action,
+  style,
+  variant = 'default',
+  showDivider = false,
 }) => {
+  const titleColor = variant === 'amber'
+    ? theme.colors.sectionLabel
+    : variant === 'subtle'
+    ? theme.colors.textSecondary
+    : theme.colors.text;
+
   return (
-    <View style={[styles.container, style]}>
-      <Text style={styles.title}>{title}</Text>
-      
-      {actionText && onActionPress && (
-        <TouchableOpacity style={styles.actionButton} onPress={onActionPress}>
-          <Text style={styles.actionText}>{actionText}</Text>
-          <ChevronRight size={16} color={theme.colors.secondary} />
-        </TouchableOpacity>
-      )}
+    <View style={style}>
+      {showDivider && <View style={styles.divider} />}
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
+        {action && (
+          <TouchableOpacity onPress={action.onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.action}>{action.label}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -35,19 +52,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginBottom: theme.spacing.m,
   },
   title: {
-    ...theme.typography.h2,
+    ...theme.typography.h3,
     color: theme.colors.text,
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionText: {
-    ...theme.typography.button,
-    color: theme.colors.secondary,
-    marginRight: 4,
+  action: {
+    ...theme.typography.label,
+    color: theme.colors.primary,
   },
 });

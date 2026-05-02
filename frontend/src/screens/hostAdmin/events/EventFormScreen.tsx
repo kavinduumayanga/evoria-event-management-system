@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } fr
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, FormInput, PrimaryButton, SecondaryButton, LoadingState, GlassCard, IconButton } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, Card, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft, Plus, X, Upload, HelpCircle, Ticket, MapPin, Tag } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -334,24 +334,26 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <View style={styles.form}>
         {isEditing && (
-          <GlassCard style={styles.statusCard}>
-            <Text style={styles.statusLabel}>Current Status:</Text>
-            <Text
-              style={[
-                styles.statusValue,
-                status === 'published' && { color: theme.colors.success },
-                status === 'draft' && { color: theme.colors.warning },
-                status === 'cancelled' && { color: theme.colors.error },
-              ]}
-            >
-              {status.toUpperCase()}
-            </Text>
-            {status === 'cancelled' && <Text style={styles.warningText}>Cancelled events cannot be edited.</Text>}
-          </GlassCard>
+          <Card variant="raised" style={styles.statusCard} noPadding>
+            <View style={styles.statusCardInner}>
+              <Text style={styles.statusLabel}>Current Status:</Text>
+              <Text
+                style={[
+                  styles.statusValue,
+                  status === 'published' && { color: theme.colors.success },
+                  status === 'draft' && { color: theme.colors.warning },
+                  status === 'cancelled' && { color: theme.colors.error },
+                ]}
+              >
+                {status.toUpperCase()}
+              </Text>
+              {status === 'cancelled' && <Text style={styles.warningText}>Cancelled events cannot be edited.</Text>}
+            </View>
+          </Card>
         )}
 
-        <FormInput label="Event Title *" value={title} onChangeText={setTitle} placeholder="Annual Tech Meetup" />
-        <FormInput
+        <Input label="Event Title *" value={title} onChangeText={setTitle} placeholder="Annual Tech Meetup" />
+        <Input
           label="Description *"
           value={description}
           onChangeText={setDescription}
@@ -362,34 +364,34 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <FormInput label="Date (ISO) *" value={date} onChangeText={setDate} placeholder="2026-10-15" />
+            <Input label="Date (ISO) *" value={date} onChangeText={setDate} placeholder="2026-10-15" />
           </View>
           <View style={styles.flexHalf}>
-            <FormInput label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="100" keyboardType="numeric" />
-          </View>
-        </View>
-
-        <View style={styles.row}>
-          <View style={styles.flexHalf}>
-            <FormInput label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
-          </View>
-          <View style={styles.flexHalf}>
-            <FormInput label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
+            <Input label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="100" keyboardType="numeric" />
           </View>
         </View>
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <FormInput label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" />
+            <Input label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
           </View>
           <View style={styles.flexHalf}>
-            <FormInput label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="17:00" />
+            <Input label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.flexHalf}>
+            <Input label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" />
+          </View>
+          <View style={styles.flexHalf}>
+            <Input label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="17:00" />
           </View>
         </View>
 
         <View style={styles.segmentedControlSection}>
           <Text style={styles.label}>Event Type *</Text>
-          <GlassCard style={styles.segmentedControlContainer}>
+          <Card variant="raised" style={styles.segmentedControlContainer}>
             {eventTypes.map((eventType) => (
               <TouchableOpacity
                 key={eventType}
@@ -404,12 +406,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Text>
               </TouchableOpacity>
             ))}
-          </GlassCard>
+          </Card>
         </View>
 
         <View style={styles.segmentedControlSection}>
           <Text style={styles.label}>Pricing Mode *</Text>
-          <GlassCard style={styles.segmentedControlContainer}>
+          <Card variant="raised" style={styles.segmentedControlContainer}>
             {pricingModes.map((modeOption) => (
               <TouchableOpacity
                 key={modeOption}
@@ -421,7 +423,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Text>
               </TouchableOpacity>
             ))}
-          </GlassCard>
+          </Card>
         </View>
 
         <Text style={styles.label}>{requiresVenue ? 'Select Venue *' : 'Select Venue (Optional)'}</Text>
@@ -454,7 +456,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.segmentedControlSection}>
           <Text style={styles.label}>Visibility *</Text>
-          <GlassCard style={styles.segmentedControlContainer}>
+          <Card variant="raised" style={styles.segmentedControlContainer}>
             {visibilityOptions.map((option) => (
               <TouchableOpacity
                 key={option}
@@ -466,7 +468,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Text>
               </TouchableOpacity>
             ))}
-          </GlassCard>
+          </Card>
         </View>
 
         <Text style={styles.label}>Event Photo</Text>
@@ -481,13 +483,13 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.coverPlaceholderText}>No event photo selected</Text>
           </View>
         )}
-        <SecondaryButton
+        <Button variant="secondary"
           title={isUploadingImage ? 'Uploading Image...' : 'Upload Event Photo'}
           onPress={handleUploadEventImage}
           icon={!isUploadingImage ? <Upload size={16} color={theme.colors.text} /> : undefined}
           style={styles.uploadButton}
         />
-        <FormInput
+        <Input
           label="Cover Image URL (Optional)"
           value={coverImage}
           onChangeText={setCoverImage}
@@ -495,8 +497,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         />
 
         <Text style={styles.sectionTitle}>Contact Details</Text>
-        <FormInput label="Contact Name" value={contactName} onChangeText={setContactName} placeholder="Event support team" />
-        <FormInput
+        <Input label="Contact Name" value={contactName} onChangeText={setContactName} placeholder="Event support team" />
+        <Input
           label="Contact Email"
           value={contactEmail}
           onChangeText={setContactEmail}
@@ -504,17 +506,17 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           autoCapitalize="none"
           keyboardType="email-address"
         />
-        <FormInput label="Contact Phone" value={contactPhone} onChangeText={setContactPhone} placeholder="+94 77 123 4567" />
+        <Input label="Contact Phone" value={contactPhone} onChangeText={setContactPhone} placeholder="+94 77 123 4567" />
 
         <Text style={styles.sectionTitle}>Branding Colors (Optional)</Text>
-        <FormInput
+        <Input
           label="Primary Color"
           value={brandingPrimaryColor}
           onChangeText={setBrandingPrimaryColor}
           placeholder="#22D3EE"
           autoCapitalize="characters"
         />
-        <FormInput
+        <Input
           label="Accent Color"
           value={brandingAccentColor}
           onChangeText={setBrandingAccentColor}
@@ -526,7 +528,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={[styles.colorSwatch, { backgroundColor: isValidHexColor(brandingAccentColor) && brandingAccentColor.trim() ? brandingAccentColor.trim() : theme.colors.surfaceLight }]} />
         </View>
 
-        <FormInput
+        <Input
           label="Tags (comma-separated)"
           value={tagsInput}
           onChangeText={setTagsInput}
@@ -534,7 +536,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           leftIcon={<Tag size={16} color={theme.colors.textMuted} />}
         />
         {(type === 'online' || type === 'hybrid') && (
-          <FormInput
+          <Input
             label={`Meeting Link (${type === 'hybrid' ? 'Hybrid' : 'Online'}) *`}
             value={meetingLink}
             onChangeText={setMeetingLink}
@@ -544,7 +546,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.segmentedControlSection}>
           <Text style={styles.label}>Requires Host Approval *</Text>
-          <GlassCard style={styles.segmentedControlContainer}>
+          <Card variant="raised" style={styles.segmentedControlContainer}>
             {[true, false].map((option) => (
               <TouchableOpacity
                 key={option ? 'approval-on' : 'approval-off'}
@@ -556,12 +558,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Text>
               </TouchableOpacity>
             ))}
-          </GlassCard>
+          </Card>
         </View>
 
         <View style={styles.segmentedControlSection}>
           <Text style={styles.label}>Priority Access Enabled *</Text>
-          <GlassCard style={styles.segmentedControlContainer}>
+          <Card variant="raised" style={styles.segmentedControlContainer}>
             {[true, false].map((option) => (
               <TouchableOpacity
                 key={option ? 'priority-on' : 'priority-off'}
@@ -573,12 +575,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Text>
               </TouchableOpacity>
             ))}
-          </GlassCard>
+          </Card>
         </View>
 
         <Text style={styles.sectionTitle}>Custom Questions (Optional)</Text>
-        <GlassCard style={styles.customQuestionsCard}>
-          <FormInput
+        <Card variant="raised" style={styles.customQuestionsCard}>
+          <Input
             label="Question"
             value={questionDraft}
             onChangeText={setQuestionDraft}
@@ -588,7 +590,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.row}>
             <View style={styles.segmentedControlSection}>
               <Text style={styles.label}>Type</Text>
-              <GlassCard style={styles.segmentedControlContainer}>
+              <Card variant="raised" style={styles.segmentedControlContainer}>
                 {customQuestionTypes.map((typeOption) => (
                   <TouchableOpacity
                     key={typeOption}
@@ -600,13 +602,13 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </GlassCard>
+              </Card>
             </View>
           </View>
           <View style={styles.row}>
             <View style={styles.segmentedControlSection}>
               <Text style={styles.label}>Required?</Text>
-              <GlassCard style={styles.segmentedControlContainer}>
+              <Card variant="raised" style={styles.segmentedControlContainer}>
                 {[true, false].map((requiredOption) => (
                   <TouchableOpacity
                     key={requiredOption ? 'required-yes' : 'required-no'}
@@ -618,14 +620,14 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </GlassCard>
+              </Card>
             </View>
           </View>
-          <SecondaryButton title="Add Question" onPress={addCustomQuestion} icon={<Plus size={16} color={theme.colors.text} />} />
-        </GlassCard>
+          <Button variant="secondary" title="Add Question" onPress={addCustomQuestion} icon={<Plus size={16} color={theme.colors.text} />} />
+        </Card>
 
         {customQuestions.map((customQuestion) => (
-          <GlassCard key={customQuestion.id} style={styles.questionRow}>
+          <Card variant="raised" key={customQuestion.id} style={styles.questionRow}>
             <View style={styles.questionInfo}>
               <Text style={styles.questionText}>{customQuestion.question}</Text>
               <Text style={styles.questionMeta}>
@@ -635,12 +637,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             <IconButton
               icon={<X size={14} color={theme.colors.error} />}
               onPress={() => setCustomQuestions((previous) => previous.filter((item) => item.id !== customQuestion.id))}
-              variant="outline"
+              variant="ghost"
             />
-          </GlassCard>
+          </Card>
         ))}
 
-        <PrimaryButton
+        <Button variant="primary"
           title={isEditing ? 'Save Changes' : 'Create Event'}
           onPress={handleSave}
           isLoading={isSaving}
@@ -751,8 +753,12 @@ const styles = StyleSheet.create({
   },
   saveButton: { marginTop: theme.spacing.xl, marginBottom: theme.spacing.xxl },
   statusCard: {
-    padding: theme.spacing.m,
+    borderRadius: theme.borderRadius.l,
+    overflow: 'hidden',
     marginBottom: theme.spacing.l,
+  },
+  statusCardInner: {
+    padding: theme.spacing.m,
     alignItems: 'flex-start',
   },
   statusLabel: { ...theme.typography.caption, color: theme.colors.textMuted, marginRight: theme.spacing.s },

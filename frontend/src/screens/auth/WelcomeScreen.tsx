@@ -1,9 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  Dimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AuthStackParamList } from '../../types/navigation';
-import { GradientBackground, PrimaryButton, SecondaryButton } from '../../components';
+import { Button } from '../../components';
 import { theme } from '../../constants/theme';
 
 type WelcomeScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Welcome'>;
@@ -12,119 +19,205 @@ interface Props {
   navigation: WelcomeScreenNavigationProp;
 }
 
+const { width, height } = Dimensions.get('window');
+
 export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
-  const logoAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
+  const orb1Anim = useRef(new Animated.Value(0)).current;
+  const orb2Anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.spring(logoAnim, {
-      toValue: 1,
-      tension: 10,
-      friction: 4,
-      useNativeDriver: true,
-    }).start();
-  }, [logoAnim]);
+    // Staggered entrance
+    Animated.sequence([
+      Animated.delay(100),
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Ambient orb pulse
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(orb1Anim, { toValue: 1, duration: 3000, useNativeDriver: true }),
+        Animated.timing(orb1Anim, { toValue: 0, duration: 3000, useNativeDriver: true }),
+      ])
+    ).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(1500),
+        Animated.timing(orb2Anim, { toValue: 1, duration: 3000, useNativeDriver: true }),
+        Animated.timing(orb2Anim, { toValue: 0, duration: 3000, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
-          <View style={styles.logoContainer}>
-            <Animated.View 
-              style={[
-                styles.logoPlaceholder,
-                {
-                  opacity: logoAnim,
-                  transform: [{ scale: logoAnim }]
-                }
-              ]}
-            >
-              <Text style={styles.logoText}>EVORIA</Text>
-            </Animated.View>
+    <View style={styles.root}>
+      {/* Background gradient */}
+      <LinearGradient
+        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Ambient orbs */}
+      <Animated.View
+        style={[
+          styles.orb,
+          styles.orb1,
+          {
+            opacity: orb1Anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.55] }),
+            transform: [{ scale: orb1Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          styles.orb2,
+          {
+            opacity: orb2Anim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.35] }),
+            transform: [{ scale: orb2Anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }) }],
+          },
+        ]}
+      />
+
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        {/* Hero Zone */}
+        <Animated.View
+          style={[
+            styles.heroZone,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          {/* Wordmark */}
+          <View style={styles.wordmarkContainer}>
+            <Text style={styles.wordmark}>EVORIA</Text>
+            <View style={styles.wordmarkBar} />
           </View>
-          
-          <View style={styles.textContainer}>
-            <Text style={styles.title}>The New Standard for Events</Text>
-            <Text style={styles.subtitle}>
-              Discover curated experiences, seamlessly manage registrations, and elevate your events.
-            </Text>
-          </View>
-          
-          <View style={styles.buttonContainer}>
-            <PrimaryButton 
-              title="Sign In" 
-              onPress={() => navigation.navigate('Login')}
-              style={styles.button}
-            />
-            <SecondaryButton 
-              title="Create an Account" 
-              onPress={() => navigation.navigate('Register')}
-              style={styles.button}
-            />
-          </View>
-        </View>
+
+          {/* Tagline */}
+          <Text style={styles.tagline}>The platform for experiences{'\n'}worth remembering.</Text>
+        </Animated.View>
+
+        {/* Social Proof */}
+        <Animated.View style={[styles.proofZone, { opacity: fadeAnim }]}>
+          <Text style={styles.proof}>Trusted by event creators worldwide</Text>
+        </Animated.View>
+
+        {/* Action Zone */}
+        <Animated.View
+          style={[
+            styles.actionZone,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <Button
+            title="Get Started"
+            onPress={() => navigation.navigate('Register')}
+            variant="primary"
+            size="lg"
+          />
+          <Button
+            title="Sign In"
+            onPress={() => navigation.navigate('Login')}
+            variant="ghost"
+            size="lg"
+            style={styles.signInBtn}
+          />
+        </Animated.View>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
-const { width } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+  },
+  orb1: {
+    width: width * 0.8,
+    height: width * 0.8,
+    backgroundColor: theme.colors.primary,
+    top: height * 0.05,
+    left: -width * 0.2,
+    opacity: 0.4,
+  },
+  orb2: {
+    width: width * 0.6,
+    height: width * 0.6,
+    backgroundColor: theme.colors.accent,
+    bottom: height * 0.1,
+    right: -width * 0.2,
+    opacity: 0.2,
+  },
   container: {
     flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.base,
     justifyContent: 'space-between',
   },
-  logoContainer: {
-    flex: 2,
+
+  // Hero
+  heroZone: {
+    flex: 3,
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingTop: theme.spacing.xxl,
   },
-  logoPlaceholder: {
-    width: width * 0.45,
-    height: width * 0.45,
-    borderRadius: theme.borderRadius.round,
-    backgroundColor: theme.colors.glass,
-    borderWidth: 1,
-    borderColor: theme.colors.glassBorder,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.glow,
+  wordmarkContainer: {
+    marginBottom: theme.spacing.l,
   },
-  logoText: {
-    ...theme.typography.h2,
+  wordmark: {
+    ...theme.typography.display,
     color: theme.colors.text,
-    letterSpacing: 4,
+    letterSpacing: 6,
     fontWeight: '800',
   },
-  textContainer: {
+  wordmarkBar: {
+    marginTop: 8,
+    width: 48,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: theme.colors.primary,
+  },
+  tagline: {
+    ...theme.typography.h2,
+    color: theme.colors.textSecondary,
+    lineHeight: 34,
+  },
+
+  // Proof
+  proofZone: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-    textAlign: 'center',
-    marginBottom: theme.spacing.m,
-  },
-  subtitle: {
-    ...theme.typography.body,
+  proof: {
+    ...theme.typography.label,
     color: theme.colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: theme.spacing.m,
+    letterSpacing: 0.5,
   },
-  buttonContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    gap: theme.spacing.m,
+
+  // Actions
+  actionZone: {
     paddingBottom: theme.spacing.xl,
+    gap: theme.spacing.sm,
   },
-  button: {
-    width: '100%',
+  signInBtn: {
+    marginTop: 4,
   },
 });

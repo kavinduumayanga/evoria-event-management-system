@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, FormInput, PrimaryButton, LoadingState } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { SessionService } from '../../../api/services';
@@ -98,60 +98,65 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) return <LoadingState />;
 
   return (
-    <ScreenContainer scrollable style={styles.container}>
+    <ScreenContainer scrollable>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={theme.colors.text} size={24} />
-        </TouchableOpacity>
-        <Text style={styles.title}>{isEditing ? 'Edit Session' : 'Create Session'}</Text>
+        <IconButton
+          icon={<ArrowLeft size={20} color={theme.colors.text} />}
+          onPress={() => navigation.goBack()}
+          variant="surface"
+          size={36}
+        />
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Session' : 'Create Session'}</Text>
       </View>
 
       <View style={styles.form}>
-        <FormInput label="Session Title *" value={title} onChangeText={setTitle} placeholder="Keynote Speech" />
-        <FormInput label="Description" value={description} onChangeText={setDescription} placeholder="Brief topic overview" />
-        <FormInput label="Speaker Name" value={speakerName} onChangeText={setSpeakerName} placeholder="Jane Doe" />
-        
-        <View style={styles.row}>
-          <View style={styles.flexHalf}><FormInput label="Date *" value={sessionDate} onChangeText={setSessionDate} placeholder="YYYY-MM-DD" /></View>
-        </View>
+        <Input label="Session title *" value={title} onChangeText={setTitle} placeholder="Keynote Speech" />
+        <Input label="Description" value={description} onChangeText={setDescription} placeholder="Brief topic overview" />
+        <Input label="Speaker name" value={speakerName} onChangeText={setSpeakerName} placeholder="Jane Doe" />
+        <Input label="Date *" value={sessionDate} onChangeText={setSessionDate} placeholder="YYYY-MM-DD" />
 
         <View style={styles.row}>
-          <View style={styles.flexHalf}><FormInput label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" /></View>
-          <View style={styles.flexHalf}><FormInput label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="10:00" /></View>
+          <View style={styles.flexHalf}><Input label="Start time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" /></View>
+          <View style={styles.flexHalf}><Input label="End time *" value={endTime} onChangeText={setEndTime} placeholder="10:00" /></View>
         </View>
 
-        <Text style={styles.label}>Status</Text>
-        <View style={styles.selectorContainer}>
-          {(['scheduled', 'cancelled', 'completed'] as SessionStatus[]).map(s => (
-            <TouchableOpacity 
+        <Text style={styles.fieldLabel}>Status</Text>
+        <View style={styles.chipGroup}>
+          {(['scheduled', 'cancelled', 'completed'] as SessionStatus[]).map((s) => (
+            <TouchableOpacity
               key={s}
-              style={[styles.chip, status === s && styles.chipSelected]}
+              style={[styles.chip, status === s && styles.chipActive]}
               onPress={() => setStatus(s)}
             >
-              <Text style={[styles.chipText, status === s && styles.chipTextSelected]}>{s.toUpperCase()}</Text>
+              <Text style={[styles.chipText, status === s && styles.chipTextActive]}>{s}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <PrimaryButton title={isEditing ? 'Save Changes' : 'Create Session'} onPress={handleSave} isLoading={isSaving} style={styles.saveButton} />
+        <Button
+          title={isEditing ? 'Save Changes' : 'Create Session'}
+          onPress={handleSave}
+          isLoading={isSaving}
+          variant="primary"
+          size="lg"
+          style={styles.saveBtn}
+        />
       </View>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: theme.spacing.m },
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: theme.spacing.xl, marginBottom: theme.spacing.xl },
-  backButton: { marginRight: theme.spacing.m },
-  title: { ...theme.typography.h1, color: theme.colors.text },
-  form: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.m, paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.xl, marginBottom: theme.spacing.xl },
+  headerTitle: { ...theme.typography.h1, color: theme.colors.text },
+  form: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl },
   row: { flexDirection: 'row', gap: theme.spacing.m },
   flexHalf: { flex: 1 },
-  label: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: theme.spacing.xs, marginLeft: 4, marginTop: theme.spacing.s },
-  selectorContainer: { flexDirection: 'row', marginBottom: theme.spacing.m, gap: theme.spacing.xs, backgroundColor: theme.colors.surfaceLight, padding: 4, borderRadius: theme.borderRadius.m },
-  chip: { flex: 1, paddingVertical: theme.spacing.m, borderRadius: theme.borderRadius.m, alignItems: 'center' },
-  chipSelected: { backgroundColor: theme.colors.glass },
-  chipText: { ...theme.typography.body, color: theme.colors.textMuted },
-  chipTextSelected: { color: theme.colors.primary, fontWeight: 'bold' },
-  saveButton: { marginTop: theme.spacing.xl, marginBottom: theme.spacing.xxl },
+  fieldLabel: { ...theme.typography.label, color: theme.colors.textMuted, marginBottom: theme.spacing.s, marginTop: theme.spacing.xs },
+  chipGroup: { flexDirection: 'row', gap: theme.spacing.s, marginBottom: theme.spacing.xl },
+  chip: { flex: 1, paddingVertical: 10, borderRadius: theme.borderRadius.m, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  chipActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySubtle },
+  chipText: { ...theme.typography.caption, color: theme.colors.textMuted, textTransform: 'capitalize' },
+  chipTextActive: { color: theme.colors.primary, fontWeight: '700' },
+  saveBtn: { marginTop: theme.spacing.m },
 });

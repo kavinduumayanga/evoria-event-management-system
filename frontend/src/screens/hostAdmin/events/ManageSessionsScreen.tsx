@@ -1,14 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, GlassCard, LoadingState, ErrorState, EmptyState } from '../../../components';
+import {
+  ScreenContainer, Card, LoadingState, ErrorState, EmptyState,
+  IconButton, StatusBadge, Button,
+} from '../../../components';
 import { theme } from '../../../constants/theme';
-import { Plus, Edit2, Trash2, ArrowLeft, Layers } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, ArrowLeft, Layers, Clock, User as UserIcon } from 'lucide-react-native';
 import { SessionService } from '../../../api/services';
 import { Session } from '../../../types';
-import { useFocusEffect } from '@react-navigation/native';
 
 type ManageSessionsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageSessions'>;
 type ManageSessionsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageSessions'>;
@@ -17,6 +19,12 @@ interface Props {
   navigation: ManageSessionsNavigationProp;
   route: ManageSessionsRouteProp;
 }
+
+const SESSION_STATUS: Record<string, any> = {
+  scheduled: 'info',
+  completed: 'success',
+  cancelled: 'error',
+};
 
 export const ManageSessionsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { eventId } = route.params;
@@ -30,41 +38,25 @@ export const ManageSessionsScreen: React.FC<Props> = ({ navigation, route }) => 
       setError(null);
       const res = await SessionService.getEventSessions(eventId);
       setSessions(res.data.sessions);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load sessions');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
+    } catch { setError('Failed to load sessions'); }
+    finally { setIsLoading(false); setIsRefreshing(false); }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchSessions();
-    }, [eventId])
-  );
-
-  const onRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    fetchSessions();
-  }, []);
+  useFocusEffect(useCallback(() => { fetchSessions(); }, [eventId]));
+  const onRefresh = useCallback(() => { setIsRefreshing(true); fetchSessions(); }, []);
 
   const handleDelete = (id: string) => {
     Alert.alert('Delete Session', 'Are you sure you want to delete this session?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
-        style: 'destructive',
+        text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
             await SessionService.deleteSession(id);
-            setSessions(prev => prev.filter(s => s.id !== id));
-          } catch (error) {
-            Alert.alert('Error', 'Failed to delete session');
-          }
-        }
-      }
+            setSessions((prev) => prev.filter((s) => s.id !== id));
+          } catch { Alert.alert('Error', 'Failed to delete session'); }
+        },
+      },
     ]);
   };
 
@@ -72,70 +64,103 @@ export const ManageSessionsScreen: React.FC<Props> = ({ navigation, route }) => 
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchSessions} /></ScreenContainer>;
 
   return (
-    <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Agenda</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.createButton}
-          onPress={() => navigation.navigate('SessionForm', { eventId })}
-        >
-          <Plus size={20} color={theme.colors.text} />
-        </TouchableOpacity>
-      </View>
-
+    <ScreenContainer>
       <FlatList
         data={sessions}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <GlassCard style={styles.sessionCard}>
-            <View style={styles.sessionInfo}>
-              <View style={styles.sessionTitleRow}>
-                <Layers size={18} color={theme.colors.primaryLight} />
-                <Text style={styles.sessionName}>{item.title}</Text>
-              </View>
-              <Text style={styles.sessionDetail}>{item.startTime} - {item.endTime}</Text>
-              {item.speakerName && <Text style={styles.sessionSpeaker}>Speaker: {item.speakerName}</Text>}
-            </View>
-            <View style={styles.actions}>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('SessionForm', { eventId, sessionId: item.id })}>
-                <Edit2 size={18} color={theme.colors.secondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item.id)}>
-                <Trash2 size={18} color={theme.colors.error} />
-              </TouchableOpacity>
-            </View>
-          </GlassCard>
-        )}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
         }
-        ListEmptyComponent={<EmptyState title="No Agenda Yet" message="Add sessions to build your event agenda." />}
+        ListHeaderComponent={
+          <View style={styles.pageHeader}>
+            <View style={styles.headerLeft}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={() => navigation.goBack()}
+                variant="surface"
+                size={36}
+              />
+              <Text style={styles.pageTitle}>Agenda</Text>
+            </View>
+            <Button
+              title="Add Session"
+              onPress={() => navigation.navigate('SessionForm', { eventId })}
+              variant="primary"
+              size="sm"
+              icon={<Plus size={15} color={theme.colors.textOnPrimary} />}
+              fullWidth={false}
+            />
+          </View>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon={<Layers size={48} color={theme.colors.textMuted} />}
+            title="No Sessions Yet"
+            message="Add sessions to build your event agenda."
+            action={{ label: 'Add Session', onPress: () => navigation.navigate('SessionForm', { eventId }) }}
+          />
+        }
+        renderItem={({ item }) => (
+          <Card variant="raised" style={styles.sessionCard} noPadding>
+            <View style={styles.sessionInner}>
+              <View style={styles.sessionTitleRow}>
+                <Layers size={16} color={theme.colors.primary} />
+                <Text style={styles.sessionName} numberOfLines={1}>{item.title}</Text>
+                <StatusBadge status={SESSION_STATUS[item.status] ?? 'neutral'} label={item.status} />
+              </View>
+
+              <View style={styles.sessionMeta}>
+                <Clock size={12} color={theme.colors.textMuted} />
+                <Text style={styles.sessionMetaText}>{item.startTime} – {item.endTime}</Text>
+                {item.hallOrRoom && (
+                  <>
+                    <Text style={styles.dot}>·</Text>
+                    <Text style={styles.sessionMetaText}>{item.hallOrRoom}</Text>
+                  </>
+                )}
+              </View>
+
+              {item.speakerName && (
+                <View style={styles.sessionMeta}>
+                  <UserIcon size={12} color={theme.colors.textMuted} />
+                  <Text style={styles.sessionMetaText}>{item.speakerName}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.actions}>
+              <IconButton
+                icon={<Edit2 size={16} color={theme.colors.primary} />}
+                onPress={() => navigation.navigate('SessionForm', { eventId, sessionId: item.id })}
+                variant="surface"
+                size={34}
+              />
+              <IconButton
+                icon={<Trash2 size={16} color={theme.colors.error} />}
+                onPress={() => handleDelete(item.id)}
+                variant="surface"
+                size={34}
+              />
+            </View>
+          </Card>
+        )}
       />
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 0 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.m, paddingTop: theme.spacing.xl },
-  headerLeft: { flexDirection: 'row', alignItems: 'center' },
-  backButton: { marginRight: theme.spacing.m },
-  title: { ...theme.typography.h1, color: theme.colors.text },
-  createButton: { backgroundColor: theme.colors.primary, padding: theme.spacing.s, borderRadius: theme.borderRadius.round },
-  listContainer: { padding: theme.spacing.m, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
-  sessionCard: { marginBottom: theme.spacing.m, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: theme.spacing.m },
-  sessionInfo: { flex: 1 },
-  sessionTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  sessionName: { ...theme.typography.h3, color: theme.colors.text, marginLeft: theme.spacing.xs },
-  sessionDetail: { ...theme.typography.caption, color: theme.colors.primaryLight, marginBottom: 2 },
-  sessionSpeaker: { ...theme.typography.caption, color: theme.colors.textMuted },
-  actions: { flexDirection: 'row' },
-  actionBtn: { padding: theme.spacing.s, marginLeft: theme.spacing.xs, backgroundColor: theme.colors.glass, borderRadius: theme.borderRadius.m },
+  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl, flexGrow: 1 },
+  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.spacing.xl, marginBottom: theme.spacing.l },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.m },
+  pageTitle: { ...theme.typography.h1, color: theme.colors.text },
+  sessionCard: { flexDirection: 'row', alignItems: 'center', borderRadius: theme.borderRadius.l, marginBottom: theme.spacing.sm, overflow: 'hidden' },
+  sessionInner: { flex: 1, padding: theme.spacing.m, gap: 4 },
+  sessionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexWrap: 'wrap' },
+  sessionName: { ...theme.typography.bodyMedium, color: theme.colors.text, flex: 1 },
+  sessionMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sessionMetaText: { ...theme.typography.caption, color: theme.colors.textMuted },
+  dot: { ...theme.typography.caption, color: theme.colors.textMuted, marginHorizontal: 2 },
+  actions: { flexDirection: 'column', gap: 4, paddingRight: theme.spacing.sm },
 });

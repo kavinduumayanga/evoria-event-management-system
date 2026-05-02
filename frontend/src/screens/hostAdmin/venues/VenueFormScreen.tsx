@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminVenueStackParamList } from '../../../types/navigation';
-import { ScreenContainer, FormInput, PrimaryButton, LoadingState } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
@@ -89,95 +89,61 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) return <LoadingState />;
 
   return (
-    <ScreenContainer scrollable style={styles.container}>
+    <ScreenContainer scrollable>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={theme.colors.text} size={24} />
-        </TouchableOpacity>
-        <Text style={styles.title}>{isEditing ? 'Edit Venue' : 'Create Venue'}</Text>
+        <IconButton
+          icon={<ArrowLeft size={20} color={theme.colors.text} />}
+          onPress={() => navigation.goBack()}
+          variant="surface"
+          size={36}
+        />
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Venue' : 'Create Venue'}</Text>
       </View>
 
       <View style={styles.form}>
-        <FormInput label="Venue Name *" value={name} onChangeText={setName} placeholder="Main Hall" />
-        <FormInput label="Address *" value={address} onChangeText={setAddress} placeholder="123 Event Street" />
-        <FormInput label="City *" value={city} onChangeText={setCity} placeholder="New York" />
-        <FormInput label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="500" keyboardType="numeric" />
-        <FormInput label="Contact Info" value={contactInfo} onChangeText={setContactInfo} placeholder="contact@venue.com" />
+        <Input label="Venue name *" value={name} onChangeText={setName} placeholder="Main Hall" />
+        <Input label="Address *" value={address} onChangeText={setAddress} placeholder="123 Event Street" />
+        <Input label="City *" value={city} onChangeText={setCity} placeholder="Colombo" />
+        <Input label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="500" keyboardType="numeric" />
+        <Input label="Contact info" value={contactInfo} onChangeText={setContactInfo} placeholder="contact@venue.com" />
 
-        <Text style={styles.label}>Venue Type</Text>
-        <View style={styles.typeSelector}>
+        <Text style={styles.fieldLabel}>Venue type</Text>
+        <View style={styles.chipGroup}>
           {(['physical', 'online', 'hybrid'] as VenueType[]).map((t) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={t}
-              style={[styles.typeOption, type === t && styles.typeOptionSelected]}
+              style={[styles.chip, type === t && styles.chipActive]}
               onPress={() => setType(t)}
             >
-              <Text style={[styles.typeText, type === t && styles.typeTextSelected]}>
+              <Text style={[styles.chipText, type === t && styles.chipTextActive]}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <PrimaryButton title={isEditing ? 'Save Changes' : 'Create Venue'} onPress={handleSave} isLoading={isSaving} style={styles.saveButton} />
+        <Button
+          title={isEditing ? 'Save Changes' : 'Create Venue'}
+          onPress={handleSave}
+          isLoading={isSaving}
+          variant="primary"
+          size="lg"
+          style={styles.saveBtn}
+        />
       </View>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: theme.spacing.m,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: theme.spacing.xl,
-    marginBottom: theme.spacing.xl,
-  },
-  backButton: {
-    marginRight: theme.spacing.m,
-  },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-  },
-  form: {
-    flex: 1,
-  },
-  label: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xs,
-    marginLeft: 4,
-  },
-  typeSelector: {
-    flexDirection: 'row',
-    marginBottom: theme.spacing.xl,
-    backgroundColor: theme.colors.surfaceLight,
-    padding: 4,
-    borderRadius: theme.borderRadius.m,
-    gap: theme.spacing.xs,
-  },
-  typeOption: {
-    flex: 1,
-    paddingVertical: theme.spacing.m,
-    borderRadius: theme.borderRadius.m,
-    alignItems: 'center',
-  },
-  typeOptionSelected: {
-    backgroundColor: theme.colors.glass,
-  },
-  typeText: {
-    ...theme.typography.body,
-    color: theme.colors.textMuted,
-  },
-  typeTextSelected: {
-    color: theme.colors.primary,
-    fontWeight: 'bold',
-  },
-  saveButton: {
-    marginTop: theme.spacing.m,
-    marginBottom: theme.spacing.xxl,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.m, paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.xl, marginBottom: theme.spacing.xl },
+  headerTitle: { ...theme.typography.h1, color: theme.colors.text },
+  form: { paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl },
+  fieldLabel: { ...theme.typography.label, color: theme.colors.textMuted, marginBottom: theme.spacing.s, marginTop: theme.spacing.xs },
+  chipGroup: { flexDirection: 'row', gap: theme.spacing.s, marginBottom: theme.spacing.xl },
+  chip: { flex: 1, paddingVertical: 10, borderRadius: theme.borderRadius.m, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  chipActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySubtle },
+  chipText: { ...theme.typography.caption, color: theme.colors.textMuted, textTransform: 'capitalize' },
+  chipTextActive: { color: theme.colors.primary, fontWeight: '700' },
+  saveBtn: { marginTop: theme.spacing.m },
 });

@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { Plus } from 'lucide-react-native';
+import { Plus, CalendarDays } from 'lucide-react-native';
 import { Event } from '../../types';
 import { AttendeeTabParamList } from '../../types/navigation';
 import { EventService } from '../../api/services';
@@ -53,47 +53,61 @@ export const MyEventsScreen = () => {
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchEvents} /></ScreenContainer>;
 
   return (
-    <ScreenContainer style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Events</Text>
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => navigation.navigate('HomeStack', { screen: 'EventForm', params: {} })}
-        >
-          <Plus size={20} color={theme.colors.text} />
-        </TouchableOpacity>
-      </View>
-
+    <ScreenContainer>
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <EventCard
             event={item}
+            variant="list"
             onPress={() => navigation.navigate('HomeStack', {
               screen: 'EventDetails',
               params: { eventId: item.id, publicSlug: item.publicSlug },
             })}
           />
         )}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
         }
-        ListEmptyComponent={<EmptyState title="No Managed Events" message="Create an event or ask an owner to add you as an event admin." />}
+        ListHeaderComponent={
+          <View style={styles.pageHeader}>
+            <View>
+              <Text style={styles.title}>My Events</Text>
+              <Text style={styles.subtitle}>Events you manage</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.createBtn}
+              onPress={() => navigation.navigate('HomeStack', { screen: 'EventForm', params: {} })}
+              activeOpacity={0.8}
+            >
+              <Plus size={18} color={theme.colors.textOnPrimary} />
+            </TouchableOpacity>
+          </View>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon={<CalendarDays size={48} color={theme.colors.textMuted} />}
+            title="No Managed Events"
+            message="Create an event or ask an owner to add you as an event admin."
+          />
+        }
       />
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 0,
+  listContent: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
-  header: {
-    padding: theme.spacing.m,
-    paddingTop: theme.spacing.xl,
+  pageHeader: {
+    paddingTop: theme.spacing.m,
+    marginBottom: theme.spacing.l,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -102,14 +116,18 @@ const styles = StyleSheet.create({
     ...theme.typography.h1,
     color: theme.colors.text,
   },
-  createButton: {
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.s,
-    borderRadius: theme.borderRadius.round,
+  subtitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
   },
-  listContainer: {
-    padding: theme.spacing.m,
-    paddingBottom: theme.spacing.xxl,
-    flexGrow: 1,
+  createBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.glow,
   },
 });
