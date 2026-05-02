@@ -8,13 +8,14 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { Camera, RefreshCw, QrCode, UserCheck } from 'lucide-react-native';
 import { theme } from '../../constants/theme';
 import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, Button, Input } from '../../components';
 import { CheckInService, EventService, UserService } from '../../api/services';
 import { Event } from '../../types';
+import { HostAdminEventStackParamList } from '../../types/navigation';
 
 interface AttendanceRecord {
   id: string;
@@ -53,6 +54,8 @@ const normalizeAttendance = (rawItems: any[]): AttendanceRecord[] => {
 };
 
 export const CheckInScannerScreen = () => {
+  const route = useRoute<RouteProp<HostAdminEventStackParamList, 'CheckInScanner'>>();
+  const preselectedEventId = String(route.params?.eventId || '');
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
@@ -84,7 +87,12 @@ export const CheckInScannerScreen = () => {
       setEvents(managedEvents);
 
       const hasSelectedEvent = managedEvents.some((event: Event) => event.id === selectedEventId);
-      const resolvedEventId = hasSelectedEvent ? selectedEventId : (managedEvents[0]?.id || '');
+      const hasPreselectedEvent = managedEvents.some((event: Event) => event.id === preselectedEventId);
+      const resolvedEventId = hasSelectedEvent
+        ? selectedEventId
+        : hasPreselectedEvent
+          ? preselectedEventId
+          : (managedEvents[0]?.id || '');
       setSelectedEventId(resolvedEventId);
 
       if (resolvedEventId) {
@@ -98,7 +106,7 @@ export const CheckInScannerScreen = () => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [fetchAttendance, selectedEventId]);
+  }, [fetchAttendance, selectedEventId, preselectedEventId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -152,7 +160,7 @@ export const CheckInScannerScreen = () => {
 
     try {
       setIsProcessingScan(true);
-      const response = await CheckInService.scanQr(qrCodeValue);
+      const response = await CheckInService.scanQr(qrCodeValue, selectedEventId || undefined);
       pushRecentScan('success', response.message || 'Check-in successful');
       Alert.alert('Success', response.message || 'Check-in successful');
       await fetchAttendance(selectedEventId);

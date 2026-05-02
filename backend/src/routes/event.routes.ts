@@ -13,11 +13,13 @@ import {
   incrementEventView,
   getRecommendedEvents,
   getEventCalendar,
+  downloadEventCalendarIcs,
   toggleEventFeatured,
   addEventAdmin,
   removeEventAdmin,
   updateEventRegistrationFields,
 } from '../controllers/event.controller';
+import { getEventDashboard } from '../controllers/eventDashboard.controller';
 import { getEventRegistrationsForManagers } from '../controllers/eventRegistration.controller';
 import { getEventGuests } from '../controllers/guest.controller';
 import {
@@ -25,6 +27,8 @@ import {
   getEventCommunications,
   inviteGuestToEvent,
 } from '../controllers/eventCommunication.controller';
+import { createEventReminder, getEventReminders } from '../controllers/reminder.controller';
+import { createEventReview, getEventReviewSummary, getEventReviews } from '../controllers/review.controller';
 import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -37,6 +41,9 @@ router.get('/host/:hostAdminId', protect, getHostEvents);
 router.get('/:eventId/registrations', protect, getEventRegistrationsForManagers);
 router.get('/:eventId/guests', protect, getEventGuests);
 router.get('/:id/calendar', getEventCalendar);
+router.get('/:id/calendar.ics', downloadEventCalendarIcs);
+router.get('/:eventId/reviews/summary', getEventReviewSummary);
+router.get('/:eventId/reviews', getEventReviews);
 router.get('/:id', getEvent);
 
 // Protected routes
@@ -51,6 +58,10 @@ router.patch('/:eventId/registration-fields', updateEventRegistrationFields);
 router.post('/:eventId/invite', inviteGuestToEvent);
 router.post('/:eventId/blast', blastEventMessage);
 router.get('/:eventId/communications', getEventCommunications);
+router.get('/:eventId/dashboard', getEventDashboard);
+router.post('/:eventId/reminders', createEventReminder);
+router.get('/:eventId/reminders', getEventReminders);
+router.post('/:eventId/reviews', createEventReview);
 router.patch('/:id/feature', toggleEventFeatured);
 router.post('/:id/admins', addEventAdmin);
 router.delete('/:id/admins/:userId', removeEventAdmin);

@@ -1,7 +1,7 @@
 import { NotificationModel } from '../models/Notification';
 
 type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
-type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
+type NotificationChannel = 'in_app' | 'push' | 'email_mock' | 'sms_mock';
 type NotificationStatus = 'sent' | 'scheduled' | 'failed';
 
 interface CreateNotificationInput {

@@ -108,3 +108,8 @@ export const uploadImageBuffer = async (
     throw new AppError('Failed to upload image to Azure Blob Storage', 500);
   }
 };
+
+// Test-only utility to make environment-based upload behavior deterministic.
+export const __resetAzureBlobClientCacheForTests = () => {
+  cachedBlobServiceClient = undefined;
+};

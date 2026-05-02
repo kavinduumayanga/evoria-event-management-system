@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "ts-node scripts/seed.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +25,7 @@
     "mongoose": "^9.5.0",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
+    "nodemailer": "^8.0.7",
     "uuid": "^14.0.0",
     "zod": "^4.3.6"
   },
@@ -36,9 +37,13 @@
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.6.0",
+    "@types/nodemailer": "^8.0.0",
+    "@types/supertest": "^6.0.3",
     "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.14",
+    "supertest": "^7.1.4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
     "typescript": "^6.0.3"
   }
 }

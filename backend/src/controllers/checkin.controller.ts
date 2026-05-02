@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { BookingModel } from '../models/Booking';
 import { RegistrationModel } from '../models/Registration';
+import { CheckInHistoryModel } from '../models/CheckInHistory';
 import { EventModel } from '../models/Event';
 import { TicketTypeModel } from '../models/TicketType';
 import { UserModel } from '../models/User';
@@ -12,10 +13,16 @@ import { canManageEvent } from '../utils/eventPermissions';
 
 const scanSchema = z.object({
   qrCodeValue: z.string().trim().min(1, 'qrCodeValue is required'),
+  eventId: z.string().trim().optional(),
 }).strict();
 
 const manualCheckInSchema = z.object({
   attendanceNote: z.string().trim().max(500).optional(),
+}).strict();
+
+const historyQuerySchema = z.object({
+  result: z.enum(['success', 'duplicate', 'invalid', 'rejected']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(100),
 }).strict();
 
 const ensureCanManageEvent = async (eventId: string, userId: string) => {
@@ -23,6 +30,27 @@ const ensureCanManageEvent = async (eventId: string, userId: string) => {
   if (!event) throw new AppError('Event not found', 404);
   if (!canManageEvent(userId, event)) throw new AppError('Not authorized for this event', 403);
   return event;
+};
+
+const recordCheckInHistory = async (input: {
+  eventId?: string | null;
+  registrationId?: string | null;
+  bookingId?: string | null;
+  qrCodeValue: string;
+  scannedBy: string;
+  result: 'success' | 'duplicate' | 'invalid' | 'rejected';
+  reason: string;
+}) => {
+  await CheckInHistoryModel.create({
+    eventId: input.eventId || null,
+    registrationId: input.registrationId || null,
+    bookingId: input.bookingId || null,
+    qrCodeValue: input.qrCodeValue,
+    scannedBy: input.scannedBy,
+    result: input.result,
+    reason: input.reason,
+    scannedAt: new Date(),
+  });
 };
 
 const shouldHaveRegistrationQr = (status: string) => (
@@ -144,13 +172,27 @@ export const getBookingQr = async (req: Request, res: Response, next: NextFuncti
 
 export const scanCheckIn = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { qrCodeValue } = scanSchema.parse(req.body);
+    const { qrCodeValue, eventId: requestedEventId } = scanSchema.parse(req.body);
+
+    const fallbackEventId = requestedEventId ? String(requestedEventId).trim() : '';
+    if (fallbackEventId) {
+      await ensureCanManageEvent(fallbackEventId, req.user!.id);
+    }
 
     const registration = await RegistrationModel.findOne({ qrCodeValue });
     if (registration) {
       await ensureCanManageEvent(registration.eventId, req.user!.id);
 
       if (registration.status === 'declined' || registration.status === 'not_going') {
+        await recordCheckInHistory({
+          eventId: registration.eventId,
+          registrationId: registration.id,
+          qrCodeValue,
+          scannedBy: req.user!.id,
+          result: 'rejected',
+          reason: 'Declined/Not-going guests cannot be checked in',
+        });
+
         return res.status(409).json({
           status: 'declined',
           message: 'Declined/Not-going guests cannot be checked in',
@@ -162,6 +204,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       }
 
       if (registration.status === 'pending') {
+        await recordCheckInHistory({
+          eventId: registration.eventId,
+          registrationId: registration.id,
+          qrCodeValue,
+          scannedBy: req.user!.id,
+          result: 'invalid',
+          reason: 'Guest must be marked going before check-in',
+        });
+
         return res.status(400).json({
           status: 'invalid',
           message: 'Guest must be marked going before check-in',
@@ -173,6 +224,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       }
 
       if (registration.status === 'checked_in') {
+        await recordCheckInHistory({
+          eventId: registration.eventId,
+          registrationId: registration.id,
+          qrCodeValue,
+          scannedBy: req.user!.id,
+          result: 'duplicate',
+          reason: 'Guest already checked in',
+        });
+
         return res.status(409).json({
           status: 'duplicate',
           message: 'Guest already checked in',
@@ -188,6 +248,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       registration.checkedInBy = req.user!.id;
       registration.checkInMethod = 'qr';
       await registration.save();
+
+      await recordCheckInHistory({
+        eventId: registration.eventId,
+        registrationId: registration.id,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'success',
+        reason: 'Check-in successful',
+      });
 
       if (registration.userId) {
         await createNotificationRecord({
@@ -218,6 +287,14 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
 
     const booking = await BookingModel.findOne({ qrCodeValue });
     if (!booking) {
+      await recordCheckInHistory({
+        eventId: fallbackEventId || null,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'invalid',
+        reason: 'Invalid QR code',
+      });
+
       return res.status(404).json({
         status: 'invalid',
         message: 'Invalid QR code',
@@ -227,6 +304,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     await ensureCanManageEvent(booking.eventId, req.user!.id);
 
     if (booking.bookingStatus === 'cancelled') {
+      await recordCheckInHistory({
+        eventId: booking.eventId,
+        bookingId: booking.id,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'rejected',
+        reason: 'Cancelled bookings cannot be checked in',
+      });
+
       return res.status(409).json({
         status: 'cancelled',
         message: 'Cancelled bookings cannot be checked in',
@@ -238,6 +324,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     }
 
     if (booking.bookingStatus !== 'confirmed') {
+      await recordCheckInHistory({
+        eventId: booking.eventId,
+        bookingId: booking.id,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'invalid',
+        reason: 'Only confirmed bookings can be checked in',
+      });
+
       return res.status(400).json({
         status: 'invalid',
         message: 'Only confirmed bookings can be checked in',
@@ -249,6 +344,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     }
 
     if (booking.approvalStatus && booking.approvalStatus !== 'approved') {
+      await recordCheckInHistory({
+        eventId: booking.eventId,
+        bookingId: booking.id,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'invalid',
+        reason: 'Booking approval is pending or rejected',
+      });
+
       return res.status(400).json({
         status: 'invalid',
         message: 'Booking approval is pending or rejected',
@@ -260,6 +364,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     }
 
     if (booking.checkInStatus === 'checked_in') {
+      await recordCheckInHistory({
+        eventId: booking.eventId,
+        bookingId: booking.id,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'duplicate',
+        reason: 'Attendee already checked in',
+      });
+
       return res.status(409).json({
         status: 'duplicate',
         message: 'Attendee already checked in',
@@ -275,6 +388,15 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     booking.checkedInBy = req.user!.id;
     booking.checkInMethod = 'qr';
     await booking.save();
+
+    await recordCheckInHistory({
+      eventId: booking.eventId,
+      bookingId: booking.id,
+      qrCodeValue,
+      scannedBy: req.user!.id,
+      result: 'success',
+      reason: 'Check-in successful',
+    });
 
     await createNotificationRecord({
       userId: booking.userId,
@@ -402,6 +524,105 @@ export const manualCheckIn = async (req: Request, res: Response, next: NextFunct
       status: 'success',
       message: 'Manual check-in successful',
       data: { booking: booking.toJSON() },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      const zodErr = error as z.ZodError<any>;
+      return next(new AppError(zodErr.issues.map((e: any) => e.message).join(', '), 400));
+    }
+    next(error);
+  }
+};
+
+export const getCheckInHistory = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const eventId = String(req.params.eventId || '').trim();
+    if (!eventId) return next(new AppError('eventId is required', 400));
+
+    await ensureCanManageEvent(eventId, req.user!.id);
+    const { result, limit } = historyQuerySchema.parse(req.query || {});
+
+    const history = await CheckInHistoryModel.find({
+      eventId,
+      ...(result ? { result } : {}),
+    })
+      .sort({ scannedAt: -1 })
+      .limit(limit);
+
+    const userIds = Array.from(new Set(
+      history
+        .map((item) => String(item.scannedBy || '').trim())
+        .filter(Boolean),
+    ));
+    const registrationIds = Array.from(new Set(
+      history
+        .map((item) => String(item.registrationId || '').trim())
+        .filter(Boolean),
+    ));
+    const bookingIds = Array.from(new Set(
+      history
+        .map((item) => String(item.bookingId || '').trim())
+        .filter(Boolean),
+    ));
+
+    const [users, registrations, bookings] = await Promise.all([
+      userIds.length ? UserModel.find({ _id: { $in: userIds } }).select('id name email') : [],
+      registrationIds.length
+        ? RegistrationModel.find({ _id: { $in: registrationIds } }).select('id name email')
+        : [],
+      bookingIds.length
+        ? BookingModel.find({ _id: { $in: bookingIds } }).select('id userId')
+        : [],
+    ]);
+
+    const bookingUserIds = Array.from(new Set(bookings.map((booking) => booking.userId)));
+    const bookingUsers = bookingUserIds.length
+      ? await UserModel.find({ _id: { $in: bookingUserIds } }).select('id name email')
+      : [];
+
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const registrationMap = new Map(registrations.map((registration) => [registration.id, registration]));
+    const bookingMap = new Map(bookings.map((booking) => [booking.id, booking]));
+    const bookingUserMap = new Map(bookingUsers.map((user) => [user.id, user]));
+
+    const mapped = history.map((entry) => {
+      const scanner = userMap.get(entry.scannedBy);
+      const registration = entry.registrationId ? registrationMap.get(entry.registrationId) : null;
+      const booking = entry.bookingId ? bookingMap.get(entry.bookingId) : null;
+      const bookingUser = booking ? bookingUserMap.get(booking.userId) : null;
+
+      const guestName = registration?.name || bookingUser?.name || null;
+      const guestEmail = registration?.email || bookingUser?.email || null;
+
+      return {
+        id: entry.id,
+        eventId: entry.eventId,
+        registrationId: entry.registrationId || null,
+        bookingId: entry.bookingId || null,
+        qrCodeValue: entry.qrCodeValue,
+        result: entry.result,
+        reason: entry.reason,
+        scannedAt: entry.scannedAt,
+        scannedBy: {
+          id: entry.scannedBy,
+          name: scanner?.name || 'Staff',
+          email: scanner?.email || null,
+        },
+        guest: guestName || guestEmail
+          ? {
+              name: guestName,
+              email: guestEmail,
+            }
+          : null,
+      };
+    });
+
+    res.status(200).json({
+      status: 'success',
+      results: mapped.length,
+      data: {
+        history: mapped,
+      },
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

@@ -7,7 +7,7 @@ import { Event } from '../../types';
 import { AttendeeTabParamList } from '../../types/navigation';
 import { EventService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
-import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState } from '../../components';
+import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button } from '../../components';
 import { theme } from '../../constants/theme';
 
 type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyEvents'>;
@@ -58,14 +58,38 @@ export const MyEventsScreen = () => {
         data={events}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <EventCard
-            event={item}
-            variant="list"
-            onPress={() => navigation.navigate('HomeStack', {
-              screen: 'EventDetails',
-              params: { eventId: item.id, publicSlug: item.publicSlug },
-            })}
-          />
+          <View style={styles.eventBlock}>
+            <EventCard
+              event={item}
+              variant="list"
+              onPress={() => navigation.navigate('HomeStack', {
+                screen: 'EventDetails',
+                params: { eventId: item.id, publicSlug: item.publicSlug },
+              })}
+            />
+            <View style={styles.eventActions}>
+              <Button
+                title="Event Dashboard"
+                onPress={() => navigation.navigate('HomeStack', {
+                  screen: 'EventDashboard',
+                  params: { eventId: item.id },
+                })}
+                variant="secondary"
+                size="sm"
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Guest List"
+                onPress={() => navigation.navigate('HomeStack', {
+                  screen: 'ManageRegistrations',
+                  params: { eventId: item.id },
+                })}
+                variant="ghost"
+                size="sm"
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -129,5 +153,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.glow,
+  },
+  eventBlock: {
+    marginBottom: theme.spacing.m,
+  },
+  eventActions: {
+    marginTop: theme.spacing.s,
+    flexDirection: 'row',
+    gap: theme.spacing.s,
   },
 });

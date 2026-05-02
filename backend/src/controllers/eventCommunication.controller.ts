@@ -8,7 +8,11 @@ import { EmailLogModel } from '../models/EmailLog';
 import { AppError } from '../utils/appError';
 import { canManageEvent } from '../utils/eventPermissions';
 import { createNotificationRecord, createNotificationsForUsers } from '../utils/notification.helper';
-import { buildEventPublicUrl, recordMockEmail, recordMockEmails } from '../utils/mockEmail.helper';
+import { buildEventPublicUrl } from '../utils/mockEmail.helper';
+import { buildEventEmailContext } from '../utils/eventCommunication.helper';
+import { sendEmail } from '../services/email.service';
+import { eventBlastTemplate, inviteGuestTemplate } from '../services/emailTemplates';
+import { sendPushToUsers } from '../services/pushNotification.service';
 
 const inviteGuestSchema = z.object({
   email: z.string().trim().email('Please provide a valid guest email'),
@@ -63,17 +67,9 @@ const ensureEventPublicSlug = async (event: any): Promise<string> => {
   return slug;
 };
 
-const buildEventSummary = (event: any): string => {
-  const location = event.type === 'online'
-    ? (event.meetingLink || 'Online')
-    : (event.city || 'Venue');
-
-  return [
-    `Event: ${event.title}`,
-    `Date: ${event.date}`,
-    `Time: ${event.startTime} - ${event.endTime}`,
-    `Location: ${location}`,
-  ].join('\n');
+const mapEmailChannel = (provider: string) => {
+  if (provider === 'mock') return 'email_mock';
+  return 'email';
 };
 
 export const inviteGuestToEvent = async (req: Request, res: Response, next: NextFunction) => {
@@ -88,30 +84,29 @@ export const inviteGuestToEvent = async (req: Request, res: Response, next: Next
     const publicUrl = buildEventPublicUrl(publicSlug, req) || '';
     const normalizedEmail = email.trim().toLowerCase();
 
-    const subject = `Invitation: ${event.title}`;
-    const finalMessage = [
-      message || `You are invited to ${event.title}.`,
-      '',
-      buildEventSummary(event),
-      '',
-      `Register here: ${publicUrl}`,
-    ].filter(Boolean).join('\n');
+    const eventContext = await buildEventEmailContext(event, req);
+    const inviteTemplate = inviteGuestTemplate({
+      ...eventContext,
+      recipientName: '',
+      inviteMessage: message,
+    });
 
+    const subject = `Invitation: ${event.title}`;
     const invitedUser = await UserModel.findOne({ email: normalizedEmail }).select('_id');
 
-    const emailLog = await recordMockEmail({
-      recipientEmail: normalizedEmail,
-      recipientUserId: invitedUser?.id || null,
-      eventId: event.id,
+    const emailResult = await sendEmail({
+      to: normalizedEmail,
       subject,
-      message: finalMessage,
+      html: inviteTemplate.html,
+      text: inviteTemplate.text,
       type: 'invite',
-      status: 'sent',
+      eventId: event.id,
+      recipientUserId: invitedUser?.id || null,
+      createdBy: req.user!.id,
       metadata: {
         publicUrl,
         invitedBy: req.user!.id,
       },
-      createdBy: req.user!.id,
     });
 
     if (invitedUser) {
@@ -126,14 +121,33 @@ export const inviteGuestToEvent = async (req: Request, res: Response, next: Next
         sentAt: new Date(),
         createdBy: req.user!.id,
       });
+
+      await sendPushToUsers([invitedUser.id], {
+        eventId: event.id,
+        title: 'Event Invitation',
+        message: `You were invited to ${event.title}.`,
+        type: 'announcement',
+        createdBy: req.user!.id,
+        data: {
+          eventId: event.id,
+          type: 'event_invite',
+          publicUrl,
+        },
+      });
     }
+
+    const responseMessage = emailResult.status === 'failed'
+      ? 'Invitation recorded, but email delivery failed'
+      : emailResult.status === 'mock'
+        ? 'Invitation recorded in mock mode'
+        : 'Invitation sent successfully';
 
     res.status(201).json({
       status: 'success',
-      message: 'Mock invitation recorded successfully',
+      message: responseMessage,
       data: {
-        invite: emailLog.toJSON(),
         publicUrl,
+        emailStatus: emailResult.status,
       },
     });
   } catch (error: any) {
@@ -154,7 +168,7 @@ export const blastEventMessage = async (req: Request, res: Response, next: NextF
     const subject = (payload.subject || payload.title || '').trim() || `Update: ${event.title}`;
 
     const registrations = await RegistrationModel.find({ eventId }).select(
-      'email emailLower userId name status',
+      'id email emailLower userId name status',
     );
 
     if (!registrations.length) {
@@ -162,6 +176,7 @@ export const blastEventMessage = async (req: Request, res: Response, next: NextF
     }
 
     const recipientsByEmail = new Map<string, {
+      registrationId: string;
       email: string;
       userId: string | null;
       name: string;
@@ -171,7 +186,9 @@ export const blastEventMessage = async (req: Request, res: Response, next: NextF
     for (const registration of registrations) {
       const emailLower = String(registration.emailLower || '').trim().toLowerCase();
       if (!emailLower || recipientsByEmail.has(emailLower)) continue;
+
       recipientsByEmail.set(emailLower, {
+        registrationId: registration.id,
         email: registration.email,
         userId: registration.userId || null,
         name: registration.name,
@@ -186,31 +203,40 @@ export const blastEventMessage = async (req: Request, res: Response, next: NextF
 
     const publicSlug = await ensureEventPublicSlug(event);
     const publicUrl = buildEventPublicUrl(publicSlug, req) || '';
-    const eventSummary = buildEventSummary(event);
+    const eventContext = await buildEventEmailContext(event, req);
 
-    const mockEmailLogs = await recordMockEmails(
-      recipients.map((recipient) => ({
-        recipientEmail: recipient.email,
-        recipientUserId: recipient.userId,
-        eventId: event.id,
+    let sent = 0;
+    let failed = 0;
+    let mock = 0;
+
+    for (const recipient of recipients) {
+      const template = eventBlastTemplate({
+        ...eventContext,
+        recipientName: recipient.name,
+        blastSubject: subject,
+        blastMessage: payload.message.trim(),
+      });
+
+      const result = await sendEmail({
+        to: recipient.email,
         subject,
-        message: [
-          payload.message.trim(),
-          '',
-          eventSummary,
-          '',
-          `Event URL: ${publicUrl}`,
-        ].join('\n'),
+        html: template.html,
+        text: template.text,
         type: 'blast',
-        status: 'sent',
+        eventId: event.id,
+        registrationId: recipient.registrationId,
+        recipientUserId: recipient.userId,
+        createdBy: req.user!.id,
         metadata: {
           publicUrl,
-          recipientName: recipient.name,
           recipientStatus: recipient.status,
         },
-        createdBy: req.user!.id,
-      })),
-    );
+      });
+
+      if (result.status === 'failed') failed += 1;
+      else if (result.status === 'mock') mock += 1;
+      else sent += 1;
+    }
 
     const inAppRecipientIds = Array.from(new Set(
       recipients
@@ -233,15 +259,30 @@ export const blastEventMessage = async (req: Request, res: Response, next: NextF
       inAppNotificationsCount = createdNotifications.length;
     }
 
+    const pushSummary = await sendPushToUsers(inAppRecipientIds, {
+      eventId: event.id,
+      title: subject,
+      message: payload.message.trim(),
+      type: 'announcement',
+      createdBy: req.user!.id,
+      data: {
+        eventId: event.id,
+        type: 'event_blast',
+      },
+    });
+
     res.status(201).json({
       status: 'success',
-      message: 'Mock blast recorded successfully',
-      results: mockEmailLogs.length,
+      message: failed > 0
+        ? 'Blast processed with partial failures'
+        : (mock > 0 ? 'Blast recorded in mock mode' : 'Blast sent successfully'),
+      results: recipients.length,
       data: {
         publicUrl,
-        recipients: mockEmailLogs.length,
+        recipients: recipients.length,
+        email: { sent, failed, mock },
         inAppRecipients: inAppNotificationsCount,
-        emailLogs: mockEmailLogs.map((log) => log.toJSON()),
+        push: pushSummary,
       },
     });
   } catch (error: any) {
@@ -279,7 +320,7 @@ export const getEventCommunications = async (req: Request, res: Response, next: 
       ...emailLogs.map((log) => ({
         id: log.id,
         source: 'email_log',
-        channel: 'email_mock',
+        channel: mapEmailChannel(String(log.provider || 'mock')),
         recipientUserId: log.recipientUserId || null,
         recipientEmail: log.recipientEmail,
         subject: log.subject,
@@ -288,8 +329,13 @@ export const getEventCommunications = async (req: Request, res: Response, next: 
         status: log.status,
         createdBy: log.createdBy || null,
         createdAt: log.createdAt,
-        sentAt: log.createdAt,
-        metadata: log.metadata || null,
+        sentAt: log.sentAt || log.createdAt,
+        metadata: {
+          ...(log.metadata || {}),
+          provider: log.provider || 'mock',
+          errorMessage: log.errorMessage || null,
+          registrationId: log.registrationId || null,
+        },
       })),
       ...notifications.map((notification) => ({
         id: notification.id,

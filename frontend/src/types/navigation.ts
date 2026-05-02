@@ -22,6 +22,10 @@ export type AttendeeHomeStackParamList = {
   PublicEventDetails: { slug: string };
   EventForm: { eventId?: string };
   ManageRegistrations: { eventId: string };
+  EventDashboard: { eventId: string };
+  EventReminders: { eventId: string };
+  CheckInHistory: { eventId: string };
+  CheckInScanner: { eventId?: string } | undefined;
   ManageTickets: { eventId: string };
   TicketForm: { eventId: string; ticketId?: string };
   TicketSelection: { eventId: string };
@@ -59,6 +63,10 @@ export type HostAdminTabParamList = {
 export type HostAdminEventStackParamList = {
   ManageEvents: undefined;
   EventForm: { eventId?: string };
+  EventDashboard: { eventId: string };
+  EventReminders: { eventId: string };
+  CheckInHistory: { eventId: string };
+  CheckInScanner: { eventId?: string } | undefined;
   ManageTickets: { eventId: string };
   TicketForm: { eventId: string; ticketId?: string };
   ManageRegistrations: { eventId: string };

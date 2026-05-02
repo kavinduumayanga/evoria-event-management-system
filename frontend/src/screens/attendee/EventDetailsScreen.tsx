@@ -21,7 +21,7 @@ import { Button, LoadingState, ErrorState, ScreenContainer, IconButton, Card, St
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { EventService, PublicEventDetails } from '../../api/services';
-import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Share2, Mail, Phone, Users } from 'lucide-react-native';
+import { ArrowLeft, Calendar as CalendarIcon, MapPin, Clock, Share2, Mail, Phone, Users, Star } from 'lucide-react-native';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -38,6 +38,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [tickets, setTickets] = useState<TicketType[]>([]);
   const [publicData, setPublicData] = useState<PublicEventDetails | null>(null);
+  const [reviewSummary, setReviewSummary] = useState<{ averageRating: number; totalReviews: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
@@ -75,6 +76,13 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       } else {
         setPublicData(null);
+      }
+
+      try {
+        const summaryRes = await EventService.getEventReviewSummary(eventId);
+        setReviewSummary(summaryRes.data);
+      } catch {
+        setReviewSummary(null);
       }
 
       EventService.incrementView(eventId).catch(() => undefined);
@@ -125,6 +133,16 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
     await Linking.openURL(dialUrl);
+  };
+
+  const handleAddToCalendar = async () => {
+    const calendarUrl = EventService.getCalendarIcsUrl(eventId);
+    const canOpen = await Linking.canOpenURL(calendarUrl);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'Unable to open calendar link on this device.');
+      return;
+    }
+    await Linking.openURL(calendarUrl);
   };
 
   if (isLoading) return <LoadingState />;
@@ -219,7 +237,23 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               <Share2 size={18} color={theme.colors.text} />
               <Text style={styles.quickActionLabel}>Share</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.quickActionButton} onPress={handleAddToCalendar} activeOpacity={0.8}>
+              <CalendarIcon size={18} color={theme.colors.text} />
+              <Text style={styles.quickActionLabel}>Add Calendar</Text>
+            </TouchableOpacity>
           </View>
+
+          {reviewSummary && reviewSummary.totalReviews > 0 ? (
+            <Card variant="raised" style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Reviews</Text>
+              <View style={styles.reviewRow}>
+                <Star size={14} color={theme.colors.warning} />
+                <Text style={styles.reviewText}>
+                  {reviewSummary.averageRating.toFixed(1)} average from {reviewSummary.totalReviews} review(s)
+                </Text>
+              </View>
+            </Card>
+          ) : null}
 
           <Card variant="raised" style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Host</Text>
@@ -399,6 +433,15 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     marginBottom: theme.spacing.m,
+  },
+  reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
+  },
+  reviewText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
   },
   sectionTitle: {
     ...theme.typography.h3,

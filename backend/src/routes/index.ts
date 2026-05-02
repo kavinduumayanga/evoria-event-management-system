@@ -18,6 +18,8 @@ import moderationRoutes from './moderation.routes';
 import waitlistRoutes from './waitlist.routes';
 import adminRoutes from './admin.routes';
 import publicRoutes from './public.routes';
+import pushRoutes from './push.routes';
+import reminderRoutes from './reminder.routes';
 
 const router = Router();
 
@@ -40,5 +42,7 @@ router.use('/moderation', moderationRoutes);
 router.use('/waitlist', waitlistRoutes);
 router.use('/admin', adminRoutes);
 router.use('/public', publicRoutes);
+router.use('/push', pushRoutes);
+router.use('/reminders', reminderRoutes);
 
 export default router;

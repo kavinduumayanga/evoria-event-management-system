@@ -10,6 +10,9 @@ import {
   EventRegistration,
   EventRegistrationStatus,
   EventCustomQuestion,
+  EventReminder,
+  CheckInHistoryRecord,
+  EventReview,
 } from '../types';
 import { API_URL } from '../constants/api';
 
@@ -117,7 +120,7 @@ export interface CreateNotificationPayload {
   title: string;
   message: string;
   type?: 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
-  channel?: 'in_app' | 'email_mock' | 'sms_mock';
+  channel?: 'in_app' | 'push' | 'email_mock' | 'sms_mock';
   scheduledAt?: string;
 }
 
@@ -125,7 +128,7 @@ export interface EventBlastPayload {
   title: string;
   message: string;
   type?: 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
-  channel?: 'in_app' | 'email_mock' | 'sms_mock';
+  channel?: 'in_app' | 'push' | 'email_mock' | 'sms_mock';
   scheduledAt?: string;
 }
 
@@ -155,7 +158,7 @@ export interface EventBroadcastPayload {
 export interface EventCommunicationEntry {
   id: string;
   source: 'email_log' | 'in_app_notification';
-  channel: 'in_app' | 'email_mock' | 'sms_mock';
+  channel: 'in_app' | 'push' | 'email_mock' | 'sms_mock' | 'email';
   recipientUserId: string | null;
   recipientEmail: string | null;
   subject: string;
@@ -166,6 +169,75 @@ export interface EventCommunicationEntry {
   createdAt: string;
   sentAt: string | null;
   metadata: Record<string, unknown> | null;
+}
+
+export interface PushTokenPayload {
+  expoPushToken: string;
+  deviceInfo?: {
+    platform?: string;
+    deviceName?: string;
+    appVersion?: string;
+    osVersion?: string;
+  };
+}
+
+export interface EventReminderPayload {
+  title: string;
+  message: string;
+  scheduledAt: string;
+  channels: Array<'email' | 'push'>;
+}
+
+export interface EventDashboardData {
+  totalRegistrations: number;
+  pendingCount: number;
+  goingCount: number;
+  declinedCount: number;
+  checkedInCount: number;
+  capacity: {
+    used: number;
+    total: number;
+    percentage: number;
+  };
+  ticketsSold: number;
+  revenue: number;
+  remindersCount: number;
+  feedback: {
+    averageRating: number;
+    totalReviews: number;
+  };
+  recentRegistrations: Array<{
+    id: string;
+    source: 'registration' | 'booking';
+    name: string;
+    email: string;
+    status: string;
+    registeredAt: string;
+    checkedInAt: string | null;
+  }>;
+  recentCheckIns: Array<{
+    id: string;
+    qrCodeValue: string;
+    result: 'success' | 'duplicate' | 'invalid' | 'rejected';
+    reason: string;
+    scannedAt: string;
+    scannedBy: {
+      id: string;
+      name: string;
+      email: string | null;
+    };
+    guest: {
+      registrationId?: string;
+      name: string;
+      email: string;
+    } | null;
+  }>;
+}
+
+export interface EventReviewPayload {
+  registrationId?: string;
+  rating: number;
+  comment?: string;
 }
 
 export interface PublicEventDetails {
@@ -385,11 +457,15 @@ export const EventService = {
     return response.data;
   },
   getEventCalendar: async (id: string, download = false) => {
-    const response = await apiClient.get(`/events/${id}/calendar`, {
-      params: { download },
+    const endpoint = download ? `/events/${id}/calendar.ics` : `/events/${id}/calendar`;
+    const response = await apiClient.get(endpoint, {
       responseType: download ? 'text' : 'json',
     });
     return response.data;
+  },
+  getCalendarIcsUrl: (id: string) => {
+    const trimmedBase = API_URL.replace(/\/+$/, '');
+    return `${trimmedBase}/events/${id}/calendar.ics`;
   },
   getEvent: async (id: string) => {
     const response = await apiClient.get(`/events/${id}`);
@@ -475,6 +551,38 @@ export const EventService = {
         communications: EventCommunicationEntry[];
       };
     };
+  },
+  getEventDashboard: async (eventId: string) => {
+    const response = await apiClient.get(`/events/${eventId}/dashboard`);
+    return response.data as { status: string; data: EventDashboardData };
+  },
+  createReminder: async (eventId: string, payload: EventReminderPayload) => {
+    const response = await apiClient.post(`/events/${eventId}/reminders`, payload);
+    return response.data as { status: string; data: { reminder: EventReminder } };
+  },
+  getReminders: async (eventId: string, params?: { status?: 'scheduled' | 'sent' | 'failed'; limit?: number }) => {
+    const response = await apiClient.get(`/events/${eventId}/reminders`, { params });
+    return response.data as { status: string; results: number; data: { reminders: EventReminder[] } };
+  },
+  deleteReminder: async (id: string) => {
+    const response = await apiClient.delete(`/reminders/${id}`);
+    return response.data;
+  },
+  processDueReminders: async (payload?: { eventId?: string; limit?: number }) => {
+    const response = await apiClient.post('/reminders/process-due', payload || {});
+    return response.data;
+  },
+  getEventReviews: async (eventId: string, limit = 20) => {
+    const response = await apiClient.get(`/events/${eventId}/reviews`, { params: { limit } });
+    return response.data as { status: string; results: number; data: { reviews: EventReview[] } };
+  },
+  getEventReviewSummary: async (eventId: string) => {
+    const response = await apiClient.get(`/events/${eventId}/reviews/summary`);
+    return response.data as { status: string; data: { averageRating: number; totalReviews: number } };
+  },
+  createEventReview: async (eventId: string, payload: EventReviewPayload) => {
+    const response = await apiClient.post(`/events/${eventId}/reviews`, payload);
+    return response.data as { status: string; data: { review: EventReview } };
   },
   toggleFeature: async (id: string) => {
     const response = await apiClient.patch(`/events/${id}/feature`);
@@ -625,8 +733,8 @@ export const CheckInService = {
     const response = await apiClient.get(`/checkins/qr/${bookingId}`);
     return response.data;
   },
-  scanQr: async (qrCodeValue: string) => {
-    const response = await apiClient.post('/checkins/scan', { qrCodeValue });
+  scanQr: async (qrCodeValue: string, eventId?: string) => {
+    const response = await apiClient.post('/checkins/scan', { qrCodeValue, eventId });
     return response.data;
   },
   manualCheckIn: async (registrationId: string, attendanceNote?: string) => {
@@ -638,6 +746,13 @@ export const CheckInService = {
   getEventAttendance: async (eventId: string) => {
     const response = await apiClient.get(`/checkins/event/${eventId}`);
     return response.data;
+  },
+  getCheckInHistory: async (
+    eventId: string,
+    params?: { result?: 'success' | 'duplicate' | 'invalid' | 'rejected'; limit?: number },
+  ) => {
+    const response = await apiClient.get(`/checkins/history/${eventId}`, { params });
+    return response.data as { status: string; results: number; data: { history: CheckInHistoryRecord[] } };
   },
 };
 
@@ -733,6 +848,19 @@ export const NotificationService = {
   },
   processScheduled: async () => {
     const response = await apiClient.post('/notifications/process-scheduled');
+    return response.data;
+  },
+};
+
+export const PushService = {
+  registerToken: async (payload: PushTokenPayload) => {
+    const response = await apiClient.post('/push/register-token', payload);
+    return response.data;
+  },
+  deleteToken: async (expoPushToken?: string) => {
+    const response = await apiClient.delete('/push/token', {
+      data: expoPushToken ? { expoPushToken } : {},
+    });
     return response.data;
   },
 };

@@ -1,30 +1,30 @@
 import { Request } from 'express';
 import { UserModel } from '../models/User';
 import { createNotificationRecord, createNotificationsForUsers } from './notification.helper';
-import { buildEventPublicUrl, recordMockEmail, recordMockEmails } from './mockEmail.helper';
+import { buildEventEmailContext, buildRegistrationQrUrl, resolveEventManagerIds } from './eventCommunication.helper';
+import { sendEmail } from '../services/email.service';
+import {
+  approvedRegistrationTemplate,
+  declinedRegistrationTemplate,
+  pendingRegistrationTemplate,
+} from '../services/emailTemplates';
+import { sendPushToUsers } from '../services/pushNotification.service';
 
-const resolveEventManagerIds = (event: any): string[] => {
-  const ownerId = typeof event?.ownerId === 'string' && event.ownerId.trim().length > 0
-    ? event.ownerId.trim()
-    : (typeof event?.hostAdminId === 'string' ? event.hostAdminId.trim() : '');
-  const adminIds = Array.isArray(event?.adminIds)
-    ? event.adminIds.map((id: string) => String(id || '').trim()).filter(Boolean)
-    : [];
-
-  return Array.from(new Set([ownerId, ...adminIds].filter(Boolean)));
-};
-
-const buildEventSummary = (event: any): string => {
-  const location = event.type === 'online'
-    ? (event.meetingLink || 'Online')
-    : (event.city || 'Venue');
-
-  return [
-    `Event: ${event.title}`,
-    `Date: ${event.date}`,
-    `Time: ${event.startTime} - ${event.endTime}`,
-    `Location: ${location}`,
-  ].join('\n');
+const buildManagerPendingEmailBody = (registration: any, eventName: string) => {
+  return {
+    html: `
+      <p>A new registration was submitted for <strong>${eventName}</strong>.</p>
+      <p>Name: ${registration.name}</p>
+      <p>Email: ${registration.email}</p>
+      <p>Status: ${registration.status}</p>
+    `,
+    text: [
+      `New registration for ${eventName}`,
+      `Name: ${registration.name}`,
+      `Email: ${registration.email}`,
+      `Status: ${registration.status}`,
+    ].join('\n'),
+  };
 };
 
 export const sendPendingRegistrationCommunications = async (
@@ -32,31 +32,27 @@ export const sendPendingRegistrationCommunications = async (
   event: any,
   registration: any,
 ) => {
-  const publicUrl = buildEventPublicUrl(event.publicSlug, req) || '';
-  const eventSummary = buildEventSummary(event);
+  const eventContext = await buildEventEmailContext(event, req);
 
-  await recordMockEmail({
-    recipientEmail: registration.email,
-    recipientUserId: registration.userId || null,
-    eventId: event.id,
-    subject: `Registration Pending: ${event.title}`,
-    message: [
-      `Hi ${registration.name},`,
-      '',
-      'Your registration was received and is currently pending review.',
-      '',
-      eventSummary,
-      '',
-      publicUrl ? `Public Event URL: ${publicUrl}` : '',
-    ].filter(Boolean).join('\n'),
+  const pendingTemplate = pendingRegistrationTemplate({
+    ...eventContext,
+    recipientName: registration.name,
+  });
+
+  await sendEmail({
+    to: registration.email,
+    subject: `Registration Pending: ${eventContext.eventName}`,
+    html: pendingTemplate.html,
+    text: pendingTemplate.text,
     type: 'registration_pending',
-    status: 'sent',
-    metadata: {
-      registrationId: registration.id,
-      registrationStatus: registration.status,
-      publicUrl: publicUrl || null,
-    },
+    eventId: event.id,
+    registrationId: registration.id,
+    recipientUserId: registration.userId || null,
     createdBy: null,
+    metadata: {
+      registrationStatus: registration.status,
+      publicEventUrl: eventContext.publicEventUrl,
+    },
   });
 
   if (registration.userId) {
@@ -69,6 +65,18 @@ export const sendPendingRegistrationCommunications = async (
       channel: 'in_app',
       status: 'sent',
       sentAt: new Date(),
+    });
+
+    await sendPushToUsers([registration.userId], {
+      eventId: event.id,
+      title: 'Registration Submitted',
+      message: `Your registration for ${event.title} is pending review.`,
+      type: 'booking',
+      data: {
+        eventId: event.id,
+        registrationId: registration.id,
+        type: 'registration_submitted',
+      },
     });
   }
 
@@ -85,32 +93,39 @@ export const sendPendingRegistrationCommunications = async (
     sentAt: new Date(),
   });
 
-  const managerUsers = await UserModel.find({ _id: { $in: managerIds } }).select('_id email');
-  const managerEmailLogs = managerUsers
-    .map((user) => String(user.email || '').trim().toLowerCase())
-    .filter(Boolean)
-    .map((email) => ({
-      recipientEmail: email,
+  await sendPushToUsers(managerIds, {
+    eventId: event.id,
+    title: 'New Registration Submitted',
+    message: `${registration.name} submitted registration for ${event.title}.`,
+    type: 'booking',
+    data: {
       eventId: event.id,
-      subject: `New Registration Pending: ${event.title}`,
-      message: [
-        `${registration.name} (${registration.email}) submitted a new registration.`,
-        '',
-        eventSummary,
-        '',
-        publicUrl ? `Public Event URL: ${publicUrl}` : '',
-      ].filter(Boolean).join('\n'),
-      type: 'registration_pending' as const,
-      status: 'sent' as const,
+      registrationId: registration.id,
+      type: 'registration_submitted',
+    },
+  });
+
+  const managerUsers = await UserModel.find({ _id: { $in: managerIds } }).select('_id email');
+
+  for (const manager of managerUsers) {
+    const recipientEmail = String(manager.email || '').trim().toLowerCase();
+    if (!recipientEmail) continue;
+
+    const managerBody = buildManagerPendingEmailBody(registration, eventContext.eventName);
+    await sendEmail({
+      to: recipientEmail,
+      subject: `New Registration Pending: ${eventContext.eventName}`,
+      html: managerBody.html,
+      text: managerBody.text,
+      type: 'registration_pending',
+      eventId: event.id,
+      registrationId: registration.id,
+      recipientUserId: manager.id,
+      createdBy: null,
       metadata: {
-        registrationId: registration.id,
         registrantEmail: registration.email,
       },
-      createdBy: null,
-    }));
-
-  if (managerEmailLogs.length > 0) {
-    await recordMockEmails(managerEmailLogs);
+    });
   }
 };
 
@@ -124,39 +139,31 @@ export const sendRegistrationStatusCommunications = async (
   const normalizedStatus = String(nextStatus || '').trim();
   if (normalizedStatus !== 'going' && normalizedStatus !== 'declined') return;
 
-  const publicUrl = buildEventPublicUrl(event.publicSlug, req) || '';
-  const eventSummary = buildEventSummary(event);
+  const eventContext = await buildEventEmailContext(event, req);
 
   if (normalizedStatus === 'going') {
-    const qrCodeValue = registration.qrCodeValue || null;
-    const qrInfoLines = qrCodeValue
-      ? [`QR Token: ${qrCodeValue}`, 'Use this QR token for check-in at the event.']
-      : ['QR token is not available yet. It will appear in your registration details.'];
+    const qrCodeUrl = buildRegistrationQrUrl(event, req, registration.id);
+    const template = approvedRegistrationTemplate({
+      ...eventContext,
+      recipientName: registration.name,
+      qrCodeValue: registration.qrCodeValue || null,
+      qrCodeUrl,
+    });
 
-    await recordMockEmail({
-      recipientEmail: registration.email,
-      recipientUserId: registration.userId || null,
-      eventId: event.id,
-      subject: `Registration Confirmed: ${event.title}`,
-      message: [
-        `Hi ${registration.name},`,
-        '',
-        'Your registration has been confirmed as GOING.',
-        '',
-        eventSummary,
-        '',
-        ...qrInfoLines,
-        '',
-        publicUrl ? `Public Event URL: ${publicUrl}` : '',
-      ].filter(Boolean).join('\n'),
+    await sendEmail({
+      to: registration.email,
+      subject: `Registration Confirmed: ${eventContext.eventName}`,
+      html: template.html,
+      text: template.text,
       type: 'registration_confirmed',
-      status: 'sent',
-      metadata: {
-        registrationId: registration.id,
-        qrCodeValue,
-        publicUrl: publicUrl || null,
-      },
+      eventId: event.id,
+      registrationId: registration.id,
+      recipientUserId: registration.userId || null,
       createdBy: actorUserId,
+      metadata: {
+        qrCodeValue: registration.qrCodeValue || null,
+        qrCodeUrl,
+      },
     });
 
     if (registration.userId) {
@@ -164,39 +171,50 @@ export const sendRegistrationStatusCommunications = async (
         userId: registration.userId,
         eventId: event.id,
         title: 'Registration Confirmed',
-        message: `You are marked as going for ${event.title}.${qrCodeValue ? ` QR: ${qrCodeValue}` : ''}`,
+        message: `You are marked as going for ${event.title}.`,
         type: 'booking',
         channel: 'in_app',
         status: 'sent',
         sentAt: new Date(),
         createdBy: actorUserId,
       });
+
+      await sendPushToUsers([registration.userId], {
+        eventId: event.id,
+        title: 'Registration Confirmed',
+        message: `You are confirmed for ${event.title}.`,
+        type: 'booking',
+        createdBy: actorUserId,
+        data: {
+          eventId: event.id,
+          registrationId: registration.id,
+          type: 'registration_status_updated',
+          status: 'going',
+        },
+      });
     }
 
     return;
   }
 
-  await recordMockEmail({
-    recipientEmail: registration.email,
-    recipientUserId: registration.userId || null,
-    eventId: event.id,
-    subject: `Registration Declined: ${event.title}`,
-    message: [
-      `Hi ${registration.name},`,
-      '',
-      'Your registration has been declined by the event organizer.',
-      '',
-      eventSummary,
-      '',
-      publicUrl ? `Public Event URL: ${publicUrl}` : '',
-    ].filter(Boolean).join('\n'),
+  const template = declinedRegistrationTemplate({
+    ...eventContext,
+    recipientName: registration.name,
+  });
+
+  await sendEmail({
+    to: registration.email,
+    subject: `Registration Declined: ${eventContext.eventName}`,
+    html: template.html,
+    text: template.text,
     type: 'registration_declined',
-    status: 'sent',
-    metadata: {
-      registrationId: registration.id,
-      publicUrl: publicUrl || null,
-    },
+    eventId: event.id,
+    registrationId: registration.id,
+    recipientUserId: registration.userId || null,
     createdBy: actorUserId,
+    metadata: {
+      status: 'declined',
+    },
   });
 
   if (registration.userId) {
@@ -210,6 +228,20 @@ export const sendRegistrationStatusCommunications = async (
       status: 'sent',
       sentAt: new Date(),
       createdBy: actorUserId,
+    });
+
+    await sendPushToUsers([registration.userId], {
+      eventId: event.id,
+      title: 'Registration Declined',
+      message: `Your registration for ${event.title} was declined.`,
+      type: 'booking',
+      createdBy: actorUserId,
+      data: {
+        eventId: event.id,
+        registrationId: registration.id,
+        type: 'registration_status_updated',
+        status: 'declined',
+      },
     });
   }
 };
