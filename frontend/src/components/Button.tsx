@@ -159,7 +159,7 @@ export const GhostButton: React.FC<LegacyButtonProps> = (props) => (
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: theme.borderRadius.s,
+    borderRadius: theme.borderRadius.round, // Fully rounded buttons
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     ...theme.shadows.glow,
   },
   secondary: {
-    backgroundColor: 'transparent',
+    backgroundColor: theme.colors.surfaceRaised,
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
   },

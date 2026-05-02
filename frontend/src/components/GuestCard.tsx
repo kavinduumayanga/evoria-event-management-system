@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, StyleProp, ViewStyle } from 'react-native';
-import { GlassCard } from './GlassCard';
+import { GlassCard } from './Card';
 import { StatusBadge } from './StatusBadge';
 import { theme } from '../constants/theme';
 import { Mail, Phone } from 'lucide-react-native';

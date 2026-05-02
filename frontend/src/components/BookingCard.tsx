@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { GlassCard } from './GlassCard';
+import { GlassCard } from './Card';
 import { Booking } from '../types';
 import { theme } from '../constants/theme';
 import { Ticket, Calendar, DollarSign } from 'lucide-react-native';
@@ -163,8 +163,8 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.m,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
     gap: theme.spacing.s,
   },
 });

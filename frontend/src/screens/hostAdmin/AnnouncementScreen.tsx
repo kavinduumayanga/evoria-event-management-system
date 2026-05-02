@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   eventChipTextActive: { color: theme.colors.primary, fontWeight: '700' },
   scrollContent: {
     paddingHorizontal: theme.spacing.base,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100,
   },
   formCard: {
     borderRadius: theme.borderRadius.l,
