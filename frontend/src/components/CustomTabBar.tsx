@@ -11,17 +11,6 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../constants/theme';
 
-// ============================================================
-// FLOATING TAB BAR — Exact Luma replica
-//
-// Reference match:
-//   - Floating pill bar pinned to bottom
-//   - Active tab: purple filled pill, icon + label side by side
-//   - Inactive tabs: icon only, muted color
-//   - 4px internal padding
-//   - Bar has subtle border + blur-like dark bg
-// ============================================================
-
 export const CustomTabBar: React.FC<BottomTabBarProps> = ({
   state,
   descriptors,
@@ -56,12 +45,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
   };
 
   return (
-    <View
-      style={[
-        styles.outer,
-        { paddingBottom: Math.max(insets.bottom, 6) },
-      ]}
-    >
+    <View style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={styles.bar}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -118,29 +102,28 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
 
 const styles = StyleSheet.create({
   outer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.tabBarBg,
+    paddingTop: 8,
+    paddingHorizontal: 8,
   },
   bar: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.tabBarBg,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    width: '100%',
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    paddingHorizontal: 2,
+    paddingVertical: 0,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 16,
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
       },
-      android: { elevation: 16 },
+      android: { elevation: 0 },
     }),
   },
   tabWrap: {
@@ -151,8 +134,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 22,
+    paddingHorizontal: 8,
+    borderRadius: 12,
     gap: 6,
   },
   tabActive: {

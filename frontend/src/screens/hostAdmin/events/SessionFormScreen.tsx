@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, Input, Button, LoadingState, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { ArrowLeft } from 'lucide-react-native';
-import { SessionService } from '../../../api/services';
+import { ArrowLeft, Upload } from 'lucide-react-native';
+import { SessionService, UploadService } from '../../../api/services';
 import { Session, SessionStatus } from '../../../types';
+import * as ImagePicker from 'expo-image-picker';
 
 type SessionFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'SessionForm'>;
 type SessionFormRouteProp = RouteProp<HostAdminEventStackParamList, 'SessionForm'>;
@@ -30,7 +31,9 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [sessionDate, setSessionDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [bannerImage, setBannerImage] = useState('');
   const [status, setStatus] = useState<SessionStatus>('scheduled');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     if (isEditing) {
@@ -49,6 +52,7 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setSessionDate(session.sessionDate);
         setStartTime(session.startTime);
         setEndTime(session.endTime);
+        setBannerImage(session.bannerImage || '');
         setStatus(session.status);
       } else {
         Alert.alert('Error', 'Session not found');
@@ -78,6 +82,7 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
         sessionDate,
         startTime,
         endTime,
+        bannerImage,
         status
       };
 
@@ -92,6 +97,34 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
       Alert.alert('Error', error.response?.data?.message || 'Failed to save session');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUploadSessionImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Media library permission is required to upload a session image.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (pickerResult.canceled || !pickerResult.assets.length) return;
+      const selectedImage = pickerResult.assets[0];
+      if (!selectedImage?.uri) return;
+
+      setIsUploadingImage(true);
+      const response = await UploadService.uploadSessionImage(selectedImage.uri);
+      setBannerImage(response.data.url);
+    } catch (error: any) {
+      Alert.alert('Upload Failed', error?.response?.data?.message || 'Unable to upload session image');
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -133,6 +166,22 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
           ))}
         </View>
 
+        <Input
+          label="Session image URL"
+          value={bannerImage}
+          onChangeText={setBannerImage}
+          placeholder="https://.../session-image.jpg"
+        />
+        {bannerImage ? <Image source={{ uri: bannerImage }} style={styles.bannerPreview} /> : null}
+        <Button
+          title={isUploadingImage ? 'Uploading Image...' : 'Upload Session Image'}
+          onPress={handleUploadSessionImage}
+          variant="secondary"
+          size="md"
+          icon={!isUploadingImage ? <Upload size={16} color={theme.colors.text} /> : undefined}
+          isLoading={isUploadingImage}
+        />
+
         <Button
           title={isEditing ? 'Save Changes' : 'Create Session'}
           onPress={handleSave}
@@ -158,5 +207,13 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySubtle },
   chipText: { ...theme.typography.caption, color: theme.colors.textMuted, textTransform: 'capitalize' },
   chipTextActive: { color: theme.colors.primary, fontWeight: '700' },
+  bannerPreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: theme.borderRadius.m,
+    marginBottom: theme.spacing.m,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   saveBtn: { marginTop: theme.spacing.m },
 });

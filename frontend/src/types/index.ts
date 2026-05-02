@@ -123,6 +123,14 @@ export interface Booking {
   attendanceNote?: string;
   customAnswers: RegistrationAnswer[];
   registrationType: RegistrationType;
+  event?: {
+    id: string;
+    title: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    location?: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

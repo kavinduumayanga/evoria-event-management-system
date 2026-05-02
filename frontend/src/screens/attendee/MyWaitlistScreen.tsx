@@ -1,11 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatusBadge } from '../../components';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatusBadge, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { WaitlistService } from '../../api/services';
 import { Booking } from '../../types';
-import { ListOrdered, Calendar, Clock } from 'lucide-react-native';
+import { ListOrdered, Calendar, Clock, ArrowLeft } from 'lucide-react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AttendeeHomeStackParamList } from '../../types/navigation';
 
 interface WaitlistItem extends Booking {
   status: 'waiting' | 'promoted';
@@ -13,6 +15,7 @@ interface WaitlistItem extends Booking {
 }
 
 export const MyWaitlistScreen = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<AttendeeHomeStackParamList>>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +47,20 @@ export const MyWaitlistScreen = () => {
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
         }
         ListHeaderComponent={
-          <View style={styles.pageHeader}>
-            <Text style={styles.pageTitle}>My Waitlist</Text>
-            <Text style={styles.pageSubtitle}>Track your waiting and promoted entries</Text>
-          </View>
+          <>
+            <View style={styles.header}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={() => navigation.goBack()}
+                variant="surface"
+                size={36}
+              />
+              <Text style={styles.pageTitle}>My Waitlist</Text>
+            </View>
+            <View style={styles.pageHeader}>
+              <Text style={styles.pageSubtitle}>Track your waiting and promoted entries</Text>
+            </View>
+          </>
         }
         ListEmptyComponent={
           <EmptyState
@@ -99,8 +112,14 @@ export const MyWaitlistScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: 100, flexGrow: 1 },
-  pageHeader: { paddingTop: theme.spacing.xl, marginBottom: theme.spacing.l },
+  listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: 140, flexGrow: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.m,
+    paddingTop: theme.spacing.l,
+  },
+  pageHeader: { marginBottom: theme.spacing.l },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   pageSubtitle: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 4 },
   card: { flexDirection: 'row', borderRadius: theme.borderRadius.l, marginBottom: theme.spacing.sm, overflow: 'hidden' },

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { BookingModel } from '../models/Booking';
 import { EventModel } from '../models/Event';
 import { TicketTypeModel } from '../models/TicketType';
+import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
 import { ApprovalStatus, RsvpStatus } from '../types';
 import { createNotificationRecord } from '../utils/notification.helper';
@@ -18,6 +19,7 @@ const registrationSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
   ticketTypeId: z.string().trim().min(1, 'ticketTypeId is required'),
   quantity: z.number().int().positive('quantity must be at least 1'),
+  allowWaitlist: z.boolean().optional().default(true),
   rsvpStatus: z.enum(['going', 'not_going']).default('going'),
   customAnswers: z.array(z.object({
     questionId: z.string().trim().min(1, 'questionId is required'),
@@ -131,6 +133,10 @@ export const createRegistration = async (req: Request, res: Response, next: Next
     }
 
     const eventAtCapacity = await isEventAtCapacityForQuantity(validatedData.eventId, validatedData.quantity);
+    if (eventAtCapacity && !validatedData.allowWaitlist) {
+      return next(new AppError('Sold Out / Capacity Full', 409));
+    }
+
     if (!eventAtCapacity) {
       validateTicketAvailability(ticket as any, validatedData.quantity);
     } else {
@@ -235,10 +241,48 @@ export const updateRegistrationRsvp = async (req: Request, res: Response, next: 
 export const getMyRegistrations = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const registrations = await BookingModel.find({ userId: req.user!.id }).sort({ createdAt: -1 });
+    const eventIds = Array.from(new Set(registrations.map((registration) => registration.eventId)));
+    const events = await EventModel.find({ _id: { $in: eventIds } })
+      .select('_id title date startTime endTime city type venueId');
+
+    const venueIds = Array.from(new Set(
+      events
+        .map((event) => (typeof event.venueId === 'string' ? event.venueId : null))
+        .filter((value): value is string => Boolean(value)),
+    ));
+    const venues = await VenueModel.find({ _id: { $in: venueIds } }).select('_id name city');
+
+    const eventMap = new Map(events.map((event) => [event.id, event]));
+    const venueMap = new Map(venues.map((venue) => [venue.id, venue]));
+
+    const mappedRegistrations = registrations.map((registration) => {
+      const event = eventMap.get(registration.eventId);
+      const venue = event?.venueId ? venueMap.get(event.venueId) : null;
+      const location = event?.type === 'online'
+        ? 'Online'
+        : venue
+          ? `${venue.name}, ${venue.city}`
+          : (event?.city || 'Venue');
+
+      return {
+        ...registration.toJSON(),
+        event: event
+          ? {
+              id: event.id,
+              title: event.title,
+              date: event.date,
+              startTime: event.startTime,
+              endTime: event.endTime,
+              location,
+            }
+          : null,
+      };
+    });
+
     res.status(200).json({
       status: 'success',
-      results: registrations.length,
-      data: { registrations: registrations.map((registration) => registration.toJSON()) },
+      results: mappedRegistrations.length,
+      data: { registrations: mappedRegistrations },
     });
   } catch (error) {
     next(error);

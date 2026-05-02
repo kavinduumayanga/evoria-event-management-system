@@ -6,9 +6,9 @@ import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList, AttendeeTabParamList } from '../../types/navigation';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { ScreenContainer, Card, Button } from '../../components';
+import { ScreenContainer, Card, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
-import { CheckCircle2, Clock, Ticket as TicketIcon, Hash } from 'lucide-react-native';
+import { CheckCircle2, Clock, Ticket as TicketIcon, ArrowLeft } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { Booking } from '../../types';
 
@@ -56,6 +56,15 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
   return (
     <ScreenContainer scrollable>
       <View style={styles.container}>
+        <View style={styles.header}>
+          <IconButton
+            icon={<ArrowLeft size={20} color={theme.colors.text} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={36}
+          />
+        </View>
+
         {/* Hero */}
         <View style={styles.heroSection}>
           <View style={[styles.iconCircle, { backgroundColor: isWaitlisted ? theme.colors.warningSubtle : theme.colors.successSubtle }]}>
@@ -124,7 +133,8 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: theme.spacing.base, paddingBottom: 100 },
+  container: { flex: 1, paddingHorizontal: theme.spacing.base, paddingBottom: 140 },
+  header: { paddingTop: theme.spacing.l, marginBottom: theme.spacing.s },
   heroSection: { alignItems: 'center', paddingTop: theme.spacing.xxl, paddingBottom: theme.spacing.xl },
   iconCircle: {
     width: 96, height: 96, borderRadius: 48,

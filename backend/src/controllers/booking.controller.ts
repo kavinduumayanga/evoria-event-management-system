@@ -26,6 +26,7 @@ const bookingSchema = z.object({
   quantity: z.number().int().positive('quantity must be greater than 0').default(1),
   promoCode: z.string().trim().optional(),
   unlockCode: z.string().trim().optional(),
+  allowWaitlist: z.boolean().optional().default(true),
   customAnswers: z.array(z.object({
     questionId: z.string().trim().min(1),
     answer: z.string().trim().min(1),
@@ -278,6 +279,10 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
     await validateMaxPerUser(req.user!.id, ticket.id, ticket.maxPerUser, validatedData.quantity);
 
     const eventAtCapacity = await isEventAtCapacityForQuantity(validatedData.eventId, validatedData.quantity);
+    if (eventAtCapacity && !validatedData.allowWaitlist) {
+      return next(new AppError('Sold Out / Capacity Full', 409));
+    }
+
     if (!eventAtCapacity) {
       validateTicketAvailability(ticket as any, validatedData.quantity);
     } else {

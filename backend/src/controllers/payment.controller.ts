@@ -50,7 +50,7 @@ export const mockCheckout = async (req: Request, res: Response, next: NextFuncti
 
     const eventAtCapacity = await isEventAtCapacityForQuantity(event.id, validatedData.quantity);
     if (eventAtCapacity) {
-      return next(new AppError('Event is full. Join waitlist instead of payment.', 409));
+      return next(new AppError('Sold Out / Capacity Full', 409));
     }
 
     validateUnlockCode(ticket as any, validatedData.unlockCode);

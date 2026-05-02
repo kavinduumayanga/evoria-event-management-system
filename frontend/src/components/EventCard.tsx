@@ -5,272 +5,167 @@ import { AnimatedPressable } from './AnimatedPressable';
 import { StatusBadge } from './StatusBadge';
 import { Event } from '../types';
 import { theme } from '../constants/theme';
-import { Calendar, MapPin, Users } from 'lucide-react-native';
-import { resolveImageUrl } from '../utils/imageUrl';
-
-// ============================================================
-// EVENT CARD — Luma-style event cards
-//
-// featured: Large card with image, gradient overlay, info at bottom
-//           Used in horizontal discovery carousels
-//
-// list:     Compact card with thumbnail + details
-//           Used in vertical event lists
-// ============================================================
+import { Calendar, Clock, MapPin, Users } from 'lucide-react-native';
 
 interface EventCardProps {
   event: Event;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
-  variant?: 'featured' | 'list';
   actions?: React.ReactNode;
+  variant?: 'default' | 'list' | 'compact';
 }
 
-const getStatusType = (status: string): any => {
-  switch (status) {
-    case 'published': return 'success';
-    case 'draft': return 'warning';
-    case 'cancelled': return 'error';
-    default: return 'neutral';
-  }
+const formatEventDate = (dateValue: string) => {
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return dateValue;
+  return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
-// ------ Featured variant ------
-const FeaturedCard: React.FC<EventCardProps> = ({ event, style }) => {
-  const imageUri = resolveImageUrl(event.coverImage);
-  const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
-  return (
-    <View style={[styles.featuredCard, style]}>
-      {/* Cover image */}
-      {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.featuredImage} />
-      ) : (
-        <View style={styles.featuredImagePlaceholder}>
-          <Calendar size={32} color={theme.colors.textMuted} />
-        </View>
-      )}
-
-      {/* Gradient overlay + content */}
-      <View style={styles.featuredOverlay}>
-        <View style={styles.featuredMeta}>
-          <StatusBadge status={getStatusType(event.status)} label={event.status} />
-          {event.isFeatured && <StatusBadge status="warning" label="Featured" />}
-        </View>
-        <View style={styles.featuredBottom}>
-          <Text style={styles.featuredTitle} numberOfLines={2}>{event.title}</Text>
-          <View style={styles.featuredDetailRow}>
-            <Calendar size={13} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.featuredDetail}>{formattedDate}</Text>
-            {event.city && (
-              <>
-                <View style={styles.dot} />
-                <MapPin size={13} color="rgba(255,255,255,0.7)" />
-                <Text style={styles.featuredDetail}>{event.city}</Text>
-              </>
-            )}
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-// ------ List variant ------
-const ListCard: React.FC<EventCardProps> = ({ event, style, actions }) => {
-  const imageUri = resolveImageUrl(event.coverImage);
-  const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-  const isCancelled = event.status === 'cancelled';
-
-  return (
-    <View
-      style={[styles.listCard, isCancelled && styles.listCardCancelled, style]}
-    >
-      {/* Thumbnail */}
-      <View style={styles.listThumbnail}>
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.listImage} />
-        ) : (
-          <View style={styles.listImagePlaceholder}>
-            <Calendar size={20} color={theme.colors.textMuted} />
-          </View>
-        )}
-      </View>
-
-      {/* Content */}
-      <View style={styles.listContent}>
-        <Text style={styles.listTitle} numberOfLines={1}>{event.title}</Text>
-        <View style={styles.listMeta}>
-          <Calendar size={12} color={theme.colors.textMuted} />
-          <Text style={styles.listMetaText}>{formattedDate}</Text>
-          {event.startTime && (
-            <>
-              <View style={styles.dot} />
-              <Text style={styles.listMetaText}>{event.startTime}</Text>
-            </>
-          )}
-        </View>
-        {event.city && (
-          <View style={styles.listMeta}>
-            <MapPin size={12} color={theme.colors.textMuted} />
-            <Text style={styles.listMetaText}>{event.city}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Optional actions */}
-      {actions && (
-        <View style={styles.listActions}>{actions}</View>
-      )}
-    </View>
-  );
-};
-
-// ------ Main export ------
 export const EventCard: React.FC<EventCardProps> = ({
   event,
   onPress,
   style,
-  variant = 'list',
   actions,
+  variant = 'default',
 }) => {
-  const CardComponent = variant === 'featured' ? FeaturedCard : ListCard;
+  const isSoldOut = Number(event.bookingCount || 0) >= Number(event.capacity || 0);
+  const containerStyle = [
+    styles.container,
+    variant === 'compact' && styles.compactContainer,
+    style,
+  ];
 
-  const content = (
-    <CardComponent event={event} style={style} actions={actions} />
+  const cardContent = (
+    <Card variant="raised" style={containerStyle} noPadding>
+      {event.coverImage ? (
+        <Image source={{ uri: event.coverImage }} style={[styles.image, variant === 'compact' && styles.compactImage]} />
+      ) : (
+        <View style={[styles.image, styles.placeholder, variant === 'compact' && styles.compactImage]}>
+          <Text style={styles.placeholderText}>No image</Text>
+        </View>
+      )}
+
+      <View style={styles.content}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
+          {isSoldOut ? (
+            <StatusBadge status="error" label="Sold Out" />
+          ) : (
+            <StatusBadge status="success" label={event.status.toUpperCase()} />
+          )}
+        </View>
+
+        <View style={styles.row}>
+          <Calendar size={14} color={theme.colors.primary} />
+          <Text style={styles.rowText}>{formatEventDate(event.date)}</Text>
+          <Clock size={14} color={theme.colors.secondary} />
+          <Text style={styles.rowText}>{event.startTime} - {event.endTime}</Text>
+        </View>
+
+        <View style={styles.row}>
+          <MapPin size={14} color={theme.colors.accent} />
+          <Text style={styles.rowText} numberOfLines={1}>
+            {event.type === 'online' ? 'Online' : (event.city || 'Venue')}
+          </Text>
+        </View>
+
+        <View style={styles.metaRow}>
+          <StatusBadge status="neutral" label={event.type.toUpperCase()} />
+          <StatusBadge status="neutral" label={event.visibility.toUpperCase()} />
+          <View style={styles.attendeeMeta}>
+            <Users size={12} color={theme.colors.textMuted} />
+            <Text style={styles.attendeeMetaText}>{event.bookingCount}/{event.capacity}</Text>
+          </View>
+        </View>
+
+        {actions ? <View style={styles.actions}>{actions}</View> : null}
+      </View>
+    </Card>
   );
 
-  if (onPress) {
-    return (
-      <AnimatedPressable onPress={onPress} style={styles.pressable}>
-        {content}
-      </AnimatedPressable>
-    );
-  }
-  return content;
+  if (!onPress) return cardContent;
+  return <AnimatedPressable onPress={onPress}>{cardContent}</AnimatedPressable>;
 };
 
 const styles = StyleSheet.create({
-  pressable: {},
-
-  // Featured card — Luma city-card style
-  featuredCard: {
-    borderRadius: theme.borderRadius.xl,
+  container: {
     marginBottom: theme.spacing.m,
+    borderRadius: theme.borderRadius.l,
     overflow: 'hidden',
-    backgroundColor: theme.colors.surface,
   },
-  featuredImage: {
-    width: '100%',
-    aspectRatio: 16 / 9,
+  compactContainer: {
+    marginBottom: theme.spacing.s,
   },
-  featuredImagePlaceholder: {
+  image: {
     width: '100%',
-    aspectRatio: 16 / 9,
-    backgroundColor: theme.colors.surfaceRaised,
-    justifyContent: 'center',
+    height: 190,
+    backgroundColor: theme.colors.surfaceLight,
+  },
+  compactImage: {
+    height: 150,
+  },
+  placeholder: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  featuredOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
+  placeholderText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  content: {
     padding: theme.spacing.m,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    gap: theme.spacing.s,
   },
-  featuredMeta: {
+  titleRow: {
     flexDirection: 'row',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.s,
+    alignItems: 'flex-start',
   },
-  featuredBottom: {
-    gap: theme.spacing.xs,
+  title: {
+    ...theme.typography.h2,
+    color: theme.colors.text,
+    flex: 1,
+    lineHeight: 26,
   },
-  featuredTitle: {
-    ...theme.typography.h3,
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
   },
-  featuredDetailRow: {
+  rowText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginRight: theme.spacing.s,
+  },
+  metaRow: {
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: theme.spacing.s,
+  },
+  attendeeMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  featuredDetail: {
-    ...theme.typography.caption,
-    color: 'rgba(255,255,255,0.8)',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-
-  // List card — Luma calendar-list-item style
-  listCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: theme.borderRadius.l,
-    marginBottom: theme.spacing.sm,
-    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  listCardCancelled: {
-    opacity: 0.5,
-  },
-  listThumbnail: {
-    width: 68,
-    height: 68,
-    flexShrink: 0,
-  },
-  listImage: {
-    width: 68,
-    height: 68,
-  },
-  listImagePlaceholder: {
-    width: 68,
-    height: 68,
-    backgroundColor: theme.colors.surfaceRaised,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    flex: 1,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.s,
-    gap: 3,
-  },
-  listTitle: {
-    ...theme.typography.h3,
-    fontSize: 15,
-    color: theme.colors.text,
-  },
-  listMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  listMetaText: {
-    ...theme.typography.caption,
+  attendeeMetaText: {
+    ...theme.typography.small,
     color: theme.colors.textMuted,
+    fontWeight: '600',
   },
-  listActions: {
-    paddingRight: theme.spacing.sm,
-  },
-
-  // Shared
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: theme.colors.textMuted,
-    marginHorizontal: 2,
+  actions: {
+    marginTop: theme.spacing.s,
+    paddingTop: theme.spacing.s,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    gap: theme.spacing.s,
   },
 });

@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { GlassCard } from './Card';
+import { Card } from './Card';
 import { Booking } from '../types';
 import { theme } from '../constants/theme';
-import { Ticket, Calendar, DollarSign } from 'lucide-react-native';
+import { Calendar, Clock, MapPin } from 'lucide-react-native';
 
 interface BookingCardProps {
   booking: Booking;
@@ -12,84 +12,60 @@ interface BookingCardProps {
   actions?: React.ReactNode;
 }
 
-export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress, style, actions }) => {
-  const approvalStatus = booking.approvalStatus || 'approved';
-  const rsvpStatus = booking.rsvpStatus || 'going';
-  const registrationType = booking.registrationType || (booking.totalAmount > 0 ? 'paid' : 'free');
-  const isWaitlisted = Boolean(booking.isWaitlisted);
+const toDisplayDate = (rawDate?: string) => {
+  if (!rawDate) return 'Date TBD';
+  const parsed = new Date(rawDate);
+  if (Number.isNaN(parsed.getTime())) return rawDate;
+  return parsed.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
 
-  const getStatusColor = () => {
-    if (isWaitlisted) return theme.colors.warning;
-    switch (booking.bookingStatus) {
-      case 'confirmed': return theme.colors.success;
-      case 'pending': return theme.colors.warning;
-      case 'cancelled': return theme.colors.error;
-      default: return theme.colors.textMuted;
-    }
-  };
+export const BookingCard: React.FC<BookingCardProps> = ({ booking, style, actions }) => {
+  const bookingStatus = booking.isWaitlisted ? 'WAITLISTED' : booking.bookingStatus.toUpperCase();
+  const title = booking.event?.title || `Event ${booking.eventId.slice(0, 8)}`;
+  const location = booking.event?.location || 'Location TBD';
 
-  const getApprovalColor = () => {
-    switch (approvalStatus) {
-      case 'approved': return theme.colors.success;
-      case 'pending': return theme.colors.warning;
-      case 'rejected': return theme.colors.error;
-      default: return theme.colors.textMuted;
-    }
-  };
+  const statusColor = booking.isWaitlisted
+    ? theme.colors.warning
+    : booking.bookingStatus === 'confirmed'
+      ? theme.colors.success
+      : booking.bookingStatus === 'cancelled'
+        ? theme.colors.error
+        : theme.colors.warning;
 
   return (
-    <GlassCard style={[styles.container, style]} variant="dark" animateEntrance>
-      <View style={styles.headerRow}>
-        <View style={styles.titleContainer}>
-          <Ticket size={18} color={theme.colors.primary} />
-          <Text style={styles.title} numberOfLines={1}>Booking #{booking.id.substring(0, 8)}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor() + '20', borderColor: getStatusColor() }]}>
-          <Text style={[styles.statusText, { color: getStatusColor() }]}>{isWaitlisted ? 'WAITLISTED' : booking.bookingStatus.toUpperCase()}</Text>
+    <Card variant="raised" style={[styles.container, style]}>
+      <View style={styles.topRow}>
+        <Text style={styles.title} numberOfLines={2}>{title}</Text>
+        <View style={[styles.statusPill, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>{bookingStatus}</Text>
         </View>
       </View>
 
-      <View style={styles.detailsContainer}>
-        <View style={styles.detailRow}>
-          <Calendar size={14} color={theme.colors.secondary} />
-          <Text style={styles.detailText}>Booked: {new Date(booking.bookingDate).toLocaleDateString()}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.label}>Approval:</Text>
-          <View style={[styles.smallBadge, { borderColor: getApprovalColor(), backgroundColor: `${getApprovalColor()}20` }]}>
-            <Text style={[styles.smallBadgeText, { color: getApprovalColor() }]}>{approvalStatus.toUpperCase()}</Text>
-          </View>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.label}>RSVP:</Text>
-          <Text style={styles.value}>{rsvpStatus.replace('_', ' ').toUpperCase()}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.label}>Quantity:</Text>
-          <Text style={styles.value}>{booking.quantity}</Text>
-        </View>
-        {isWaitlisted && (
-          <View style={styles.detailRow}>
-            <Text style={styles.label}>Queue:</Text>
-            <Text style={styles.value}>{booking.waitlistPosition ? `#${booking.waitlistPosition}` : 'Waiting'}</Text>
-          </View>
-        )}
-        <View style={styles.detailRow}>
-          <Text style={styles.label}>Type:</Text>
-          <Text style={styles.value}>{registrationType.toUpperCase()}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <DollarSign size={14} color={theme.colors.success} />
-          <Text style={styles.detailText}>Total: ${booking.totalAmount}</Text>
-        </View>
+      <View style={styles.metaRow}>
+        <Calendar size={14} color={theme.colors.primary} />
+        <Text style={styles.metaText}>{toDisplayDate(booking.event?.date)}</Text>
+      </View>
+      <View style={styles.metaRow}>
+        <Clock size={14} color={theme.colors.secondary} />
+        <Text style={styles.metaText}>{booking.event?.startTime || '--'} - {booking.event?.endTime || '--'}</Text>
+      </View>
+      <View style={styles.metaRow}>
+        <MapPin size={14} color={theme.colors.accent} />
+        <Text style={styles.metaText} numberOfLines={1}>{location}</Text>
       </View>
 
-      {actions && (
-        <View style={styles.actionsContainer}>
-          {actions}
-        </View>
-      )}
-    </GlassCard>
+      <View style={styles.bottomRow}>
+        <Text style={styles.badge}>RSVP: {booking.rsvpStatus.replace('_', ' ').toUpperCase()}</Text>
+        <Text style={styles.badge}>Qty: {booking.quantity}</Text>
+      </View>
+
+      {actions ? <View style={styles.actionsContainer}>{actions}</View> : null}
+    </Card>
   );
 };
 
@@ -97,74 +73,58 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: theme.spacing.m,
   },
-  headerRow: {
+  topRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.m,
-    paddingBottom: theme.spacing.s,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    gap: theme.spacing.s,
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.s,
   },
   title: {
     ...theme.typography.h3,
     color: theme.colors.text,
-    marginLeft: theme.spacing.s,
+    flex: 1,
+    lineHeight: 24,
   },
-  statusBadge: {
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: 999,
     paddingHorizontal: theme.spacing.s,
     paddingVertical: 4,
-    borderRadius: theme.borderRadius.s,
-    borderWidth: 1,
   },
   statusText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  detailsContainer: {
-    marginTop: theme.spacing.xs,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  label: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    width: 60,
-  },
-  value: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-  },
-  detailText: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-    marginLeft: theme.spacing.s,
-  },
-  smallBadge: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.s,
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 2,
-  },
-  smallBadgeText: {
     ...theme.typography.small,
     fontWeight: '700',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  metaText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    flex: 1,
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    marginTop: theme.spacing.xs,
+  },
+  badge: {
+    ...theme.typography.small,
+    color: theme.colors.textMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    paddingHorizontal: theme.spacing.s,
+    paddingVertical: 4,
   },
   actionsContainer: {
     marginTop: theme.spacing.m,
     paddingTop: theme.spacing.m,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
-    flexDirection: 'column',
-    justifyContent: 'flex-start',
     gap: theme.spacing.s,
   },
 });

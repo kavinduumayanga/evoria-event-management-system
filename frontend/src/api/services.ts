@@ -81,6 +81,8 @@ export interface CreateBookingPayload {
   quantity: number;
   promoCode?: string;
   unlockCode?: string;
+  customAnswers?: RegistrationAnswer[];
+  allowWaitlist?: boolean;
 }
 
 export interface CreateReportPayload {
@@ -314,6 +316,44 @@ export const UploadService = {
     } as any);
 
     const response = await apiClient.post('/uploads/event-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data as { status: string; data: { url: string } };
+  },
+  uploadProfileImage: async (uri: string) => {
+    const formData = new FormData();
+    const extension = (uri.split('.').pop() || 'jpg').toLowerCase();
+    const safeExt = extension.replace(/[^a-z0-9]/g, '') || 'jpg';
+
+    formData.append('image', {
+      uri,
+      name: `profile-image-${Date.now()}.${safeExt}`,
+      type: inferImageMimeType(uri),
+    } as any);
+
+    const response = await apiClient.post('/uploads/profile-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data as { status: string; data: { url: string } };
+  },
+  uploadSessionImage: async (uri: string) => {
+    const formData = new FormData();
+    const extension = (uri.split('.').pop() || 'jpg').toLowerCase();
+    const safeExt = extension.replace(/[^a-z0-9]/g, '') || 'jpg';
+
+    formData.append('image', {
+      uri,
+      name: `session-image-${Date.now()}.${safeExt}`,
+      type: inferImageMimeType(uri),
+    } as any);
+
+    const response = await apiClient.post('/uploads/session-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

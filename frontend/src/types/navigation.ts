@@ -35,6 +35,10 @@ export type AttendeeHomeStackParamList = {
     ticketName: string;
     currency: string;
     unitPrice: number;
+    customAnswers?: Array<{
+      questionId: string;
+      answer: string;
+    }>;
   };
   BookingConfirmation: { bookingId: string };
   MyTicketQR: { bookingId: string };

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { ScreenContainer, Card, Button, LoadingState, ErrorState, IconButton } from '../../components';
+import { ScreenContainer, Card, Button, LoadingState, ErrorState, IconButton, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import { ArrowLeft, Tag, Receipt, CreditCard } from 'lucide-react-native';
 import { BookingService, PaymentService } from '../../api/services';
@@ -35,12 +35,16 @@ const lineStyles = StyleSheet.create({
 });
 
 export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId, ticketTypeId, quantity, promoCode, unlockCode, ticketName, currency, unitPrice } = route.params;
+  const { eventId, ticketTypeId, quantity, promoCode, unlockCode, ticketName, currency, unitPrice, customAnswers } = route.params;
 
   const [isLoading, setIsLoading] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
   const [summary, setSummary] = useState<CheckoutSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cardholderName, setCardholderName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
 
   useEffect(() => { fetchSummary(); }, [ticketTypeId, quantity, promoCode, unlockCode]);
 
@@ -58,19 +62,41 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
   };
 
   const confirmPayment = async () => {
+    const normalizedCardNumber = cardNumber.replace(/\s+/g, '');
+    if (!cardholderName.trim()) {
+      Alert.alert('Validation', 'Cardholder name is required.');
+      return;
+    }
+    if (!/^\d{16}$/.test(normalizedCardNumber)) {
+      Alert.alert('Validation', 'Card number must be 16 digits.');
+      return;
+    }
+    if (!/^\d{2}\/\d{2}$/.test(expiry.trim())) {
+      Alert.alert('Validation', 'Expiry must be in MM/YY format.');
+      return;
+    }
+    if (!/^\d{3,4}$/.test(cvv.trim())) {
+      Alert.alert('Validation', 'CVV must be 3 or 4 digits.');
+      return;
+    }
+
     try {
       setIsConfirming(true);
       // Re-validate stock + promo before booking
       await PaymentService.mockCheckout({ ticketTypeId, quantity, promoCode, unlockCode });
-      const bookingRes = await BookingService.createBooking({ eventId, ticketTypeId, quantity, promoCode, unlockCode });
-      const waitlisted = Boolean(bookingRes.data.booking?.isWaitlisted);
-      Alert.alert('Success', waitlisted
-        ? 'Event reached capacity. You were added to the waitlist.'
-        : 'Payment successful!'
-      );
+      const bookingRes = await BookingService.createBooking({
+        eventId,
+        ticketTypeId,
+        quantity,
+        promoCode,
+        unlockCode,
+        customAnswers,
+        allowWaitlist: false,
+      });
+      Alert.alert('Payment Successful', 'Mock Visa payment confirmed.');
       navigation.replace('BookingConfirmation', { bookingId: bookingRes.data.booking.id });
     } catch (err: any) {
-      Alert.alert('Payment Failed', err.response?.data?.message || 'Unable to complete payment');
+      Alert.alert(err?.response?.status === 409 ? 'Sold Out' : 'Payment Failed', err.response?.data?.message || 'Unable to complete payment');
     } finally {
       setIsConfirming(false);
     }
@@ -137,6 +163,41 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
                 <Text style={styles.disclaimerText}>This is a simulated payment. No real charges will be made.</Text>
               </View>
             </Card>
+
+            <Card variant="raised" style={styles.paymentFormCard}>
+              <Text style={styles.formTitle}>Mock Visa Payment</Text>
+              <Input
+                label="Cardholder name"
+                value={cardholderName}
+                onChangeText={setCardholderName}
+                placeholder="John Doe"
+              />
+              <Input
+                label="Card number"
+                value={cardNumber}
+                onChangeText={setCardNumber}
+                keyboardType="number-pad"
+                placeholder="4111111111111111"
+              />
+              <View style={styles.formRow}>
+                <Input
+                  label="Expiry (MM/YY)"
+                  value={expiry}
+                  onChangeText={setExpiry}
+                  keyboardType="number-pad"
+                  placeholder="12/30"
+                  containerStyle={styles.flexInput}
+                />
+                <Input
+                  label="CVV"
+                  value={cvv}
+                  onChangeText={setCvv}
+                  keyboardType="number-pad"
+                  placeholder="123"
+                  containerStyle={styles.flexInput}
+                />
+              </View>
+            </Card>
           </>
         )}
       </View>
@@ -185,6 +246,10 @@ const styles = StyleSheet.create({
   disclaimerCard: { borderRadius: theme.borderRadius.m, overflow: 'hidden' },
   disclaimerInner: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s, padding: theme.spacing.m },
   disclaimerText: { ...theme.typography.caption, color: theme.colors.textMuted, flex: 1, lineHeight: 18 },
+  paymentFormCard: { marginTop: theme.spacing.m },
+  formTitle: { ...theme.typography.h3, color: theme.colors.text, marginBottom: theme.spacing.s },
+  formRow: { flexDirection: 'row', gap: theme.spacing.s },
+  flexInput: { flex: 1 },
   errorCard: { borderRadius: theme.borderRadius.l, overflow: 'hidden' },
   errorInner: { padding: theme.spacing.xl },
   errorText: { ...theme.typography.body, color: theme.colors.error, marginBottom: theme.spacing.m },
