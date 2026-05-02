@@ -103,7 +103,7 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: theme.borderRadius.xl,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
@@ -132,14 +132,17 @@ const styles = StyleSheet.create({
   textLg: { fontSize: 18 },
   // Variants
   primary: {
-    backgroundColor: theme.colors.primary,
-    ...theme.shadows.glow,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
   },
-  primaryText: { color: theme.colors.textOnPrimary },
+  primaryText: { color: '#000000' },
   secondary: {
-    backgroundColor: theme.colors.surfaceLight,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
-  secondaryText: { color: theme.colors.primaryDark },
+  secondaryText: { color: '#FFFFFF' },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 2,

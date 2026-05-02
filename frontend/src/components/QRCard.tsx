@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle, Text } from 'react-native';
-import { GlassCard } from './Card';
+import { GlassCard } from './GlassCard';
 import QRCode from 'react-native-qrcode-svg';
-import { theme } from '../constants/theme';
 
 interface QRCardProps {
   value: string;
@@ -18,7 +17,7 @@ export const QRCard: React.FC<QRCardProps> = ({
   style 
 }) => {
   return (
-    <GlassCard style={[styles.container, style]} variant="primary" animateEntrance>
+    <GlassCard variant="dark" style={[styles.container, style]}>
       <View style={styles.qrWrapper}>
         <View style={styles.qrContainer}>
           <QRCode
@@ -37,25 +36,26 @@ export const QRCard: React.FC<QRCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.xxl,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
   },
   qrWrapper: {
-    padding: theme.spacing.m,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: theme.borderRadius.l,
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(6, 182, 212, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   qrContainer: {
-    padding: theme.spacing.m,
+    padding: 16,
     backgroundColor: '#FFFFFF',
-    borderRadius: theme.borderRadius.m,
+    borderRadius: 16,
   },
   label: {
-    ...theme.typography.body,
-    color: theme.colors.secondary,
-    marginTop: theme.spacing.l,
+    color: '#FFFFFF',
+    marginTop: 24,
+    fontSize: 16,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   }
 });

@@ -97,7 +97,7 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
           />
         }
         renderItem={({ item }) => (
-          <Card variant={item.isActive ? 'raised' : 'default'} style={styles.ticketCard} noPadding>
+          <Card variant={item.isActive ? 'raised' : 'elevated'} style={styles.ticketCard} noPadding>
             <View style={styles.ticketInner}>
               {/* Header row */}
               <View style={styles.ticketTitleRow}>
