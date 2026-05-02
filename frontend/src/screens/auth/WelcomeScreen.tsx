@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,6 +25,8 @@ const { width, height } = Dimensions.get('window');
 export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
+  const logoScale = useRef(new Animated.Value(0.7)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
   const orb1Anim = useRef(new Animated.Value(0)).current;
   const orb2Anim = useRef(new Animated.Value(0)).current;
 
@@ -31,6 +34,19 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
     // Staggered entrance
     Animated.sequence([
       Animated.delay(100),
+      Animated.parallel([
+        Animated.spring(logoScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          speed: 14,
+          bounciness: 10,
+        }),
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 380,
+          useNativeDriver: true,
+        }),
+      ]),
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -59,7 +75,7 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
         Animated.timing(orb2Anim, { toValue: 0, duration: 3000, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [fadeAnim, logoOpacity, logoScale, orb1Anim, orb2Anim, slideAnim]);
 
   return (
     <View style={styles.root}>
@@ -101,6 +117,15 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
             { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
+          <Animated.View
+            style={[
+              styles.logoWrap,
+              { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+            ]}
+          >
+            <Image source={require('../../../assets/icon.png')} style={styles.logo} />
+          </Animated.View>
+
           {/* Wordmark */}
           <View style={styles.wordmarkContainer}>
             <Text style={styles.wordmark}>EVORIA</Text>
@@ -178,6 +203,22 @@ const styles = StyleSheet.create({
     flex: 3,
     justifyContent: 'center',
     paddingTop: theme.spacing.xxl,
+  },
+  logoWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.l,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  logo: {
+    width: 62,
+    height: 62,
+    borderRadius: 16,
   },
   wordmarkContainer: {
     marginBottom: theme.spacing.l,

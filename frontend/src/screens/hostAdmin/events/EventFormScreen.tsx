@@ -2,14 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, SectionHeader } from '../../../components';
-import { theme } from '../../../constants/theme';
-import { ArrowLeft, Plus, X, Upload, HelpCircle, Ticket, MapPin, Tag } from 'lucide-react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import { ArrowLeft, Plus, X, Upload, HelpCircle } from 'lucide-react-native';
+import { HostAdminEventStackParamList } from '../../../types/navigation';
+import { ScreenContainer, Input, Button, LoadingState, Card, IconButton } from '../../../components';
+import { theme } from '../../../constants/theme';
 import { EventService, UploadService, VenueService } from '../../../api/services';
-import { Event, Venue, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode } from '../../../types';
+import { Event, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode, Venue } from '../../../types';
 import { resolveImageUrl } from '../../../utils/imageUrl';
+import { useAuthStore } from '../../../store/auth.store';
 
 type EventFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'EventForm'>;
 type EventFormRouteProp = RouteProp<HostAdminEventStackParamList, 'EventForm'>;
@@ -23,10 +25,43 @@ const eventTypes: EventType[] = ['online', 'physical', 'hybrid'];
 const pricingModes: EventPricingMode[] = ['free', 'ticketed'];
 const visibilityOptions: EventVisibility[] = ['public', 'private', 'unlisted'];
 const customQuestionTypes: CustomQuestionType[] = ['text', 'number', 'choice'];
+const themeColors = ['#8B5CF6', '#22C55E', '#F97316', '#0EA5E9', '#EC4899', '#14B8A6', '#EAB308', '#EF4444'];
+
+const toDateString = (value: Date) => {
+  const year = value.getFullYear();
+  const month = `${value.getMonth() + 1}`.padStart(2, '0');
+  const day = `${value.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toTimeString = (value: Date) => {
+  const hours = `${value.getHours()}`.padStart(2, '0');
+  const minutes = `${value.getMinutes()}`.padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
+const toTimeDate = (time: string) => {
+  const now = new Date();
+  const [hours, minutes] = time.split(':').map((part) => Number(part));
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return now;
+  now.setHours(hours, minutes, 0, 0);
+  return now;
+};
+
+const parseTimeToMinutes = (timeValue: string): number | null => {
+  const cleaned = timeValue.trim();
+  const match = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return (hours * 60) + minutes;
+};
 
 export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const eventId = route.params?.eventId;
   const isEditing = !!eventId;
+  const authUser = useAuthStore((state) => state.user);
 
   const [isLoading, setIsLoading] = useState(isEditing);
   const [isSaving, setIsSaving] = useState(false);
@@ -48,18 +83,19 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [pricingMode, setPricingMode] = useState<EventPricingMode>('ticketed');
   const [visibility, setVisibility] = useState<EventVisibility>('public');
   const [coverImage, setCoverImage] = useState('');
-  const [contactName, setContactName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [brandingPrimaryColor, setBrandingPrimaryColor] = useState('');
-  const [brandingAccentColor, setBrandingAccentColor] = useState('');
+  const [brandingPrimaryColor, setBrandingPrimaryColor] = useState(themeColors[0]);
+  const [brandingAccentColor, setBrandingAccentColor] = useState(themeColors[3]);
   const [status, setStatus] = useState<EventStatus>('draft');
-  const [priorityAccessEnabled, setPriorityAccessEnabled] = useState(false);
   const [requiresApproval, setRequiresApproval] = useState(false);
+
   const [customQuestions, setCustomQuestions] = useState<EventCustomQuestion[]>([]);
   const [questionDraft, setQuestionDraft] = useState('');
   const [questionType, setQuestionType] = useState<CustomQuestionType>('text');
   const [questionRequired, setQuestionRequired] = useState(false);
+
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -70,17 +106,18 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchData = async () => {
     try {
       const venuesResponse = await VenueService.getVenues();
-      setVenues(venuesResponse.data.venues);
+      setVenues(venuesResponse.data.venues || []);
 
       if (isEditing) {
         const eventResponse = await EventService.getEvent(eventId!);
         const event: Event = eventResponse.data.event;
-        setTitle(event.title);
-        setDescription(event.description);
-        setDate(event.date);
-        setStartTime(event.startTime);
-        setEndTime(event.endTime);
-        setCapacity(event.capacity.toString());
+
+        setTitle(event.title || '');
+        setDescription(event.description || '');
+        setDate((event.date || '').slice(0, 10));
+        setStartTime(event.startTime || '');
+        setEndTime(event.endTime || '');
+        setCapacity(String(event.capacity || ''));
         setCategory(event.category || '');
         setCity(event.city || '');
         setTagsInput((event.tags || []).join(', '));
@@ -88,17 +125,19 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setVenueId(event.venueId || '');
         setType(event.type || 'physical');
         setPricingMode(event.pricingMode || 'ticketed');
-        setVisibility(event.visibility);
+        setVisibility(event.visibility || 'public');
         setCoverImage(event.coverImage || '');
-        setContactName(event.contactDetails?.name || '');
-        setContactEmail(event.contactDetails?.email || '');
-        setContactPhone(event.contactDetails?.phone || '');
-        setBrandingPrimaryColor(event.branding?.primaryColor || '');
-        setBrandingAccentColor(event.branding?.accentColor || '');
-        setStatus(event.status);
-        setPriorityAccessEnabled(Boolean(event.priorityAccessEnabled));
+        setBrandingPrimaryColor(event.branding?.primaryColor || themeColors[0]);
+        setBrandingAccentColor(event.branding?.accentColor || themeColors[3]);
+        setStatus(event.status || 'draft');
         setRequiresApproval(Boolean(event.requiresApproval));
-        setCustomQuestions(event.customQuestions || []);
+        setCustomQuestions(event.customQuestions || event.registrationFields?.customQuestions || []);
+      } else {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setDate(toDateString(tomorrow));
+        setStartTime('09:00');
+        setEndTime('11:00');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load event details');
@@ -108,35 +147,25 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const parseTimeToMinutes = (timeValue: string): number | null => {
-    const cleaned = timeValue.trim().toUpperCase();
-    const match = cleaned.match(/^(\d{1,2}):(\d{2})(?:\s?(AM|PM))?$/);
-    if (!match) return null;
-
-    let hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    const period = match[3];
-
-    if (minutes < 0 || minutes > 59) return null;
-
-    if (period) {
-      if (hours < 1 || hours > 12) return null;
-      if (period === 'AM') {
-        if (hours === 12) hours = 0;
-      } else if (hours !== 12) {
-        hours += 12;
-      }
-    } else if (hours < 0 || hours > 23) {
-      return null;
+  const handleDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setDate(toDateString(selectedDate));
     }
-
-    return (hours * 60) + minutes;
   };
 
-  const isValidHexColor = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return true;
-    return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed);
+  const handleStartTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowStartTimePicker(false);
+    if (selectedDate) {
+      setStartTime(toTimeString(selectedDate));
+    }
+  };
+
+  const handleEndTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowEndTimePicker(false);
+    if (selectedDate) {
+      setEndTime(toTimeString(selectedDate));
+    }
   };
 
   const handleUploadEventImage = async () => {
@@ -150,30 +179,42 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.8,
+        quality: 0.85,
       });
 
-      if (pickerResult.canceled || !pickerResult.assets.length) {
-        return;
-      }
-
+      if (pickerResult.canceled || !pickerResult.assets.length) return;
       const selectedImage = pickerResult.assets[0];
-      if (!selectedImage?.uri) {
-        Alert.alert('Upload Error', 'Unable to read selected image.');
-        return;
-      }
+      if (!selectedImage?.uri) return;
 
       setIsUploadingImage(true);
       const response = await UploadService.uploadEventImage(selectedImage.uri);
       const uploadedPath = response.data.url;
       const resolvedUrl = resolveImageUrl(uploadedPath) || uploadedPath;
       setCoverImage(resolvedUrl);
-      Alert.alert('Image Uploaded', 'Event image uploaded successfully.');
     } catch (uploadError: any) {
       Alert.alert('Upload Failed', uploadError?.response?.data?.message || 'Unable to upload event image.');
     } finally {
       setIsUploadingImage(false);
     }
+  };
+
+  const addCustomQuestion = () => {
+    if (!questionDraft.trim()) {
+      Alert.alert('Validation Error', 'Custom question text cannot be empty.');
+      return;
+    }
+
+    const newQuestion: EventCustomQuestion = {
+      id: `q_${Date.now()}`,
+      question: questionDraft.trim(),
+      type: questionType,
+      required: questionRequired,
+    };
+
+    setCustomQuestions((previous) => [...previous, newQuestion]);
+    setQuestionDraft('');
+    setQuestionType('text');
+    setQuestionRequired(false);
   };
 
   const handleSave = async () => {
@@ -182,36 +223,27 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     const trimmedStart = startTime.trim();
     const trimmedEnd = endTime.trim();
     const trimmedMeetingLink = meetingLink.trim();
-    const trimmedContactEmail = contactEmail.trim();
 
     if (!title.trim()) {
       Alert.alert('Validation Error', 'Event title is required.');
       return;
     }
-
     if (!description.trim()) {
       Alert.alert('Validation Error', 'Event description is required.');
       return;
     }
-
     if (!trimmedDate || !trimmedStart || !trimmedEnd) {
-      Alert.alert('Validation Error', 'Please fill all required fields.');
+      Alert.alert('Validation Error', 'Date, start time, and end time are required.');
       return;
     }
-
-    if (!/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(trimmedDate) || Number.isNaN(new Date(trimmedDate).getTime())) {
-      Alert.alert('Validation Error', 'Date must be a valid ISO date (YYYY-MM-DD).');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate) || Number.isNaN(new Date(trimmedDate).getTime())) {
+      Alert.alert('Validation Error', 'Please pick a valid date.');
       return;
     }
 
     const startMinutes = parseTimeToMinutes(trimmedStart);
     const endMinutes = parseTimeToMinutes(trimmedEnd);
-    if (startMinutes === null || endMinutes === null) {
-      Alert.alert('Validation Error', 'Time must be in HH:mm or hh:mm AM/PM format.');
-      return;
-    }
-
-    if (endMinutes <= startMinutes) {
+    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
       Alert.alert('Validation Error', 'End time must be after start time.');
       return;
     }
@@ -241,18 +273,9 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     }
 
-    if (trimmedContactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedContactEmail)) {
-      Alert.alert('Validation Error', 'Contact email must be a valid email address.');
-      return;
-    }
-
-    if (!isValidHexColor(brandingPrimaryColor) || !isValidHexColor(brandingAccentColor)) {
-      Alert.alert('Validation Error', 'Branding colors must be valid HEX values like #22D3EE.');
-      return;
-    }
-
     try {
       setIsSaving(true);
+
       const eventData = {
         title: title.trim(),
         description: description.trim(),
@@ -272,18 +295,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         pricingMode,
         visibility,
         coverImage: coverImage.trim() ? coverImage.trim() : undefined,
-        contactDetails: {
-          name: contactName.trim(),
-          email: trimmedContactEmail.toLowerCase(),
-          phone: contactPhone.trim(),
-        },
-        branding: {
-          primaryColor: brandingPrimaryColor.trim(),
-          accentColor: brandingAccentColor.trim(),
-        },
-        priorityAccessEnabled,
         requiresApproval,
         customQuestions,
+        branding: {
+          primaryColor: brandingPrimaryColor,
+          accentColor: brandingAccentColor,
+        },
       };
 
       if (isEditing) {
@@ -304,53 +321,32 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const saveDisabled = isSaving || (isEditing && status === 'cancelled');
 
-  const addCustomQuestion = () => {
-    if (!questionDraft.trim()) {
-      Alert.alert('Validation Error', 'Custom question text cannot be empty.');
-      return;
-    }
-
-    const newQuestion: EventCustomQuestion = {
-      id: `q_${Date.now()}`,
-      question: questionDraft.trim(),
-      type: questionType,
-      required: questionRequired,
-    };
-
-    setCustomQuestions((previous) => [...previous, newQuestion]);
-    setQuestionDraft('');
-    setQuestionType('text');
-    setQuestionRequired(false);
-  };
-
   return (
-    <ScreenContainer scrollable style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={theme.colors.text} size={24} />
-        </TouchableOpacity>
-        <Text style={styles.title}>{isEditing ? 'Edit Event' : 'Create Event'}</Text>
-      </View>
+    <ScreenContainer>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <IconButton
+            icon={<ArrowLeft size={20} color={theme.colors.text} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={36}
+          />
+          <Text style={styles.title}>{isEditing ? 'Edit Event' : 'Create Event'}</Text>
+        </View>
 
-      <View style={styles.form}>
-        {isEditing && (
-          <Card variant="raised" style={styles.statusCard} noPadding>
-            <View style={styles.statusCardInner}>
-              <Text style={styles.statusLabel}>Current Status:</Text>
-              <Text
-                style={[
-                  styles.statusValue,
-                  status === 'published' && { color: theme.colors.success },
-                  status === 'draft' && { color: theme.colors.warning },
-                  status === 'cancelled' && { color: theme.colors.error },
-                ]}
-              >
-                {status.toUpperCase()}
-              </Text>
-              {status === 'cancelled' && <Text style={styles.warningText}>Cancelled events cannot be edited.</Text>}
-            </View>
+        {isEditing ? (
+          <Card variant="raised" style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Status: {status.toUpperCase()}</Text>
+            {status === 'cancelled' ? <Text style={styles.warningText}>Cancelled events cannot be edited.</Text> : null}
           </Card>
-        )}
+        ) : null}
+
+        <Card variant="raised" style={styles.hostCard}>
+          <Text style={styles.sectionTitle}>Host Details</Text>
+          <Text style={styles.hostValue}>{authUser?.name || 'Host Name'}</Text>
+          <Text style={styles.hostSub}>{authUser?.email || 'No host email available'}</Text>
+          <Text style={styles.hostSub}>{authUser?.phone || 'No host phone available'}</Text>
+        </Card>
 
         <Input label="Event Title *" value={title} onChangeText={setTitle} placeholder="Annual Tech Meetup" />
         <Input
@@ -364,304 +360,344 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <Input label="Date (ISO) *" value={date} onChangeText={setDate} placeholder="2026-10-15" />
+            <Text style={styles.label}>Date *</Text>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => setShowDatePicker(true)}>
+              <Text style={styles.pickerValue}>{date || 'Pick a date'}</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.flexHalf}>
-            <Input label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="100" keyboardType="numeric" />
+            <Input
+              label="Capacity *"
+              value={capacity}
+              onChangeText={setCapacity}
+              placeholder="100"
+              keyboardType="numeric"
+            />
           </View>
         </View>
 
         <View style={styles.row}>
           <View style={styles.flexHalf}>
-            <Input label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
+            <Text style={styles.label}>Start Time *</Text>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => setShowStartTimePicker(true)}>
+              <Text style={styles.pickerValue}>{startTime || 'Pick start time'}</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.flexHalf}>
-            <Input label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
+            <Text style={styles.label}>End Time *</Text>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => setShowEndTimePicker(true)}>
+              <Text style={styles.pickerValue}>{endTime || 'Pick end time'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.row}>
-          <View style={styles.flexHalf}>
-            <Input label="Start Time *" value={startTime} onChangeText={setStartTime} placeholder="09:00" />
-          </View>
-          <View style={styles.flexHalf}>
-            <Input label="End Time *" value={endTime} onChangeText={setEndTime} placeholder="17:00" />
-          </View>
+        <Input label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
+        <Input label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
+
+        <Text style={styles.label}>Event Type *</Text>
+        <View style={styles.segmentRow}>
+          {eventTypes.map((eventType) => (
+            <TouchableOpacity
+              key={eventType}
+              style={[styles.segment, type === eventType && styles.segmentSelected]}
+              onPress={() => {
+                setType(eventType);
+                if (eventType === 'online') setVenueId('');
+              }}
+            >
+              <Text style={[styles.segmentText, type === eventType && styles.segmentTextSelected]}>{eventType.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <View style={styles.segmentedControlSection}>
-          <Text style={styles.label}>Event Type *</Text>
-          <Card variant="raised" style={styles.segmentedControlContainer}>
-            {eventTypes.map((eventType) => (
-              <TouchableOpacity
-                key={eventType}
-                style={[styles.segmentButton, type === eventType && styles.segmentButtonSelected]}
-                onPress={() => {
-                  setType(eventType);
-                  if (eventType === 'online') setVenueId('');
-                }}
-              >
-                <Text style={[styles.segmentButtonText, type === eventType && styles.segmentButtonTextSelected]}>
-                  {eventType.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </Card>
+        <Text style={styles.label}>Pricing *</Text>
+        <View style={styles.segmentRow}>
+          {pricingModes.map((modeOption) => (
+            <TouchableOpacity
+              key={modeOption}
+              style={[styles.segment, pricingMode === modeOption && styles.segmentSelected]}
+              onPress={() => setPricingMode(modeOption)}
+            >
+              <Text style={[styles.segmentText, pricingMode === modeOption && styles.segmentTextSelected]}>{modeOption.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <View style={styles.segmentedControlSection}>
-          <Text style={styles.label}>Pricing Mode *</Text>
-          <Card variant="raised" style={styles.segmentedControlContainer}>
-            {pricingModes.map((modeOption) => (
-              <TouchableOpacity
-                key={modeOption}
-                style={[styles.segmentButton, pricingMode === modeOption && styles.segmentButtonSelected]}
-                onPress={() => setPricingMode(modeOption)}
-              >
-                <Text style={[styles.segmentButtonText, pricingMode === modeOption && styles.segmentButtonTextSelected]}>
-                  {modeOption.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </Card>
+        <Text style={styles.label}>Visibility *</Text>
+        <View style={styles.segmentRow}>
+          {visibilityOptions.map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={[styles.segment, visibility === option && styles.segmentSelected]}
+              onPress={() => setVisibility(option)}
+            >
+              <Text style={[styles.segmentText, visibility === option && styles.segmentTextSelected]}>{option.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Requires Approval *</Text>
+        <View style={styles.segmentRow}>
+          {[true, false].map((option) => (
+            <TouchableOpacity
+              key={option ? 'requires-approval' : 'no-approval'}
+              style={[styles.segment, requiresApproval === option && styles.segmentSelected]}
+              onPress={() => setRequiresApproval(option)}
+            >
+              <Text style={[styles.segmentText, requiresApproval === option && styles.segmentTextSelected]}>
+                {option ? 'YES' : 'NO'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <Text style={styles.label}>{requiresVenue ? 'Select Venue *' : 'Select Venue (Optional)'}</Text>
-        <View style={styles.selectorContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {!requiresVenue && (
-              <TouchableOpacity
-                style={[styles.chip, !venueId && styles.chipSelected]}
-                onPress={() => setVenueId('')}
-              >
-                <Text style={[styles.chipText, !venueId && styles.chipTextSelected]}>NO VENUE</Text>
-              </TouchableOpacity>
-            )}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.venueRow}>
+          {!requiresVenue ? (
+            <TouchableOpacity style={[styles.chip, !venueId && styles.chipSelected]} onPress={() => setVenueId('')}>
+              <Text style={[styles.chipText, !venueId && styles.chipTextSelected]}>NO VENUE</Text>
+            </TouchableOpacity>
+          ) : null}
+          {venues.map((venue) => (
+            <TouchableOpacity
+              key={venue.id}
+              style={[styles.chip, venueId === venue.id && styles.chipSelected]}
+              onPress={() => setVenueId(venue.id)}
+            >
+              <Text style={[styles.chipText, venueId === venue.id && styles.chipTextSelected]}>{venue.name}</Text>
+            </TouchableOpacity>
+          ))}
+          {!venues.length ? <Text style={styles.noVenueText}>No venues available. Create a venue first.</Text> : null}
+        </ScrollView>
 
-            {venues.map((venue) => (
-              <TouchableOpacity
-                key={venue.id}
-                style={[styles.chip, venueId === venue.id && styles.chipSelected]}
-                onPress={() => setVenueId(venue.id)}
-              >
-                <Text style={[styles.chipText, venueId === venue.id && styles.chipTextSelected]}>{venue.name}</Text>
-              </TouchableOpacity>
-            ))}
-
-            {venues.length === 0 && (
-              <Text style={styles.noVenueText}>No venues available. Create a venue first.</Text>
-            )}
-          </ScrollView>
-        </View>
-
-        <View style={styles.segmentedControlSection}>
-          <Text style={styles.label}>Visibility *</Text>
-          <Card variant="raised" style={styles.segmentedControlContainer}>
-            {visibilityOptions.map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={[styles.segmentButton, visibility === option && styles.segmentButtonSelected]}
-                onPress={() => setVisibility(option)}
-              >
-                <Text style={[styles.segmentButtonText, visibility === option && styles.segmentButtonTextSelected]}>
-                  {option.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </Card>
-        </View>
-
-        <Text style={styles.label}>Event Photo</Text>
-        {coverImage.trim() ? (
-          <Image
-            source={{ uri: resolveImageUrl(coverImage.trim()) || coverImage.trim() }}
-            style={styles.coverPreview}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.coverPreviewPlaceholder}>
-            <Text style={styles.coverPlaceholderText}>No event photo selected</Text>
-          </View>
-        )}
-        <Button variant="secondary"
-          title={isUploadingImage ? 'Uploading Image...' : 'Upload Event Photo'}
-          onPress={handleUploadEventImage}
-          icon={!isUploadingImage ? <Upload size={16} color={theme.colors.text} /> : undefined}
-          style={styles.uploadButton}
-        />
-        <Input
-          label="Cover Image URL (Optional)"
-          value={coverImage}
-          onChangeText={setCoverImage}
-          placeholder="https://example.com/image.jpg"
-        />
-
-        <SectionHeader title="Contact Details" showDivider />
-        <Input label="Contact Name" value={contactName} onChangeText={setContactName} placeholder="Event support team" />
-        <Input
-          label="Contact Email"
-          value={contactEmail}
-          onChangeText={setContactEmail}
-          placeholder="support@example.com"
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <Input label="Contact Phone" value={contactPhone} onChangeText={setContactPhone} placeholder="+94 77 123 4567" />
-
-        <SectionHeader title="Branding Colors (Optional)" showDivider />
-        <Input
-          label="Primary Color"
-          value={brandingPrimaryColor}
-          onChangeText={setBrandingPrimaryColor}
-          placeholder="#22D3EE"
-          autoCapitalize="characters"
-        />
-        <Input
-          label="Accent Color"
-          value={brandingAccentColor}
-          onChangeText={setBrandingAccentColor}
-          placeholder="#8B5CF6"
-          autoCapitalize="characters"
-        />
-        <View style={styles.brandingPreviewRow}>
-          <View style={[styles.colorSwatch, { backgroundColor: isValidHexColor(brandingPrimaryColor) && brandingPrimaryColor.trim() ? brandingPrimaryColor.trim() : theme.colors.surfaceLight }]} />
-          <View style={[styles.colorSwatch, { backgroundColor: isValidHexColor(brandingAccentColor) && brandingAccentColor.trim() ? brandingAccentColor.trim() : theme.colors.surfaceLight }]} />
-        </View>
-
-        <Input
-          label="Tags (comma-separated)"
-          value={tagsInput}
-          onChangeText={setTagsInput}
-          placeholder="conference, startup, ai"
-          leftIcon={<Tag size={16} color={theme.colors.textMuted} />}
-        />
-        {(type === 'online' || type === 'hybrid') && (
+        {(type === 'online' || type === 'hybrid') ? (
           <Input
             label={`Meeting Link (${type === 'hybrid' ? 'Hybrid' : 'Online'}) *`}
             value={meetingLink}
             onChangeText={setMeetingLink}
             placeholder="https://meet.google.com/..."
           />
-        )}
+        ) : null}
 
-        <View style={styles.segmentedControlSection}>
-          <Text style={styles.label}>Requires Host Approval *</Text>
-          <Card variant="raised" style={styles.segmentedControlContainer}>
-            {[true, false].map((option) => (
+        <Card variant="raised" style={styles.photoCard}>
+          <Text style={styles.sectionTitle}>Event Photo</Text>
+          <Text style={styles.photoHint}>Recommended size: 1280 x 720 (JPG/PNG), max 5MB.</Text>
+          {coverImage.trim() ? (
+            <Image source={{ uri: resolveImageUrl(coverImage.trim()) || coverImage.trim() }} style={styles.coverPreview} resizeMode="cover" />
+          ) : (
+            <View style={styles.coverPreviewPlaceholder}>
+              <Text style={styles.coverPlaceholderText}>No event photo selected</Text>
+            </View>
+          )}
+          <Button
+            variant="secondary"
+            title={isUploadingImage ? 'Uploading Image...' : 'Upload Event Photo'}
+            onPress={handleUploadEventImage}
+            icon={!isUploadingImage ? <Upload size={16} color={theme.colors.text} /> : undefined}
+            isLoading={isUploadingImage}
+          />
+        </Card>
+
+        <Card variant="raised" style={styles.photoCard}>
+          <Text style={styles.sectionTitle}>Branding Color</Text>
+          <Text style={styles.photoHint}>Choose a primary and accent color for this event theme.</Text>
+          <Text style={styles.colorLabel}>Primary</Text>
+          <View style={styles.colorRow}>
+            {themeColors.map((color) => (
               <TouchableOpacity
-                key={option ? 'approval-on' : 'approval-off'}
-                style={[styles.segmentButton, requiresApproval === option && styles.segmentButtonSelected]}
-                onPress={() => setRequiresApproval(option)}
-              >
-                <Text style={[styles.segmentButtonText, requiresApproval === option && styles.segmentButtonTextSelected]}>
-                  {option ? 'YES' : 'NO'}
-                </Text>
-              </TouchableOpacity>
+                key={`primary-${color}`}
+                style={[
+                  styles.colorBubble,
+                  { backgroundColor: color },
+                  brandingPrimaryColor === color && styles.colorBubbleSelected,
+                ]}
+                onPress={() => setBrandingPrimaryColor(color)}
+              />
             ))}
-          </Card>
-        </View>
-
-        <View style={styles.segmentedControlSection}>
-          <Text style={styles.label}>Priority Access Enabled *</Text>
-          <Card variant="raised" style={styles.segmentedControlContainer}>
-            {[true, false].map((option) => (
+          </View>
+          <Text style={styles.colorLabel}>Accent</Text>
+          <View style={styles.colorRow}>
+            {themeColors.map((color) => (
               <TouchableOpacity
-                key={option ? 'priority-on' : 'priority-off'}
-                style={[styles.segmentButton, priorityAccessEnabled === option && styles.segmentButtonSelected]}
-                onPress={() => setPriorityAccessEnabled(option)}
-              >
-                <Text style={[styles.segmentButtonText, priorityAccessEnabled === option && styles.segmentButtonTextSelected]}>
-                  {option ? 'YES' : 'NO'}
-                </Text>
-              </TouchableOpacity>
+                key={`accent-${color}`}
+                style={[
+                  styles.colorBubble,
+                  { backgroundColor: color },
+                  brandingAccentColor === color && styles.colorBubbleSelected,
+                ]}
+                onPress={() => setBrandingAccentColor(color)}
+              />
             ))}
-          </Card>
-        </View>
+          </View>
+        </Card>
 
-        <SectionHeader title="Custom Questions (Optional)" showDivider />
-        <Card variant="raised" style={styles.customQuestionsCard}>
+        <Input
+          label="Tags (comma-separated)"
+          value={tagsInput}
+          onChangeText={setTagsInput}
+          placeholder="conference, startup, ai"
+        />
+
+        <Card variant="raised" style={styles.questionCard}>
+          <Text style={styles.sectionTitle}>Registration Questions (Optional)</Text>
+          {customQuestions.length > 0 ? (
+            customQuestions.map((customQuestion) => (
+              <View key={customQuestion.id} style={styles.questionRow}>
+                <View style={styles.questionInfo}>
+                  <Text style={styles.questionText}>{customQuestion.question}</Text>
+                  <Text style={styles.questionMeta}>
+                    {customQuestion.type.toUpperCase()} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
+                  </Text>
+                </View>
+                <IconButton
+                  icon={<X size={14} color={theme.colors.error} />}
+                  onPress={() => setCustomQuestions((previous) => previous.filter((item) => item.id !== customQuestion.id))}
+                  variant="ghost"
+                  size={30}
+                />
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noQuestionText}>No registration questions added yet.</Text>
+          )}
+
           <Input
-            label="Question"
+            label="New Question"
             value={questionDraft}
             onChangeText={setQuestionDraft}
             placeholder="What is your t-shirt size?"
             leftIcon={<HelpCircle size={16} color={theme.colors.textMuted} />}
           />
-          <View style={styles.row}>
-            <View style={styles.segmentedControlSection}>
-              <Text style={styles.label}>Type</Text>
-              <Card variant="raised" style={styles.segmentedControlContainer}>
-                {customQuestionTypes.map((typeOption) => (
-                  <TouchableOpacity
-                    key={typeOption}
-                    style={[styles.segmentButton, questionType === typeOption && styles.segmentButtonSelected]}
-                    onPress={() => setQuestionType(typeOption)}
-                  >
-                    <Text style={[styles.segmentButtonText, questionType === typeOption && styles.segmentButtonTextSelected]}>
-                      {typeOption.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </Card>
-            </View>
+
+          <Text style={styles.label}>Question Type</Text>
+          <View style={styles.segmentRow}>
+            {customQuestionTypes.map((typeOption) => (
+              <TouchableOpacity
+                key={typeOption}
+                style={[styles.segment, questionType === typeOption && styles.segmentSelected]}
+                onPress={() => setQuestionType(typeOption)}
+              >
+                <Text style={[styles.segmentText, questionType === typeOption && styles.segmentTextSelected]}>
+                  {typeOption.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          <View style={styles.row}>
-            <View style={styles.segmentedControlSection}>
-              <Text style={styles.label}>Required?</Text>
-              <Card variant="raised" style={styles.segmentedControlContainer}>
-                {[true, false].map((requiredOption) => (
-                  <TouchableOpacity
-                    key={requiredOption ? 'required-yes' : 'required-no'}
-                    style={[styles.segmentButton, questionRequired === requiredOption && styles.segmentButtonSelected]}
-                    onPress={() => setQuestionRequired(requiredOption)}
-                  >
-                    <Text style={[styles.segmentButtonText, questionRequired === requiredOption && styles.segmentButtonTextSelected]}>
-                      {requiredOption ? 'REQUIRED' : 'OPTIONAL'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </Card>
-            </View>
+
+          <Text style={styles.label}>Required</Text>
+          <View style={styles.segmentRow}>
+            {[true, false].map((option) => (
+              <TouchableOpacity
+                key={option ? 'required-yes' : 'required-no'}
+                style={[styles.segment, questionRequired === option && styles.segmentSelected]}
+                onPress={() => setQuestionRequired(option)}
+              >
+                <Text style={[styles.segmentText, questionRequired === option && styles.segmentTextSelected]}>
+                  {option ? 'YES' : 'NO'}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          <Button variant="secondary" title="Add Question" onPress={addCustomQuestion} icon={<Plus size={16} color={theme.colors.text} />} />
+
+          <Button
+            variant="secondary"
+            title="Add Question"
+            onPress={addCustomQuestion}
+            icon={<Plus size={16} color={theme.colors.text} />}
+          />
         </Card>
 
-        {customQuestions.map((customQuestion) => (
-          <Card variant="raised" key={customQuestion.id} style={styles.questionRow}>
-            <View style={styles.questionInfo}>
-              <Text style={styles.questionText}>{customQuestion.question}</Text>
-              <Text style={styles.questionMeta}>
-                {customQuestion.type.toUpperCase()} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
-              </Text>
-            </View>
-            <IconButton
-              icon={<X size={14} color={theme.colors.error} />}
-              onPress={() => setCustomQuestions((previous) => previous.filter((item) => item.id !== customQuestion.id))}
-              variant="ghost"
-            />
-          </Card>
-        ))}
-
-        <Button variant="primary"
+        <Button
+          variant="primary"
           title={isEditing ? 'Save Changes' : 'Create Event'}
           onPress={handleSave}
           isLoading={isSaving}
           disabled={saveDisabled}
           style={styles.saveButton}
         />
-      </View>
+      </ScrollView>
+
+      {showDatePicker ? (
+        <DateTimePicker
+          value={date ? new Date(`${date}T00:00:00`) : new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      ) : null}
+      {showStartTimePicker ? (
+        <DateTimePicker
+          value={toTimeDate(startTime)}
+          mode="time"
+          display="default"
+          onChange={handleStartTimeChange}
+        />
+      ) : null}
+      {showEndTimePicker ? (
+        <DateTimePicker
+          value={toTimeDate(endTime)}
+          mode="time"
+          display="default"
+          onChange={handleEndTimeChange}
+        />
+      ) : null}
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: theme.spacing.m },
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: theme.spacing.xl, marginBottom: theme.spacing.xl },
-  backButton: { marginRight: theme.spacing.m },
-  title: { ...theme.typography.h1, color: theme.colors.text },
-  form: { flex: 1 },
-  row: { flexDirection: 'row', gap: theme.spacing.m },
-  flexHalf: { flex: 1 },
+  container: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: 168,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.m,
+    paddingTop: theme.spacing.xl,
+    marginBottom: theme.spacing.l,
+  },
+  title: {
+    ...theme.typography.h1,
+    color: theme.colors.text,
+  },
+  statusCard: {
+    marginBottom: theme.spacing.m,
+  },
+  statusLabel: {
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
+  },
+  warningText: {
+    ...theme.typography.caption,
+    color: theme.colors.error,
+    marginTop: 6,
+  },
+  hostCard: {
+    marginBottom: theme.spacing.m,
+  },
+  sectionTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  hostValue: {
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
+  },
+  hostSub: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: theme.spacing.m,
+  },
+  flexHalf: {
+    flex: 1,
+  },
   label: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
@@ -669,55 +705,90 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginTop: theme.spacing.s,
   },
-  sectionTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
-    marginTop: theme.spacing.l,
-    marginBottom: theme.spacing.m,
-  },
-  segmentedControlSection: {
-    marginBottom: theme.spacing.m,
-    flex: 1,
-  },
-  segmentedControlContainer: {
-    flexDirection: 'row',
-    padding: 4,
+  pickerButton: {
+    height: 52,
     borderRadius: theme.borderRadius.m,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceRaised,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.m,
   },
-  segmentButton: {
+  pickerValue: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    marginBottom: theme.spacing.m,
+  },
+  segment: {
     flex: 1,
-    paddingVertical: theme.spacing.s,
+    minHeight: 42,
+    borderRadius: theme.borderRadius.m,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
-    borderRadius: theme.borderRadius.s,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.s,
   },
-  segmentButtonSelected: {
-    backgroundColor: theme.colors.glass,
+  segmentSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySubtle,
   },
-  segmentButtonText: {
+  segmentText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  segmentButtonTextSelected: {
+  segmentTextSelected: {
     color: theme.colors.primaryLight,
   },
-  selectorContainer: { flexDirection: 'row', marginBottom: theme.spacing.m, gap: theme.spacing.s },
+  venueRow: {
+    gap: theme.spacing.s,
+    marginBottom: theme.spacing.m,
+  },
   chip: {
     paddingHorizontal: theme.spacing.m,
     paddingVertical: theme.spacing.s,
     borderRadius: theme.borderRadius.m,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginRight: theme.spacing.s,
+    backgroundColor: theme.colors.surface,
   },
-  chipSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.glass },
-  chipText: { ...theme.typography.caption, color: theme.colors.textMuted },
-  chipTextSelected: { color: theme.colors.primary, fontWeight: 'bold' },
+  chipSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySubtle,
+  },
+  chipText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+  },
+  chipTextSelected: {
+    color: theme.colors.primary,
+  },
+  noVenueText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    alignSelf: 'center',
+    paddingVertical: theme.spacing.s,
+  },
+  photoCard: {
+    marginBottom: theme.spacing.m,
+  },
+  photoHint: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.s,
+  },
   coverPreview: {
     width: '100%',
     height: 180,
     borderRadius: theme.borderRadius.m,
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.m,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -730,51 +801,45 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: theme.spacing.s,
+    marginBottom: theme.spacing.m,
   },
   coverPlaceholderText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
   },
-  uploadButton: {
-    marginBottom: theme.spacing.m,
+  colorLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
   },
-  brandingPreviewRow: {
+  colorRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing.s,
-    marginBottom: theme.spacing.m,
+    marginBottom: theme.spacing.s,
   },
-  colorSwatch: {
-    width: 42,
-    height: 42,
-    borderRadius: theme.borderRadius.round,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+  colorBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  saveButton: { marginTop: theme.spacing.xl, marginBottom: 120 },
-  statusCard: {
-    borderRadius: theme.borderRadius.l,
-    overflow: 'hidden',
-    marginBottom: theme.spacing.l,
+  colorBubbleSelected: {
+    borderColor: '#FFFFFF',
   },
-  statusCardInner: {
-    padding: theme.spacing.m,
-    alignItems: 'flex-start',
-  },
-  statusLabel: { ...theme.typography.caption, color: theme.colors.textMuted, marginRight: theme.spacing.s },
-  statusValue: { ...theme.typography.h3, fontWeight: 'bold', marginTop: theme.spacing.xs },
-  warningText: { ...theme.typography.caption, color: theme.colors.error, marginTop: theme.spacing.s },
-  noVenueText: { color: theme.colors.textMuted, alignSelf: 'center', marginVertical: theme.spacing.s },
-  customQuestionsCard: {
-    padding: theme.spacing.m,
+  questionCard: {
     marginBottom: theme.spacing.m,
   },
   questionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: theme.spacing.m,
     marginBottom: theme.spacing.s,
+    paddingBottom: theme.spacing.s,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   questionInfo: {
     flex: 1,
@@ -788,5 +853,14 @@ const styles = StyleSheet.create({
     ...theme.typography.small,
     color: theme.colors.primaryLight,
     marginTop: 4,
+  },
+  noQuestionText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.s,
+  },
+  saveButton: {
+    marginTop: theme.spacing.m,
+    marginBottom: theme.spacing.xl,
   },
 });

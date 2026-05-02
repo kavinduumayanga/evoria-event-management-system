@@ -7,7 +7,7 @@ import { Booking } from '../../types';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { AttendeeTabParamList } from '../../types/navigation';
-import { QrCode } from 'lucide-react-native';
+import { QrCode, Eye } from 'lucide-react-native';
 
 type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyRegistrations'>;
 
@@ -90,24 +90,39 @@ export const MyBookingsScreen = () => {
                       Waiting in queue{item.waitlistPosition ? ` (#${item.waitlistPosition})` : ''}
                     </Text>
                   </Card>
-                ) : (
-                  <View style={styles.rsvpActions}>
-                    <Button
-                      title="Going"
-                      onPress={() => handleRsvpUpdate(item.id, 'going')}
-                      variant={item.rsvpStatus === 'going' ? 'primary' : 'secondary'}
-                      size="sm"
-                      style={{ flex: 1 }}
-                    />
-                    <Button
-                      title="Not Going"
-                      onPress={() => handleRsvpUpdate(item.id, 'not_going')}
-                      variant={item.rsvpStatus === 'not_going' ? 'danger' : 'secondary'}
-                      size="sm"
-                      style={{ flex: 1 }}
-                    />
-                  </View>
-                )}
+                ) : null}
+
+                <View style={styles.rsvpActions}>
+                  <Button
+                    title="Going"
+                    onPress={() => handleRsvpUpdate(item.id, 'going')}
+                    variant={item.rsvpStatus === 'going' ? 'primary' : 'secondary'}
+                    size="sm"
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Not Going"
+                    onPress={() => handleRsvpUpdate(item.id, 'not_going')}
+                    variant={item.rsvpStatus === 'not_going' ? 'danger' : 'secondary'}
+                    size="sm"
+                    style={{ flex: 1 }}
+                  />
+                </View>
+
+                {item.event?.id ? (
+                  <Button
+                    title="View Event"
+                    icon={<Eye size={16} color={theme.colors.text} />}
+                    onPress={() =>
+                      navigation.navigate('HomeStack', {
+                        screen: 'EventDetails',
+                        params: { eventId: item.event!.id },
+                      })
+                    }
+                    variant="secondary"
+                    size="sm"
+                  />
+                ) : null}
 
                 {item.bookingStatus === 'confirmed' && !item.isWaitlisted && (
                   <Button
@@ -136,7 +151,7 @@ export const MyBookingsScreen = () => {
 const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: theme.spacing.base,
-    paddingBottom: 100,
+    paddingBottom: 140,
     flexGrow: 1,
   },
   pageHeader: {

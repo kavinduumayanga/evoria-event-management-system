@@ -14,9 +14,10 @@ import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, User, Phone, Image as ImageIcon } from 'lucide-react-native';
 import { Input, Button, IconButton, LoadingState } from '../../components';
 import { theme } from '../../constants/theme';
-import { UserService } from '../../api/services';
+import { UploadService, UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
+import * as ImagePicker from 'expo-image-picker';
 
 const phoneRegex = /^\+?[0-9\s\-()]{7,20}$/;
 
@@ -30,6 +31,7 @@ export const EditProfileScreen = () => {
   const [profileImage, setProfileImage] = useState(authUser?.profileImage || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -83,6 +85,34 @@ export const EditProfileScreen = () => {
     }
   };
 
+  const handleUploadProfileImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Media library permission is required to upload a profile image.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (pickerResult.canceled || !pickerResult.assets.length) return;
+      const selectedImage = pickerResult.assets[0];
+      if (!selectedImage?.uri) return;
+
+      setIsUploadingImage(true);
+      const response = await UploadService.uploadProfileImage(selectedImage.uri);
+      setProfileImage(response.data.url);
+    } catch (error: any) {
+      Alert.alert('Upload Failed', getApiErrorMessage(error, 'Unable to upload profile image.'));
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   if (isBootstrapping) return <LoadingState />;
 
   return (
@@ -132,7 +162,14 @@ export const EditProfileScreen = () => {
               value={profileImage}
               onChangeText={setProfileImage}
               leftIcon={<ImageIcon size={18} color={theme.colors.textMuted} />}
-              hint="Use the upload endpoint first, then paste the returned path here."
+              hint="Upload an image or paste a direct URL."
+            />
+            <Button
+              title={isUploadingImage ? 'Uploading Image...' : 'Upload Profile Image'}
+              onPress={handleUploadProfileImage}
+              variant="secondary"
+              size="md"
+              isLoading={isUploadingImage}
             />
           </ScrollView>
         </KeyboardAvoidingView>
