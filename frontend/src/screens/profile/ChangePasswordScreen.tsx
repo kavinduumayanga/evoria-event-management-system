@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Lock } from 'lucide-react-native';
-import { ScreenContainer, FormInput, PrimaryButton, GlassCard, IconButton } from '../../components';
+import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
@@ -22,17 +32,14 @@ export const ChangePasswordScreen = () => {
       Alert.alert('Validation', 'Please fill in all password fields.');
       return;
     }
-
     if (newPassword.length < 6) {
       Alert.alert('Validation', 'New password must be at least 6 characters long.');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       Alert.alert('Validation', 'Password confirmation does not match.');
       return;
     }
-
     if (newPassword === currentPassword) {
       Alert.alert('Validation', 'New password must be different from current password.');
       return;
@@ -40,28 +47,17 @@ export const ChangePasswordScreen = () => {
 
     try {
       setIsLoading(true);
-
-      const response = await UserService.changePassword({
-        currentPassword,
-        newPassword,
-      });
-
+      const response = await UserService.changePassword({ currentPassword, newPassword });
       const updatedUser = response?.data?.user;
       const token = response?.token;
-
-      if (updatedUser && token) {
-        await login(updatedUser, token);
-      }
+      if (updatedUser && token) await login(updatedUser, token);
 
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
 
       Alert.alert('Success', 'Password updated successfully.', [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
+        { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error: any) {
       Alert.alert('Update Failed', getApiErrorMessage(error, 'Unable to update password.'));
@@ -71,82 +67,100 @@ export const ChangePasswordScreen = () => {
   };
 
   return (
-    <ScreenContainer scrollable={false}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#0A0A0F', '#0F0D1A', '#0A0A0F']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <IconButton 
-            icon={<ArrowLeft color={theme.colors.text} size={24} />} 
-            onPress={() => navigation.goBack()} 
-            variant="solid" 
+          <IconButton
+            icon={<ArrowLeft color={theme.colors.text} size={22} />}
+            onPress={() => navigation.goBack()}
+            variant="surface"
+            size={40}
           />
-          <Text style={styles.title}>Change Password</Text>
+          <Text style={styles.headerTitle}>Change Password</Text>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <GlassCard style={styles.card} variant="dark" animateEntrance>
-            <FormInput
-              label="Current Password"
-              placeholder="Enter current password"
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Input
+              label="Current password"
+              placeholder="Enter your current password"
               isPassword
+              autoCapitalize="none"
+              autoCorrect={false}
               value={currentPassword}
               onChangeText={setCurrentPassword}
-              leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+              leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
             />
-
-            <FormInput
-              label="New Password"
-              placeholder="Enter new password"
+            <Input
+              label="New password"
+              placeholder="At least 6 characters"
               isPassword
+              autoCapitalize="none"
+              autoCorrect={false}
               value={newPassword}
               onChangeText={setNewPassword}
-              leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+              leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
             />
-
-            <FormInput
-              label="Confirm New Password"
-              placeholder="Re-enter new password"
+            <Input
+              label="Confirm new password"
+              placeholder="Re-enter your new password"
               isPassword
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              leftIcon={<Lock size={20} color={theme.colors.textMuted} />}
+              leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
             />
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-            <PrimaryButton
-              title="Update Password"
-              onPress={handleChangePassword}
-              isLoading={isLoading}
-              style={styles.updateButton}
-            />
-          </GlassCard>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </ScreenContainer>
+        <View style={styles.bottomZone}>
+          <Button
+            title="Update Password"
+            onPress={handleChangePassword}
+            isLoading={isLoading}
+            variant="primary"
+            size="lg"
+          />
+        </View>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: theme.colors.background },
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.m,
-    marginBottom: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.m,
   },
-  content: {
-    flexGrow: 1,
-    paddingBottom: theme.spacing.xxl,
-  },
-  title: {
+  headerTitle: {
     ...theme.typography.h2,
     color: theme.colors.text,
   },
-  card: {
-    padding: theme.spacing.l,
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: theme.spacing.base,
+    paddingTop: theme.spacing.m,
   },
-  updateButton: {
-    marginTop: theme.spacing.l,
+  bottomZone: {
+    paddingHorizontal: theme.spacing.base,
+    paddingBottom: theme.spacing.l,
+    paddingTop: theme.spacing.m,
   },
 });

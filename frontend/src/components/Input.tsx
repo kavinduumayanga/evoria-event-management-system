@@ -1,129 +1,207 @@
-import React, { useRef, useState } from 'react';
-import { 
-  View, 
-  TextInput, 
-  Text, 
-  StyleSheet, 
-  TextInputProps, 
-  TouchableOpacity
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TextInputProps,
+  StyleProp,
+  ViewStyle,
+  TouchableOpacity,
+  Animated,
 } from 'react-native';
-import { theme } from '../constants/theme';
 import { Eye, EyeOff } from 'lucide-react-native';
+import { theme } from '../constants/theme';
 
-interface InputProps extends TextInputProps {
+// ============================================================
+// INPUT — Unified input component (replaces both Input.tsx and FormInput.tsx)
+//
+// Features:
+//   - Fixed 48dp height (single-line), auto-height (multiline)
+//   - Label always visible above field
+//   - Focus border animation (primary color)
+//   - Error state with message below
+//   - Left icon slot
+//   - Password toggle built-in
+//   - NO dynamic keys — stable component, never remounts on typing
+//
+// Usage:
+//   <Input label="Email" value={email} onChangeText={setEmail} />
+//   <Input label="Password" isPassword value={pw} onChangeText={setPw} />
+//   <Input label="Bio" multiline numberOfLines={4} value={bio} onChangeText={setBio} />
+// ============================================================
+
+interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
   error?: string;
+  leftIcon?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  containerStyle?: StyleProp<ViewStyle>;
   isPassword?: boolean;
+  hint?: string;
 }
 
 export const Input: React.FC<InputProps> = ({
   label,
   error,
-  isPassword,
+  leftIcon,
   style,
-  onFocus,
-  onBlur,
-  ...props
+  containerStyle,
+  isPassword = false,
+  multiline = false,
+  numberOfLines = 1,
+  hint,
+  ...textInputProps
 }) => {
-  const inputRef = useRef<TextInput>(null);
-  const [isSecure, setIsSecure] = useState(isPassword);
+  const [isFocused, setIsFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const borderAnim = useRef(new Animated.Value(0)).current;
 
-  const handleFocus: NonNullable<TextInputProps['onFocus']> = (event) => {
-    if (onFocus) {
-      onFocus(event);
-    }
+  const handleFocus = () => {
+    setIsFocused(true);
+    Animated.timing(borderAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
   };
 
-  const handleBlur: NonNullable<TextInputProps['onBlur']> = (event) => {
-    if (onBlur) {
-      onBlur(event);
-    }
+  const handleBlur = () => {
+    setIsFocused(false);
+    Animated.timing(borderAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
   };
 
-  const handleToggleSecure = () => {
-    setIsSecure((current) => !current);
+  const borderColor = borderAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      error ? theme.colors.errorBorder : theme.colors.border,
+      error ? theme.colors.error : theme.colors.borderFocus,
+    ],
+  });
 
-    // Keep focus on password field after toggling visibility.
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-  };
+  const inputHeight = multiline ? Math.max(80, numberOfLines * 24 + 24) : 48;
 
   return (
-    <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      
-      <View 
+    <View style={[styles.wrapper, containerStyle]}>
+      {label && (
+        <Text style={[styles.label, error && styles.labelError]}>{label}</Text>
+      )}
+
+      <Animated.View
         style={[
-          styles.inputContainer,
-          error ? styles.inputError : null,
-          style
+          styles.fieldContainer,
+          { borderColor, height: multiline ? undefined : inputHeight },
+          multiline && { minHeight: inputHeight, paddingVertical: 12 },
+          style,
         ]}
       >
+        {leftIcon && (
+          <View style={styles.leftIcon}>{leftIcon}</View>
+        )}
+
         <TextInput
-          ref={inputRef}
-          style={styles.input}
+          style={[
+            styles.input,
+            leftIcon && styles.inputWithLeftIcon,
+            isPassword && styles.inputWithRightIcon,
+            multiline && styles.multilineInput,
+          ]}
           placeholderTextColor={theme.colors.textMuted}
-          secureTextEntry={isSecure || false}
-          {...props}
+          selectionColor={theme.colors.primary}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          secureTextEntry={isPassword && !showPassword}
+          multiline={multiline}
+          numberOfLines={multiline ? numberOfLines : undefined}
+          textAlignVertical={multiline ? 'top' : 'center'}
+          {...textInputProps}
         />
-        
+
         {isPassword && (
-          <TouchableOpacity 
-            onPress={handleToggleSecure}
-            onPressIn={() => inputRef.current?.focus()}
-            style={styles.eyeIcon}
+          <TouchableOpacity
+            style={styles.rightIcon}
+            onPress={() => setShowPassword((prev) => !prev)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            {isSecure ? (
-              <EyeOff size={20} color={theme.colors.textMuted} />
-            ) : (
-              <Eye size={20} color={theme.colors.textMuted} />
-            )}
+            {showPassword
+              ? <EyeOff size={18} color={theme.colors.textMuted} />
+              : <Eye size={18} color={theme.colors.textMuted} />
+            }
           </TouchableOpacity>
         )}
-      </View>
-      
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      </Animated.View>
+
+      {error ? (
+        <Text style={styles.error}>{error}</Text>
+      ) : hint ? (
+        <Text style={styles.hint}>{hint}</Text>
+      ) : null}
     </View>
   );
 };
 
+// ============================================================
+// Legacy aliases — FormInput maps to Input
+// ============================================================
+export const FormInput = Input;
+
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     marginBottom: theme.spacing.m,
   },
   label: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.s,
-    fontWeight: '600',
+    ...theme.typography.label,
+    color: theme.colors.textSecondary,
+    marginBottom: 6,
   },
-  inputContainer: {
+  labelError: {
+    color: theme.colors.error,
+  },
+  fieldContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: theme.borderRadius.m,
-    paddingHorizontal: theme.spacing.m,
+    borderWidth: 1,
+    overflow: 'hidden',
+    paddingHorizontal: theme.spacing.sm,
+  },
+  leftIcon: {
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rightIcon: {
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
   },
   input: {
     flex: 1,
-    color: theme.colors.text,
-    paddingVertical: theme.spacing.m,
     ...theme.typography.body,
+    color: theme.colors.text,
+    paddingVertical: 0,
   },
-  inputError: {
-    borderColor: theme.colors.error,
+  inputWithLeftIcon: {},
+  inputWithRightIcon: {},
+  multilineInput: {
+    textAlignVertical: 'top',
   },
-  eyeIcon: {
-    padding: theme.spacing.s,
-  },
-  errorText: {
-    ...theme.typography.small,
+  error: {
+    ...theme.typography.caption,
     color: theme.colors.error,
-    marginTop: theme.spacing.s,
+    marginTop: 4,
+    marginLeft: 2,
+  },
+  hint: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: 4,
+    marginLeft: 2,
   },
 });

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, GlassCard, StatCard } from '../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatCard } from '../../components';
 import { theme } from '../../constants/theme';
 import { AdminService, ModerationService, ReportService } from '../../api/services';
 import { PlatformAnalytics, ReportRecord } from '../../types';
@@ -171,10 +171,12 @@ export const ModerationDashboardScreen = () => {
                   accentColor={theme.colors.error}
                 />
               </View>
-              <GlassCard style={styles.totalReportsCard}>
-                <Text style={styles.totalReportsLabel}>Total Reports</Text>
-                <Text style={styles.totalReportsValue}>{analytics.totalReports}</Text>
-              </GlassCard>
+              <Card variant="primary" style={styles.totalReportsCard} noPadding>
+                <View style={styles.totalReportsInner}>
+                  <Text style={styles.totalReportsLabel}>Total Reports</Text>
+                  <Text style={styles.totalReportsValue}>{analytics.totalReports}</Text>
+                </View>
+              </Card>
             </View>
 
             <Text style={styles.sectionTitle}>Reports</Text>
@@ -186,47 +188,49 @@ export const ModerationDashboardScreen = () => {
             : (item.target?.name || `User ${item.targetId}`);
 
           return (
-            <GlassCard style={styles.reportCard}>
-              <View style={styles.reportHeader}>
-                <Text style={styles.reportType}>{item.targetType.toUpperCase()} REPORT</Text>
-                <View style={[
-                  styles.statusBadge,
-                  item.isResolved ? styles.statusResolved : styles.statusPending,
-                ]}>
-                  <Text style={styles.statusText}>{item.isResolved ? 'RESOLVED' : 'OPEN'}</Text>
+            <Card variant="raised" style={styles.reportCard} noPadding>
+              <View style={styles.reportCardInner}>
+                <View style={styles.reportHeader}>
+                  <Text style={styles.reportType}>{item.targetType.toUpperCase()} REPORT</Text>
+                  <View style={[
+                    styles.statusBadge,
+                    item.isResolved ? styles.statusResolved : styles.statusPending,
+                  ]}>
+                    <Text style={styles.statusText}>{item.isResolved ? 'RESOLVED' : 'OPEN'}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.targetText}>{targetLabel}</Text>
+                <Text style={styles.reasonText}>Reason: {item.reason}</Text>
+                <Text style={styles.metaText}>Reporter: {item.reporter?.name || item.reporterId}</Text>
+                <Text style={styles.metaText}>Created: {new Date(item.createdAt).toLocaleString()}</Text>
+
+                <View style={styles.actionsRow}>
+                  {item.targetType === 'event' ? (
+                    <>
+                      <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleApproveEvent(item)}>
+                        <Text style={[styles.actionText, { color: theme.colors.success }]}>Approve Event</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleRejectEvent(item)}>
+                        <Text style={[styles.actionText, { color: theme.colors.error }]}>Reject Event</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity style={[styles.actionButton, styles.suspendButton]} onPress={() => handleUserToggle(item)}>
+                      <Text style={[styles.actionText, { color: theme.colors.warning }]}>
+                        {item.target?.isSuspended ? 'Activate User' : 'Suspend User'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {!item.isResolved && (
+                    <TouchableOpacity style={[styles.actionButton, styles.resolveButton]} onPress={() => handleResolve(item)}>
+                      <Text style={[styles.actionText, { color: theme.colors.primaryLight }]}>Resolve</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
-
-              <Text style={styles.targetText}>{targetLabel}</Text>
-              <Text style={styles.reasonText}>Reason: {item.reason}</Text>
-              <Text style={styles.metaText}>Reporter: {item.reporter?.name || item.reporterId}</Text>
-              <Text style={styles.metaText}>Created: {new Date(item.createdAt).toLocaleString()}</Text>
-
-              <View style={styles.actionsRow}>
-                {item.targetType === 'event' ? (
-                  <>
-                    <TouchableOpacity style={[styles.actionButton, styles.approveButton]} onPress={() => handleApproveEvent(item)}>
-                      <Text style={[styles.actionText, { color: theme.colors.success }]}>Approve Event</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={() => handleRejectEvent(item)}>
-                      <Text style={[styles.actionText, { color: theme.colors.error }]}>Reject Event</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <TouchableOpacity style={[styles.actionButton, styles.suspendButton]} onPress={() => handleUserToggle(item)}>
-                    <Text style={[styles.actionText, { color: theme.colors.warning }]}>
-                      {item.target?.isSuspended ? 'Activate User' : 'Suspend User'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {!item.isResolved && (
-                  <TouchableOpacity style={[styles.actionButton, styles.resolveButton]} onPress={() => handleResolve(item)}>
-                    <Text style={[styles.actionText, { color: theme.colors.primaryLight }]}>Resolve</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </GlassCard>
+            </Card>
           );
         }}
         ListEmptyComponent={<EmptyState title="No Reports" message="No moderation reports have been submitted yet." />}
@@ -269,6 +273,10 @@ const styles = StyleSheet.create({
     flex: 0.48,
   },
   totalReportsCard: {
+    borderRadius: theme.borderRadius.l,
+    overflow: 'hidden',
+  },
+  totalReportsInner: {
     padding: theme.spacing.m,
     alignItems: 'center',
   },
@@ -287,9 +295,11 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.s,
   },
   reportCard: {
+    borderRadius: theme.borderRadius.l,
+    overflow: 'hidden',
     marginBottom: theme.spacing.m,
-    padding: theme.spacing.m,
   },
+  reportCardInner: { padding: theme.spacing.m },
   reportHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

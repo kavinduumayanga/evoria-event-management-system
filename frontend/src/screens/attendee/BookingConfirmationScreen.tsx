@@ -6,9 +6,9 @@ import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList, AttendeeTabParamList } from '../../types/navigation';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { GradientBackground, PrimaryButton, SecondaryButton, GlassCard } from '../../components';
+import { ScreenContainer, Card, Button } from '../../components';
 import { theme } from '../../constants/theme';
-import { CheckCircle } from 'lucide-react-native';
+import { CheckCircle2, Clock, Ticket as TicketIcon, Hash } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { Booking } from '../../types';
 
@@ -16,7 +16,6 @@ type BookingConfirmationNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AttendeeHomeStackParamList, 'BookingConfirmation'>,
   BottomTabNavigationProp<AttendeeTabParamList>
 >;
-
 type BookingConfirmationRouteProp = RouteProp<AttendeeHomeStackParamList, 'BookingConfirmation'>;
 
 interface Props {
@@ -24,97 +23,125 @@ interface Props {
   route: BookingConfirmationRouteProp;
 }
 
+const InfoRow = ({ label, value }: { label: string; value: string }) => (
+  <View style={infoStyles.row}>
+    <Text style={infoStyles.label}>{label}</Text>
+    <Text style={infoStyles.value}>{value}</Text>
+  </View>
+);
+
+const infoStyles = StyleSheet.create({
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  label: { ...theme.typography.caption, color: theme.colors.textMuted },
+  value: { ...theme.typography.bodyMedium, color: theme.colors.text },
+});
+
 export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }) => {
   const { bookingId } = route.params;
   const [booking, setBooking] = useState<Booking | null>(null);
 
-  useEffect(() => {
-    fetchBooking();
-  }, [bookingId]);
+  useEffect(() => { fetchBooking(); }, [bookingId]);
 
   const fetchBooking = async () => {
     try {
       const res = await apiClient.get(`/bookings/${bookingId}`);
       setBooking(res.data.data.booking);
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const isWaitlisted = Boolean(booking?.isWaitlisted);
+  const approvalStatus = booking?.approvalStatus || 'approved';
+  const rsvpStatus = booking?.rsvpStatus || 'going';
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
-          <CheckCircle size={80} color={theme.colors.success} style={{ alignSelf: 'center', marginBottom: 20 }} />
-          <Text style={styles.title}>{isWaitlisted ? 'Waitlist Joined' : 'Booking Confirmed!'}</Text>
-          <Text style={styles.subtitle}>
+    <ScreenContainer scrollable>
+      <View style={styles.container}>
+        {/* Hero */}
+        <View style={styles.heroSection}>
+          <View style={[styles.iconCircle, { backgroundColor: isWaitlisted ? theme.colors.warningSubtle : theme.colors.successSubtle }]}>
             {isWaitlisted
-              ? 'Event is full. You are now in the waitlist queue and will be promoted automatically when seats open.'
-              : 'Payment Successful (Mock). Your tickets have been confirmed.'}
+              ? <Clock size={40} color={theme.colors.warning} />
+              : <CheckCircle2 size={40} color={theme.colors.success} />
+            }
+          </View>
+          <Text style={styles.heroTitle}>
+            {isWaitlisted ? 'Joined Waitlist!' : 'Booking Confirmed!'}
           </Text>
+          <Text style={styles.heroSubtitle}>
+            {isWaitlisted
+              ? 'Event is full. You\'ll be promoted automatically when a seat opens.'
+              : 'Your registration is complete. See you there!'}
+          </Text>
+        </View>
 
-          {booking && (
-            <GlassCard style={styles.card}>
-              {(() => {
-                const approvalStatus = booking.approvalStatus || 'approved';
-                const rsvpStatus = booking.rsvpStatus || 'going';
-                return (
-                  <>
-              <Text style={styles.label}>Booking ID</Text>
-              <Text style={styles.value}>{booking.id}</Text>
-
-              {booking.isWaitlisted && (
-                <>
-                  <Text style={styles.label}>Waitlist Position</Text>
-                  <Text style={styles.value}>#{booking.waitlistPosition || '-'}</Text>
-                </>
+        {/* Booking details card */}
+        {booking && (
+          <Card variant="raised" style={styles.detailCard} noPadding>
+            <View style={styles.cardHeader}>
+              <TicketIcon size={16} color={theme.colors.primary} />
+              <Text style={styles.cardTitle}>Booking Details</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <InfoRow label="Booking ID" value={`#${booking.id.slice(-8).toUpperCase()}`} />
+              {isWaitlisted && (
+                <InfoRow label="Waitlist Position" value={`#${booking.waitlistPosition || '—'}`} />
               )}
-              
-              <Text style={styles.label}>Quantity</Text>
-              <Text style={styles.value}>{booking.quantity}</Text>
+              <InfoRow label="Quantity" value={String(booking.quantity)} />
+              <InfoRow label="Approval" value={approvalStatus.toUpperCase()} />
+              <InfoRow label="RSVP" value={rsvpStatus.replace('_', ' ').toUpperCase()} />
+              <View style={[infoStyles.row, { borderBottomWidth: 0 }]}>
+                <Text style={infoStyles.label}>Total Paid</Text>
+                <Text style={[infoStyles.value, styles.totalAmount]}>
+                  ${booking.totalAmount.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
 
-              <Text style={styles.label}>Approval Status</Text>
-              <Text style={styles.value}>{approvalStatus.toUpperCase()}</Text>
-
-              <Text style={styles.label}>RSVP</Text>
-              <Text style={styles.value}>{rsvpStatus.replace('_', ' ').toUpperCase()}</Text>
-              
-              <Text style={styles.label}>Total Amount</Text>
-              <Text style={styles.value}>${booking.totalAmount.toFixed(2)}</Text>
-                  </>
-                );
-              })()}
-            </GlassCard>
-          )}
-
-          <PrimaryButton 
+        {/* Actions */}
+        <View style={styles.actions}>
+          <Button
             title={isWaitlisted ? 'View My Waitlist' : 'View My Bookings'}
-            onPress={() => (
+            onPress={() =>
               isWaitlisted
                 ? navigation.navigate('HomeStack', { screen: 'MyWaitlist' })
                 : navigation.navigate('MyRegistrations')
-            )}
-            style={{ marginTop: 20 }}
+            }
+            variant="primary"
+            size="lg"
           />
-          <SecondaryButton 
-            title="Back to Home" 
-            onPress={() => navigation.navigate('HomeStack', { screen: 'EventList' })} 
-            style={{ marginTop: 10 }}
+          <Button
+            title="Back to Discover"
+            onPress={() => navigation.navigate('HomeStack', { screen: 'EventList' })}
+            variant="ghost"
+            size="md"
           />
         </View>
-      </SafeAreaView>
-    </GradientBackground>
+      </View>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flex: 1, padding: theme.spacing.xl, justifyContent: 'center' },
-  title: { ...theme.typography.h1, color: theme.colors.text, textAlign: 'center', marginBottom: 10 },
-  subtitle: { ...theme.typography.body, color: theme.colors.textMuted, textAlign: 'center', marginBottom: 30 },
-  card: { padding: theme.spacing.l },
-  label: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: 5 },
-  value: { ...theme.typography.h3, color: theme.colors.text, marginBottom: 15 },
+  container: { flex: 1, paddingHorizontal: theme.spacing.base, paddingBottom: theme.spacing.xxl },
+  heroSection: { alignItems: 'center', paddingTop: theme.spacing.xxl, paddingBottom: theme.spacing.xl },
+  iconCircle: {
+    width: 96, height: 96, borderRadius: 48,
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: theme.spacing.xl,
+    shadowColor: theme.colors.success,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  heroTitle: { ...theme.typography.h1, color: theme.colors.text, textAlign: 'center', marginBottom: theme.spacing.m },
+  heroSubtitle: { ...theme.typography.body, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 24, maxWidth: 300 },
+  detailCard: { borderRadius: theme.borderRadius.l, overflow: 'hidden', marginBottom: theme.spacing.xl },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s, padding: theme.spacing.m, backgroundColor: theme.colors.primarySubtle },
+  cardTitle: { ...theme.typography.label, color: theme.colors.primary },
+  cardBody: { padding: theme.spacing.m },
+  totalAmount: { ...theme.typography.h3, color: theme.colors.primary, fontWeight: '700' },
+  actions: { gap: theme.spacing.m },
 });

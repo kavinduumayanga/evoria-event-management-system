@@ -1,8 +1,19 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { CalendarDays, Users, DollarSign, UserCheck } from 'lucide-react-native';
-import { ScreenContainer, StatCard, EventCard, LoadingState, ErrorState, EmptyState } from '../../components';
+import {
+  CalendarDays, Users, DollarSign, UserCheck,
+  TrendingUp, Settings,
+} from 'lucide-react-native';
+import {
+  ScreenContainer, StatCard, EventCard,
+  LoadingState, ErrorState, EmptyState, SectionHeader,
+} from '../../components';
 import { theme } from '../../constants/theme';
 import { AnalyticsService, EventService, UserService } from '../../api/services';
 import { Event, DashboardAnalytics } from '../../types';
@@ -24,18 +35,15 @@ export const DashboardScreen = () => {
   const fetchData = async () => {
     try {
       setError(null);
-
       const [userRes, analyticsRes, eventsRes] = await Promise.all([
         UserService.getMe(),
         AnalyticsService.getDashboardAnalytics(),
         EventService.getEvents(),
       ]);
-
       setUserName(userRes.data.user.name);
       setAnalytics(analyticsRes.data);
       setRecentEvents((eventsRes.data.events || []).slice(0, 3));
-    } catch (fetchError) {
-      console.error(fetchError);
+    } catch {
       setError('Failed to load dashboard analytics');
     } finally {
       setIsLoading(false);
@@ -43,11 +51,7 @@ export const DashboardScreen = () => {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => { fetchData(); }, []));
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -57,67 +61,87 @@ export const DashboardScreen = () => {
   if (isLoading && !isRefreshing) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchData} /></ScreenContainer>;
 
+  // Get first name only
+  const firstName = userName.split(' ')[0] || userName;
+
   return (
-    <ScreenContainer
-      scrollable
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
-      }
-    >
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Welcome back,</Text>
-        <Text style={styles.name}>{userName}</Text>
+    <ScreenContainer scrollable refreshing={isRefreshing} onRefresh={onRefresh}>
+      {/* === PAGE HEADER === */}
+      <View style={styles.pageHeader}>
+        <View>
+          <Text style={styles.greeting}>Hello, {firstName}</Text>
+          <Text style={styles.role}>Host Dashboard</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.settingsBtn}
+          onPress={() => navigation.navigate('Profile', { screen: 'ProfileHome' })}
+        >
+          <Settings size={20} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
+      {/* === STATS GRID (2×2) === */}
       <View style={styles.statsGrid}>
         <View style={styles.statsRow}>
           <StatCard
-            title="Total Events"
+            title="Events"
             value={analytics.totalEvents}
-            icon={<CalendarDays size={24} color={theme.colors.primary} />}
+            icon={<CalendarDays size={22} color={theme.colors.primary} />}
             style={styles.statCard}
+            accentColor={theme.colors.primary}
           />
           <StatCard
-            title="Total Bookings"
+            title="Bookings"
             value={analytics.totalBookings}
-            icon={<Users size={24} color={theme.colors.secondary} />}
+            icon={<Users size={22} color={theme.colors.primaryLight} />}
             style={styles.statCard}
-            accentColor={theme.colors.secondary}
+            accentColor={theme.colors.primaryLight}
           />
         </View>
         <View style={styles.statsRow}>
           <StatCard
             title="Revenue"
-            value={analytics.totalRevenue.toFixed(2)}
-            icon={<DollarSign size={24} color={theme.colors.success} />}
+            value={`$${analytics.totalRevenue.toFixed(0)}`}
+            icon={<DollarSign size={22} color={theme.colors.success} />}
             style={styles.statCard}
             accentColor={theme.colors.success}
           />
           <StatCard
             title="Attendees"
             value={analytics.totalAttendees}
-            icon={<UserCheck size={24} color={theme.colors.accent} />}
+            icon={<UserCheck size={22} color={theme.colors.warning} />}
             style={styles.statCard}
-            accentColor={theme.colors.accent}
+            accentColor={theme.colors.warning}
           />
         </View>
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Events</Text>
-        <Text style={styles.seeAll} onPress={() => navigation.navigate('EventsStack', { screen: 'ManageEvents' })}>
-          See All
-        </Text>
-      </View>
+      {/* === RECENT EVENTS === */}
+      <SectionHeader
+        title="Recent Events"
+        action={{
+          label: 'See All',
+          onPress: () => navigation.navigate('EventsStack', { screen: 'ManageEvents' }),
+        }}
+        style={styles.sectionHeader}
+      />
 
       {recentEvents.length === 0 ? (
-        <EmptyState title="No Events Yet" message="Create your first event to get started" />
+        <EmptyState
+          icon={<CalendarDays size={40} color={theme.colors.textMuted} />}
+          title="No Events Yet"
+          message="Create your first event to get started."
+          action={{
+            label: 'Create Event',
+            onPress: () => navigation.navigate('EventsStack', { screen: 'EventForm', params: {} }),
+          }}
+        />
       ) : (
         recentEvents.map((event) => (
           <EventCard
             key={event.id}
             event={event}
+            variant="list"
             onPress={() => navigation.navigate('EventsStack', {
               screen: 'EventForm',
               params: { eventId: event.id },
@@ -130,44 +154,45 @@ export const DashboardScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  pageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: theme.spacing.base,
     paddingTop: theme.spacing.xl,
-  },
-  header: {
     marginBottom: theme.spacing.xl,
   },
   greeting: {
-    ...theme.typography.body,
-    color: theme.colors.textMuted,
-  },
-  name: {
     ...theme.typography.h1,
     color: theme.colors.text,
-    marginTop: theme.spacing.xs,
+  },
+  role: {
+    ...theme.typography.label,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.borderRadius.m,
+    backgroundColor: theme.colors.surfaceRaised,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statsGrid: {
+    paddingHorizontal: theme.spacing.base,
     marginBottom: theme.spacing.xl,
+    gap: theme.spacing.m,
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.m,
+    gap: theme.spacing.m,
   },
   statCard: {
-    flex: 0.48,
+    flex: 1,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: theme.spacing.base,
     marginBottom: theme.spacing.m,
-  },
-  sectionTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
-  },
-  seeAll: {
-    ...theme.typography.button,
-    color: theme.colors.primary,
   },
 });

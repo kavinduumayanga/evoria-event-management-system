@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { ScreenContainer, GlassCard, LoadingState, ErrorState, SecondaryButton } from '../../components';
+import { User, Mail, Phone, Shield, LogOut, ChevronRight, KeyRound } from 'lucide-react-native';
+import { ScreenContainer, Card, LoadingState, ErrorState, Button } from '../../components';
 import { theme } from '../../constants/theme';
-import { User, Mail, Phone, Shield, LogOut } from 'lucide-react-native';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -17,6 +17,7 @@ export const ProfileScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+
   const resolvedProfileImage = resolveImageUrl(user?.profileImage);
 
   const fetchProfile = useCallback(async () => {
@@ -25,10 +26,7 @@ export const ProfileScreen = () => {
       const response = await UserService.getMe();
       const currentUser = response?.data?.user;
       setUser(currentUser);
-
-      if (currentUser) {
-        await updateAuthUser(currentUser);
-      }
+      if (currentUser) await updateAuthUser(currentUser);
     } catch (err: any) {
       setError(getApiErrorMessage(err, 'Failed to load profile'));
     } finally {
@@ -36,217 +34,146 @@ export const ProfileScreen = () => {
     }
   }, [updateAuthUser]);
 
-  useFocusEffect(
-    useCallback(() => {
-      setIsLoading(true);
-      fetchProfile();
-    }, [fetchProfile])
-  );
+  useFocusEffect(useCallback(() => { setIsLoading(true); fetchProfile(); }, [fetchProfile]));
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
+    Alert.alert('Log out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: async () => await logout() },
+    ]);
+  };
+
+  const handleDeactivateAccount = () => {
+    Alert.alert('Deactivate Account', 'This will deactivate your account and sign you out. Continue?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Logout',
+        text: 'Deactivate',
         style: 'destructive',
         onPress: async () => {
-          await logout();
+          try {
+            await UserService.deactivateAccount();
+            await logout();
+          } catch (err: any) {
+            Alert.alert('Failed', getApiErrorMessage(err, 'Unable to deactivate account.'));
+          }
         },
       },
     ]);
   };
 
-  const handleDeactivateAccount = () => {
-    Alert.alert(
-      'Deactivate Account',
-      'This will deactivate your account and sign you out. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await UserService.deactivateAccount();
-              await logout();
-            } catch (err: any) {
-              Alert.alert('Deactivation Failed', getApiErrorMessage(err, 'Unable to deactivate account.'));
-            }
-          },
-        },
-      ]
-    );
-  };
+  if (isLoading) return <LoadingState />;
+  if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchProfile} /></ScreenContainer>;
 
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (error) {
-    return (
-      <ScreenContainer>
-        <ErrorState message={error} onRetry={fetchProfile} />
-      </ScreenContainer>
-    );
-  }
+  const initials = (user?.name || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
 
   return (
     <ScreenContainer scrollable>
-      <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
+      {/* === HEADER === */}
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>Profile</Text>
       </View>
 
-      <View style={styles.avatarContainer}>
+      {/* === AVATAR + NAME === */}
+      <View style={styles.avatarSection}>
         {resolvedProfileImage ? (
-          <Image source={{ uri: resolvedProfileImage }} style={styles.avatarImage} resizeMode="cover" />
+          <Image source={{ uri: resolvedProfileImage }} style={styles.avatarImage} />
         ) : (
           <View style={styles.avatarFallback}>
-            <User size={40} color={theme.colors.primary} />
+            <Text style={styles.avatarInitials}>{initials}</Text>
           </View>
         )}
-
-        <Text style={styles.name}>{user?.name}</Text>
-
-        <View style={styles.roleBadge}>
-          <Shield size={12} color={theme.colors.secondary} style={{ marginRight: 4 }} />
+        <Text style={styles.userName}>{user?.name}</Text>
+        <View style={styles.rolePill}>
+          <Shield size={11} color={theme.colors.primaryLight} />
           <Text style={styles.roleText}>MEMBER</Text>
         </View>
       </View>
 
-      <GlassCard style={styles.detailsCard} variant="dark" animateEntrance>
-        <View style={styles.detailRow}>
-          <Mail size={20} color={theme.colors.textMuted} />
-          <View style={styles.detailTextContainer}>
-            <Text style={styles.detailLabel}>Email</Text>
-            <Text style={styles.detailValue}>{user?.email || '-'}</Text>
-          </View>
-        </View>
+      {/* === INFO CARD === */}
+      <Card variant="raised" style={styles.infoCard} noPadding>
+        <InfoRow icon={<Mail size={18} color={theme.colors.textMuted} />} label="Email" value={user?.email || '—'} />
+        <View style={styles.divider} />
+        <InfoRow icon={<Phone size={18} color={theme.colors.textMuted} />} label="Phone" value={user?.phone || 'Not set'} />
+      </Card>
 
-        <View style={styles.detailRow}>
-          <Phone size={20} color={theme.colors.textMuted} />
-          <View style={styles.detailTextContainer}>
-            <Text style={styles.detailLabel}>Phone</Text>
-            <Text style={styles.detailValue}>{user?.phone || 'Not set'}</Text>
-          </View>
-        </View>
-      </GlassCard>
+      {/* === ACTIONS === */}
+      <View style={styles.actionsSection}>
+        <ActionRow
+          label="Edit Profile"
+          icon={<User size={18} color={theme.colors.primary} />}
+          onPress={() => navigation.navigate('EditProfile')}
+        />
+        <ActionRow
+          label="Change Password"
+          icon={<KeyRound size={18} color={theme.colors.primary} />}
+          onPress={() => navigation.navigate('ChangePassword')}
+        />
+      </View>
 
-      <SecondaryButton
-        title="Edit Profile"
-        style={styles.actionButton}
-        onPress={() => navigation.navigate('EditProfile')}
-      />
-
-      <SecondaryButton
-        title="Change Password"
-        style={styles.actionButton}
-        onPress={() => navigation.navigate('ChangePassword')}
-      />
-
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <LogOut size={18} color={theme.colors.error} style={{ marginRight: 8 }} />
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.deactivateButton} onPress={handleDeactivateAccount}>
-        <Text style={styles.deactivateText}>Deactivate Account</Text>
-      </TouchableOpacity>
+      {/* === LOGOUT / DEACTIVATE === */}
+      <View style={styles.dangerSection}>
+        <Button
+          title="Log Out"
+          onPress={handleLogout}
+          variant="secondary"
+          size="md"
+          style={styles.logoutBtn}
+        />
+        <TouchableOpacity onPress={handleDeactivateAccount} style={styles.deactivateBtn}>
+          <Text style={styles.deactivateText}>Deactivate Account</Text>
+        </TouchableOpacity>
+      </View>
     </ScreenContainer>
   );
 };
 
+// Sub-components
+const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
+  <View style={infoStyles.row}>
+    <View style={infoStyles.iconWrap}>{icon}</View>
+    <View>
+      <Text style={infoStyles.label}>{label}</Text>
+      <Text style={infoStyles.value}>{value}</Text>
+    </View>
+  </View>
+);
+
+const ActionRow: React.FC<{ label: string; icon: React.ReactNode; onPress: () => void }> = ({ label, icon, onPress }) => (
+  <TouchableOpacity style={actionStyles.row} onPress={onPress} activeOpacity={0.7}>
+    <View style={actionStyles.iconWrap}>{icon}</View>
+    <Text style={actionStyles.label}>{label}</Text>
+    <ChevronRight size={18} color={theme.colors.textMuted} />
+  </TouchableOpacity>
+);
+
+const infoStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', padding: theme.spacing.m },
+  iconWrap: { width: 40, height: 40, borderRadius: theme.borderRadius.m, backgroundColor: theme.colors.surfaceOverlay, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.m },
+  label: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: 2 },
+  value: { ...theme.typography.bodyMedium, color: theme.colors.text },
+});
+
+const actionStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing.m, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  iconWrap: { width: 36, height: 36, borderRadius: theme.borderRadius.m, backgroundColor: theme.colors.primarySubtle, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.m },
+  label: { ...theme.typography.bodyMedium, color: theme.colors.text, flex: 1 },
+});
+
 const styles = StyleSheet.create({
-  header: {
-    paddingTop: theme.spacing.xl,
-    marginBottom: theme.spacing.xl,
-  },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.xxl,
-  },
-  avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: theme.spacing.m,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-  },
-  avatarFallback: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: theme.spacing.m,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-  },
-  name: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.s,
-  },
-  roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.round,
-  },
-  roleText: {
-    ...theme.typography.caption,
-    color: theme.colors.secondary,
-    fontWeight: 'bold',
-  },
-  detailsCard: {
-    marginBottom: theme.spacing.xl,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.s,
-  },
-  detailTextContainer: {
-    marginLeft: theme.spacing.m,
-  },
-  detailLabel: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-  },
-  detailValue: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-    marginTop: 2,
-  },
-  actionButton: {
-    marginBottom: theme.spacing.m,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing.m,
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
-    borderRadius: theme.borderRadius.m,
-    marginBottom: theme.spacing.m,
-  },
-  logoutText: {
-    ...theme.typography.button,
-    color: theme.colors.error,
-  },
-  deactivateButton: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.s,
-  },
-  deactivateText: {
-    ...theme.typography.caption,
-    color: theme.colors.error,
-  },
+  pageHeader: { paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.xl, marginBottom: theme.spacing.xl },
+  pageTitle: { ...theme.typography.h1, color: theme.colors.text },
+  avatarSection: { alignItems: 'center', marginBottom: theme.spacing.xl, paddingHorizontal: theme.spacing.base },
+  avatarImage: { width: 96, height: 96, borderRadius: 48, marginBottom: theme.spacing.m, borderWidth: 2, borderColor: theme.colors.primary },
+  avatarFallback: { width: 96, height: 96, borderRadius: 48, backgroundColor: theme.colors.primarySubtle, borderWidth: 2, borderColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: theme.spacing.m },
+  avatarInitials: { ...theme.typography.h2, color: theme.colors.primary, fontWeight: '700' },
+  userName: { ...theme.typography.h2, color: theme.colors.text, marginBottom: theme.spacing.s },
+  rolePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: theme.colors.primarySubtle, paddingHorizontal: 10, paddingVertical: 4, borderRadius: theme.borderRadius.round },
+  roleText: { ...theme.typography.overline, color: theme.colors.primaryLight },
+  infoCard: { marginHorizontal: theme.spacing.base, marginBottom: theme.spacing.l, borderRadius: theme.borderRadius.l, overflow: 'hidden' },
+  divider: { height: 1, backgroundColor: theme.colors.border, marginHorizontal: theme.spacing.m },
+  actionsSection: { marginHorizontal: theme.spacing.base, marginBottom: theme.spacing.xl },
+  dangerSection: { marginHorizontal: theme.spacing.base, marginBottom: theme.spacing.xxl },
+  logoutBtn: { marginBottom: theme.spacing.m },
+  deactivateBtn: { alignItems: 'center', paddingVertical: theme.spacing.s },
+  deactivateText: { ...theme.typography.caption, color: theme.colors.error },
 });

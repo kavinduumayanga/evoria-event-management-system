@@ -1,31 +1,53 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { Button } from './Button';
 import { theme } from '../constants/theme';
-import { Inbox } from 'lucide-react-native';
-import { GlassCard } from './GlassCard';
+
+// ============================================================
+// EMPTY STATE — Shown when a list/section has no data
+//
+// Usage:
+//   <EmptyState
+//     icon={<CalendarDays size={48} color={theme.colors.textMuted} />}
+//     title="No Events Yet"
+//     message="Create your first event to get started."
+//     action={{ label: "Create Event", onPress: () => {} }}  // optional
+//   />
+// ============================================================
 
 interface EmptyStateProps {
+  icon?: React.ReactNode;
   title: string;
   message?: string;
-  icon?: React.ReactNode;
+  action?: {
+    label: string;
+    onPress: () => void;
+  };
   style?: StyleProp<ViewStyle>;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ 
-  title, 
-  message, 
-  icon = <Inbox size={48} color={theme.colors.secondary} />, 
-  style 
+export const EmptyState: React.FC<EmptyStateProps> = ({
+  icon,
+  title,
+  message,
+  action,
+  style,
 }) => {
   return (
     <View style={[styles.container, style]}>
-      <GlassCard style={styles.card} variant="dark" animateEntrance>
-        <View style={styles.iconContainer}>
-          {icon}
-        </View>
-        <Text style={styles.title}>{title}</Text>
-        {message && <Text style={styles.message}>{message}</Text>}
-      </GlassCard>
+      {icon && <View style={styles.iconWrapper}>{icon}</View>}
+      <Text style={styles.title}>{title}</Text>
+      {message && <Text style={styles.message}>{message}</Text>}
+      {action && (
+        <Button
+          title={action.label}
+          onPress={action.onPress}
+          variant="secondary"
+          size="sm"
+          style={styles.action}
+          fullWidth={false}
+        />
+      )}
     </View>
   );
 };
@@ -33,21 +55,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.xl,
-  },
-  card: {
-    width: '100%',
-    alignItems: 'center',
     paddingVertical: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.xl,
   },
-  iconContainer: {
+  iconWrapper: {
     marginBottom: theme.spacing.l,
-    opacity: 0.8,
+    opacity: 0.5,
   },
   title: {
-    ...theme.typography.h2,
+    ...theme.typography.h3,
     color: theme.colors.text,
     textAlign: 'center',
     marginBottom: theme.spacing.s,
@@ -56,5 +74,9 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
+    lineHeight: 22,
+  },
+  action: {
+    marginTop: theme.spacing.l,
   },
 });

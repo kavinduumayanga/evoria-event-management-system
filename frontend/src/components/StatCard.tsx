@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { NeonCard } from './NeonCard';
+import { Card } from './Card';
+import { AnimatedPressable } from './AnimatedPressable';
+import { StatusBadge, BadgeStatus } from './StatusBadge';
 import { theme } from '../constants/theme';
+import { Calendar, Ticket, MapPin } from 'lucide-react-native';
 
 interface StatCardProps {
   title: string;
@@ -11,48 +14,48 @@ interface StatCardProps {
   accentColor?: string;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ 
-  title, 
-  value, 
-  icon, 
+export const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  icon,
   style,
-  accentColor = theme.colors.primary 
+  accentColor = theme.colors.primary,
 }) => {
   return (
-    <NeonCard style={[styles.container, style]} accentColor={accentColor}>
-      <View style={styles.iconContainer}>
-        {icon}
-      </View>
-      <View style={styles.textContainer}>
+    <Card variant="raised" style={[styles.container, style]} noPadding>
+      <View style={styles.inner}>
+        <View style={[styles.iconContainer, { backgroundColor: `${accentColor}1A` }]}>
+          {icon}
+        </View>
         <Text style={styles.value}>{value}</Text>
         <Text style={styles.title}>{title}</Text>
       </View>
-    </NeonCard>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: theme.borderRadius.l,
+  },
+  inner: {
     padding: theme.spacing.m,
+    gap: theme.spacing.xs,
   },
   iconContainer: {
-    marginRight: theme.spacing.m,
-    padding: theme.spacing.s,
-    backgroundColor: theme.colors.surfaceLight,
+    width: 40,
+    height: 40,
     borderRadius: theme.borderRadius.m,
-  },
-  textContainer: {
-    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
   },
   value: {
     ...theme.typography.h2,
     color: theme.colors.text,
   },
   title: {
-    ...theme.typography.caption,
+    ...theme.typography.label,
     color: theme.colors.textMuted,
-    marginTop: 2,
   },
 });
