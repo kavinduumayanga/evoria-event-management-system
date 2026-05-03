@@ -108,7 +108,9 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
               {safeString((item as any).description, '').trim() ? (
                 <Text style={styles.venueDetail} numberOfLines={2}>{safeString((item as any).description, '')}</Text>
               ) : null}
-              <Text style={styles.venueCapacity}>Capacity: {item.capacity.toLocaleString()}</Text>
+              <Text style={styles.venueCapacity}>
+                Capacity: {Number.isFinite(Number(item.capacity)) ? Number(item.capacity).toLocaleString() : 'Not specified'}
+              </Text>
             </View>
             <View style={styles.venueActions}>
               <IconButton

@@ -10,6 +10,7 @@ import { sendEmail } from '../services/email.service';
 
 const MIN_PASSWORD_LENGTH = 6;
 const OTP_DIGITS = 6;
+const STRICT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
 
 const resolveOtpExpiryMinutes = () => {
   const value = Number.parseInt(String(process.env.OTP_EXPIRY_MINUTES || '10').trim(), 10);
@@ -40,30 +41,36 @@ const toSafeUser = (userDoc: any) => {
   return user;
 };
 
+const strictEmailSchema = z
+  .string()
+  .trim()
+  .email('Please provide a valid email address')
+  .regex(STRICT_EMAIL_REGEX, 'Please provide a valid email address');
+
 const registerSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  email: z.string().email('Please provide a valid email address'),
+  email: strictEmailSchema,
   password: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`),
   phone: z.string().trim().max(30, 'Phone number is too long').optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email('Please provide a valid email address'),
+  email: strictEmailSchema,
   password: z.string().min(1, 'Password is required'),
 });
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email('Please provide a valid email address'),
+  email: strictEmailSchema,
 });
 
 const resetPasswordSchema = z.object({
-  email: z.string().email('Please provide a valid email address'),
+  email: strictEmailSchema,
   token: z.string().trim().min(1, 'Reset token is required'),
   newPassword: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`),
 });
 
 const verifyResetOtpSchema = z.object({
-  email: z.string().email('Please provide a valid email address'),
+  email: strictEmailSchema,
   token: z.string().trim().min(1, 'Reset token is required'),
 });
 

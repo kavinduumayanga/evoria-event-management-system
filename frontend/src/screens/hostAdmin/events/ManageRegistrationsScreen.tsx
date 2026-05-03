@@ -194,11 +194,12 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
 
               {/* Meta */}
               <Text style={styles.metaText}>{item.email}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>Mobile: {item.mobile}</Text>
-                <Text style={styles.metaDot}>·</Text>
-                <Text style={styles.metaText}>Ticket: {(item as any).ticketType || 'General Admission'}</Text>
-              </View>
+              <Text style={styles.metaText}>Mobile: {item.mobile}</Text>
+              <Text style={styles.metaText}>Ticket: {(item as any).ticketType || 'General Admission'}</Text>
+              <Text style={styles.metaText}>
+                Registered:{' '}
+                {new Date(item.registeredAt || item.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </Text>
               {item.checkedInAt && (
                 <Text style={styles.checkedInText}>
                   ✓ Checked in {new Date(item.checkedInAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -206,25 +207,27 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
               )}
 
               {/* Actions */}
-              <View style={styles.actionsRow}>
+              <View style={styles.actionsRowPrimary}>
                 <Button
-                  title="Going"
+                  title="Approve"
                   onPress={() => setGuestStatus(item.id, 'going')}
                   variant={item.status === 'going' ? 'primary' : 'secondary'}
                   size="sm"
                   style={styles.actionBtn}
                 />
                 <Button
-                  title="Not Going"
-                  onPress={() => setGuestStatus(item.id, 'not_going')}
-                  variant={item.status === 'not_going' ? 'danger' : 'secondary'}
+                  title="Reject"
+                  onPress={() => setGuestStatus(item.id, 'declined')}
+                  variant={item.status === 'declined' ? 'danger' : 'secondary'}
                   size="sm"
                   style={styles.actionBtn}
                 />
+              </View>
+              <View style={styles.actionsRowSecondary}>
                 <Button
-                  title="Decline"
-                  onPress={() => setGuestStatus(item.id, 'declined')}
-                  variant={item.status === 'declined' ? 'danger' : 'ghost'}
+                  title="Not Going"
+                  onPress={() => setGuestStatus(item.id, 'not_going')}
+                  variant={item.status === 'not_going' ? 'danger' : 'ghost'}
                   size="sm"
                   style={styles.actionBtn}
                 />
@@ -238,6 +241,23 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
                     style={styles.actionBtn}
                   />
                 )}
+                <Button
+                  title="View"
+                  onPress={() => {
+                    Alert.alert(
+                      safeString(item.name, 'Guest'),
+                      [
+                        `Email: ${safeString(item.email, '—')}`,
+                        `Mobile: ${safeString(item.mobile, '—')}`,
+                        `Status: ${safeString(item.status, '—').replace('_', ' ')}`,
+                        `Ticket: ${safeString((item as any).ticketType, 'General Admission')}`,
+                      ].join('\n')
+                    );
+                  }}
+                  variant="secondary"
+                  size="sm"
+                  style={styles.actionBtn}
+                />
               </View>
             </View>
           </Card>
@@ -265,10 +285,9 @@ const styles = StyleSheet.create({
   guestInner: { padding: theme.spacing.m, gap: 4 },
   guestTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.xs },
   guestName: { ...theme.typography.bodyMedium, color: theme.colors.text, flex: 1, marginRight: theme.spacing.s },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { ...theme.typography.caption, color: theme.colors.textMuted },
-  metaDot: { ...theme.typography.caption, color: theme.colors.textMuted },
   checkedInText: { ...theme.typography.caption, color: theme.colors.success, marginTop: 2 },
-  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginTop: theme.spacing.sm },
-  actionBtn: { flexGrow: 1, minWidth: '44%' },
+  actionsRowPrimary: { flexDirection: 'row', gap: theme.spacing.xs, marginTop: theme.spacing.sm },
+  actionsRowSecondary: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginTop: theme.spacing.xs },
+  actionBtn: { flexGrow: 1, minWidth: 96 },
 });

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { RegistrationModel } from '../models/Registration';
 import { EventModel } from '../models/Event';
 import { UserModel } from '../models/User';
+import { BookingModel } from '../models/Booking';
 import { AppError } from '../utils/appError';
 import { canManageEvent } from '../utils/eventPermissions';
 import {
@@ -165,6 +166,20 @@ export const createPublicEventRegistration = async (req: Request, res: Response,
         ? 'You are already registered for this event'
         : 'This email is already registered for this event';
       return next(new AppError(duplicateMessage, 409));
+    }
+
+    if (requester?.id) {
+      const existingBooking = await BookingModel.findOne({
+        userId: requester.id,
+        eventId: event.id,
+        bookingStatus: { $ne: 'cancelled' },
+      }).select('_id isWaitlisted');
+      if (existingBooking) {
+        const message = existingBooking.isWaitlisted
+          ? 'You are already on this event waitlist'
+          : 'You are already registered for this event';
+        return next(new AppError(message, 409));
+      }
     }
 
     const registration = await RegistrationModel.create({

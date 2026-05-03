@@ -16,7 +16,7 @@ interface LocationResult {
 interface LocationSearchInputProps {
   label?: string;
   placeholder?: string;
-  onSelect: (location: { name: string; address: string; lat: number; lng: number } | null) => void;
+  onSelect: (location: { name: string; address: string; lat: number; lng: number; city?: string; country?: string } | null) => void;
   initialValue?: string;
 }
 
@@ -105,7 +105,9 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({ label 
       name: selectedName,
       address: selectedAddress,
       lat: item.latitude,
-      lng: item.longitude
+      lng: item.longitude,
+      city: item.city || '',
+      country: item.country || '',
     });
   };
 
