@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Keyboard, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Keyboard, TextInput, ScrollView } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostAdminVenueStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState, IconButton, Card } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, IconButton, Card, LocationSearchInput } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
@@ -19,6 +19,25 @@ interface Props {
   route: VenueFormRouteProp;
 }
 
+type SearchedLocation = {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  city?: string;
+  country?: string;
+} | null;
+
+const extractCityFromAddress = (addressValue: string): string => {
+  const parts = addressValue
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length < 2) return '';
+  return parts[Math.max(0, parts.length - 2)] || '';
+};
+
 export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const venueId = route.params?.venueId;
   const isEditing = !!venueId;
@@ -27,22 +46,21 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const cityRef = useRef<TextInput>(null);
   const capacityRef = useRef<TextInput>(null);
   const contactRef = useRef<TextInput>(null);
-  const descriptionRef = useRef<TextInput>(null);
 
   const [isLoading, setIsLoading] = useState(isEditing);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [capacity, setCapacity] = useState('');
   const [type, setType] = useState<VenueType>('physical');
   const [contactInfo, setContactInfo] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<SearchedLocation>(null);
 
   useEffect(() => {
     if (isEditing) {
-      fetchVenue();
+      void fetchVenue();
     }
   }, [venueId]);
 
@@ -55,12 +73,29 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
       }
 
       setName(safeString(venue.name, ''));
-      setDescription(safeString((venue as any).description, ''));
       setAddress(safeString(venue.address, ''));
       setCity(safeString(venue.city, ''));
-      setCapacity(String(Number.isFinite(Number(venue.capacity)) ? Number(venue.capacity) : ''));
+      setCapacity(
+        Number.isFinite(Number(venue.capacity)) && Number(venue.capacity) > 0
+          ? String(Number(venue.capacity))
+          : '',
+      );
       setType(venue.type || 'physical');
       setContactInfo(safeString(venue.contactInfo, ''));
+
+      const lat = typeof venue.lat === 'number' && Number.isFinite(venue.lat) ? venue.lat : null;
+      const lng = typeof venue.lng === 'number' && Number.isFinite(venue.lng) ? venue.lng : null;
+      if (lat !== null && lng !== null) {
+        setSelectedLocation({
+          name: safeString(venue.name, ''),
+          address: safeString(venue.address, ''),
+          lat,
+          lng,
+          city: safeString(venue.city, ''),
+        });
+      } else {
+        setSelectedLocation(null);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to load venue details');
       navigation.goBack();
@@ -71,22 +106,56 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleSave = async () => {
     Keyboard.dismiss();
-    const parsedCapacity = Number.parseInt(capacity, 10);
-    if (!name.trim() || !address.trim() || !city.trim() || !Number.isFinite(parsedCapacity) || parsedCapacity <= 0) {
-      Alert.alert('Error', 'Please fill all required fields');
+    const trimmedName = name.trim();
+    const trimmedAddress = address.trim();
+    const trimmedCity = city.trim();
+    const hasSelectedLocation = selectedLocation !== null;
+    const hasManualLocation = Boolean(trimmedAddress && trimmedCity);
+
+    if (!trimmedName) {
+      Alert.alert('Validation', 'Venue name is required.');
       return;
     }
+
+    if (!hasSelectedLocation && !hasManualLocation) {
+      Alert.alert('Validation', 'Select a location from search or enter both address and city manually.');
+      return;
+    }
+
+    const resolvedAddress = trimmedAddress || safeString(selectedLocation?.address, '').trim();
+    const resolvedCity =
+      trimmedCity
+      || safeString(selectedLocation?.city, '').trim()
+      || extractCityFromAddress(resolvedAddress);
+
+    if (!resolvedAddress || !resolvedCity) {
+      Alert.alert('Validation', 'Address and city are required.');
+      return;
+    }
+
+    let parsedCapacity: number | undefined;
+    if (capacity.trim()) {
+      const value = Number.parseInt(capacity.trim(), 10);
+      if (!Number.isFinite(value) || value <= 0) {
+        Alert.alert('Validation', 'Capacity must be a valid number greater than 0.');
+        return;
+      }
+      parsedCapacity = value;
+    }
+
+    const lat = selectedLocation && Number.isFinite(selectedLocation.lat) ? selectedLocation.lat : undefined;
+    const lng = selectedLocation && Number.isFinite(selectedLocation.lng) ? selectedLocation.lng : undefined;
 
     try {
       setIsSaving(true);
       const venueData = {
-        name: name.trim(),
-        description: description.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        capacity: parsedCapacity,
+        name: trimmedName,
+        address: resolvedAddress,
+        city: resolvedCity,
+        ...(parsedCapacity !== undefined ? { capacity: parsedCapacity } : {}),
         type,
         contactInfo: contactInfo.trim(),
+        ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
       };
 
       if (isEditing) {
@@ -106,7 +175,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) return <LoadingState />;
 
   return (
-    <ScreenContainer scrollable>
+    <ScreenContainer>
       <View style={styles.header}>
         <IconButton
           icon={<ArrowLeft size={20} color={theme.colors.text} />}
@@ -117,20 +186,43 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
         <Text style={styles.headerTitle}>{isEditing ? 'Edit Venue' : 'Create Venue'}</Text>
       </View>
 
-      <View style={styles.form}>
+      <ScrollView
+        contentContainerStyle={styles.form}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+      >
         <Input
           label="Venue name *"
           value={name}
           onChangeText={setName}
           placeholder="Main Hall"
           returnKeyType="next"
-          onSubmitEditing={() => addressRef.current?.focus()}
         />
+
+        <LocationSearchInput
+          label="Search Location (OpenStreetMap)"
+          placeholder="Search by place name"
+          initialValue={safeString(address, '')}
+          onSelect={(location) => {
+            setSelectedLocation(location);
+            if (!location) return;
+            setAddress(location.address || location.name || '');
+            const autoCity = safeString(location.city, '').trim() || extractCityFromAddress(location.address || '');
+            if (autoCity) {
+              setCity(autoCity);
+            }
+          }}
+        />
+
         <Input
           ref={addressRef}
           label="Address *"
           value={address}
-          onChangeText={setAddress}
+          onChangeText={(value) => {
+            setAddress(value);
+            setSelectedLocation(null);
+          }}
           placeholder="123 Event Street"
           returnKeyType="next"
           onSubmitEditing={() => cityRef.current?.focus()}
@@ -139,14 +231,17 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
           ref={cityRef}
           label="City *"
           value={city}
-          onChangeText={setCity}
+          onChangeText={(value) => {
+            setCity(value);
+            setSelectedLocation(null);
+          }}
           placeholder="Colombo"
           returnKeyType="next"
           onSubmitEditing={() => capacityRef.current?.focus()}
         />
         <Input
           ref={capacityRef}
-          label="Capacity *"
+          label="Capacity"
           value={capacity}
           onChangeText={setCapacity}
           placeholder="500"
@@ -160,19 +255,8 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
           value={contactInfo}
           onChangeText={setContactInfo}
           placeholder="contact@venue.com"
-          returnKeyType="next"
-          onSubmitEditing={() => descriptionRef.current?.focus()}
-        />
-        <Input
-          ref={descriptionRef}
-          label="Description"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Describe this venue"
-          multiline
-          numberOfLines={3}
           returnKeyType="done"
-          onSubmitEditing={handleSave}
+          blurOnSubmit
         />
 
         <View style={styles.segmentedControlSection}>
@@ -202,7 +286,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
           size="lg"
           style={{ ...styles.saveBtn, marginBottom: Math.max(insets.bottom, 16) + 84 }}
         />
-      </View>
+      </ScrollView>
     </ScreenContainer>
   );
 };

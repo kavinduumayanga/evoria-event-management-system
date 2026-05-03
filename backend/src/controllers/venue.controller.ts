@@ -9,7 +9,9 @@ const venueSchema = z.object({
   description: z.string().trim().optional().default(''),
   address: z.string().trim().min(1, 'Address is required'),
   city: z.string().trim().min(1, 'City is required'),
-  capacity: z.number().int().positive('Capacity must be greater than 0'),
+  capacity: z.number().int().positive('Capacity must be greater than 0').optional(),
+  lat: z.number().finite().optional().nullable(),
+  lng: z.number().finite().optional().nullable(),
   type: z.enum(['physical', 'online', 'hybrid']),
   contactInfo: z.string().trim().max(300).optional().default(''),
 }).strict();
@@ -26,10 +28,16 @@ const ensureVenueOwnership = (venue: any, userId: string) => {
 export const createVenue = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = venueSchema.parse(req.body);
+    const hasLat = typeof validatedData.lat === 'number';
+    const hasLng = typeof validatedData.lng === 'number';
+    if (hasLat !== hasLng) {
+      return next(new AppError('Venue coordinates must include both latitude and longitude', 400));
+    }
 
     const newVenueDoc = await VenueModel.create({
       ownerId: req.user!.id,
       ...validatedData,
+      capacity: validatedData.capacity ?? 1,
     });
 
     res.status(201).json({ status: 'success', data: { venue: newVenueDoc.toJSON() } });
@@ -83,6 +91,16 @@ export const updateVenue = async (req: Request, res: Response, next: NextFunctio
     ensureVenueOwnership(venue, req.user!.id);
 
     const updates = venueUpdateSchema.parse(req.body);
+    const hasLat = Object.prototype.hasOwnProperty.call(updates, 'lat');
+    const hasLng = Object.prototype.hasOwnProperty.call(updates, 'lng');
+    if (hasLat !== hasLng) {
+      return next(new AppError('Venue coordinates must include both latitude and longitude', 400));
+    }
+
+    if (updates.capacity !== undefined && updates.capacity <= 0) {
+      return next(new AppError('Capacity must be greater than 0', 400));
+    }
+
     const updatedVenue = await VenueModel.findByIdAndUpdate(req.params.id as string, updates, { new: true });
     res.status(200).json({ status: 'success', data: { venue: updatedVenue!.toJSON() } });
   } catch (error: any) {

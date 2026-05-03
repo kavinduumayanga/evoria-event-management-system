@@ -164,7 +164,11 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
   return (
     <ScreenContainer>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 16 : 0}
+        >
           <View style={styles.header}>
             <IconButton
               icon={<ArrowLeft size={20} color={theme.colors.text} />}
@@ -177,8 +181,9 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
 
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 150 }]}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 96 }]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
             {error ? (
@@ -287,21 +292,19 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
                     </View>
                   </View>
                 </Card>
+
+                <View style={styles.payActionWrap}>
+                  <Button
+                    title="Confirm & Pay"
+                    onPress={confirmPayment}
+                    isLoading={isConfirming}
+                    variant="primary"
+                    size="lg"
+                  />
+                </View>
               </>
             )}
           </ScrollView>
-
-          {!error && (
-            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 72 }]}>
-              <Button
-                title="Confirm & Pay"
-                onPress={confirmPayment}
-                isLoading={isConfirming}
-                variant="primary"
-                size="lg"
-              />
-            </View>
-          )}
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
     </ScreenContainer>
@@ -320,7 +323,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...theme.typography.h1, color: theme.colors.text },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: theme.spacing.base, gap: theme.spacing.m },
+  scrollContent: { paddingHorizontal: theme.spacing.base, gap: theme.spacing.m, flexGrow: 1 },
   sectionCard: { borderRadius: theme.borderRadius.l, overflow: 'hidden' },
   sectionInner: { padding: theme.spacing.m },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s, marginBottom: theme.spacing.s },
@@ -345,11 +348,8 @@ const styles = StyleSheet.create({
   errorInner: { padding: theme.spacing.xl },
   errorText: { ...theme.typography.body, color: theme.colors.error, marginBottom: theme.spacing.m },
   retryBtn: { marginTop: theme.spacing.s },
-  footer: {
-    paddingHorizontal: theme.spacing.base,
-    paddingTop: theme.spacing.m,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+  payActionWrap: {
+    marginTop: theme.spacing.m,
+    marginBottom: theme.spacing.s,
   },
 });

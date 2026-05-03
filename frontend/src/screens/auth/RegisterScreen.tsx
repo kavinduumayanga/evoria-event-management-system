@@ -21,13 +21,20 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
+  const strictEmailRegex = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
 
   const handleRegister = async () => {
     Keyboard.dismiss();
-    if (!name || !email || !password) return Alert.alert('Validation', 'Please fill all fields.');
+    const trimmedName = name.trim();
+    const trimmedEmail = safeLower(email.trim());
+    if (!trimmedName || !trimmedEmail || !password) return Alert.alert('Validation', 'Please fill all fields.');
+    if (!strictEmailRegex.test(trimmedEmail)) {
+      Alert.alert('Validation', 'Please enter a valid email address.');
+      return;
+    }
     try {
       setIsLoading(true);
-      const res = await AuthService.register({ name: name.trim(), email: safeLower(email.trim()), password });
+      const res = await AuthService.register({ name: trimmedName, email: trimmedEmail, password });
       if (res.token && (res.user || res.data?.user)) {
         await login(res.user || res.data?.user, res.token);
       }

@@ -1218,12 +1218,18 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
     const normalizedLocation = normalizeLocation(event.location);
     const locationName = String(normalizedLocation?.name || '').trim();
     const locationAddress = String(normalizedLocation?.address || '').trim();
+    const venueLat = typeof (venue as any)?.lat === 'number' && Number.isFinite((venue as any).lat)
+      ? Number((venue as any).lat)
+      : null;
+    const venueLng = typeof (venue as any)?.lng === 'number' && Number.isFinite((venue as any).lng)
+      ? Number((venue as any).lng)
+      : null;
     const locationLat = typeof normalizedLocation?.lat === 'number' && Number.isFinite(normalizedLocation.lat)
       ? normalizedLocation.lat
-      : null;
+      : venueLat;
     const locationLng = typeof normalizedLocation?.lng === 'number' && Number.isFinite(normalizedLocation.lng)
       ? normalizedLocation.lng
-      : null;
+      : venueLng;
     const venueFallbackLabel = venue ? `${venue.name}, ${venue.city}` : '';
     const locationLabel = event.type === 'online'
       ? (event.meetingLink || 'Online')
@@ -1281,6 +1287,8 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
                   name: venue.name,
                   address: venue.address,
                   city: venue.city,
+                  lat: venueLat,
+                  lng: venueLng,
                   type: venue.type,
                   contactInfo: venue.contactInfo || '',
                 }

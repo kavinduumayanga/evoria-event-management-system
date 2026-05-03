@@ -7,12 +7,13 @@ import { Event, Venue, TicketType } from '../../types';
 import { LoadingState, ErrorState, ScreenContainer, HeaderBar, PrimaryButton, SecondaryButton, SectionBlock } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { EventService, PublicEventDetails, ReportService } from '../../api/services';
+import { EventService, PublicEventDetails, RegistrationService, ReportService } from '../../api/services';
 import { MapPin, Calendar as CalendarIcon, Clock, MoreHorizontal, Mail, Ticket } from 'lucide-react-native';
 import { formatSafeDate, formatSafeTime, safeInitials, safeStatus, safeString, safeTitle } from '../../utils/safeText';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { LinearGradient } from 'expo-linear-gradient';
 import { safeArray } from '../../utils/safeData';
+import { useAuthStore } from '../../store/auth.store';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -40,9 +41,25 @@ const isLightHexColor = (hexColor: string): boolean => {
   return luminance >= 150;
 };
 
+const resolveRegistrationStatusLabel = (registration: any): string => {
+  if (!registration) return 'Already Registered';
+  if (registration.bookingStatus === 'cancelled') return 'Cancelled';
+  if (registration.isWaitlisted) {
+    const position = Number.isFinite(Number(registration.waitlistPosition)) ? Number(registration.waitlistPosition) : null;
+    return position ? `Waitlisted (#${position})` : 'Waitlisted';
+  }
+  if (registration.approvalStatus === 'pending') return 'Pending Approval';
+  if (registration.approvalStatus === 'rejected') return 'Rejected';
+  if (registration.checkInStatus === 'checked_in') return 'Checked In';
+  if (registration.rsvpStatus === 'not_going') return 'Not Going';
+  if (registration.bookingStatus === 'confirmed') return 'Confirmed';
+  return safeTitle(registration.bookingStatus, 'Registered');
+};
+
 export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const eventId = route.params?.eventId;
   const publicSlug = route.params?.publicSlug;
+  const currentUser = useAuthStore((state) => state.user);
   const [event, setEvent] = useState<Event | null>(null);
   const [venue, setVenue] = useState<Venue | null>(null);
   const [tickets, setTickets] = useState<TicketType[]>([]);
@@ -51,6 +68,8 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [error, setError] = useState<string | null>(null);
   const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
   const [hasHostImageError, setHasHostImageError] = useState(false);
+  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
+  const [registrationStatusLabel, setRegistrationStatusLabel] = useState<string | null>(null);
 
   const fetchEventDetails = useCallback(async () => {
     if (!eventId) return;
@@ -62,6 +81,8 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       setTickets([]);
       setPublicData(null);
       setHasHostImageError(false);
+      setIsAlreadyRegistered(false);
+      setRegistrationStatusLabel(null);
 
       const [eventRes, ticketsRes] = await Promise.all([
         apiClient.get(`/events/${eventId}`),
@@ -95,12 +116,32 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           }
         }
       }
+
+      if (currentUser?.id) {
+        try {
+          const myRegistrationsResponse = await RegistrationService.getMyRegistrations();
+          const registrations = safeArray<any>(myRegistrationsResponse?.data?.registrations);
+          const activeRegistration = registrations.find((registration) => {
+            if (safeString(registration.eventId, '') !== eventData.id) return false;
+            return safeString(registration.bookingStatus, '') !== 'cancelled';
+          });
+
+          if (activeRegistration) {
+            setIsAlreadyRegistered(true);
+            setRegistrationStatusLabel(resolveRegistrationStatusLabel(activeRegistration));
+          }
+        } catch (registrationError: any) {
+          if (__DEV__) {
+            console.warn('Unable to resolve registration status', registrationError?.response?.data || registrationError?.message || registrationError);
+          }
+        }
+      }
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Failed to load event details');
     } finally {
       setIsLoading(false);
     }
-  }, [eventId, publicSlug]);
+  }, [eventId, publicSlug, currentUser?.id]);
 
   useFocusEffect(useCallback(() => { fetchEventDetails(); }, [fetchEventDetails]));
 
@@ -122,7 +163,14 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const formattedDate = formatSafeDate(event.date, 'Date unavailable', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const isSoldOut = Number(event.capacity) > 0 && Number(event.bookingCount) >= Number(event.capacity);
   const hasRegistrationInventory = safeString(event.pricingMode, 'ticketed') === 'free' || tickets.some(t => t.isActive && t.quantity > t.soldCount);
-  const canRegister = safeStatus(event.status, 'draft') === 'published' && safeString(event.visibility, 'private') === 'public' && !isSoldOut && hasRegistrationInventory;
+  const isRegistrationOpen = safeStatus(event.status, 'draft') === 'published' && safeString(event.visibility, 'private') === 'public' && !isSoldOut && hasRegistrationInventory;
+  const canRegister = isRegistrationOpen && !isAlreadyRegistered;
+  const registerButtonTitle = isAlreadyRegistered
+    ? 'Already Registered'
+    : safeString(event.pricingMode, 'ticketed') === 'free'
+      ? 'Register Free'
+      : 'Register';
+  const registerStatusText = registrationStatusLabel || 'Already Registered';
   const isManageableByCurrentUser = Boolean(publicData?.event?.isManageableByCurrentUser);
   const isCancelled = safeStatus(event.status, 'draft') === 'cancelled';
   const toFiniteCoordinate = (value: unknown): number | null => {
@@ -316,14 +364,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.actionRow}>
           <View style={styles.actionFlex1}>
             <PrimaryButton
-              title="Register"
+              title={registerButtonTitle}
               icon={<Ticket color={registerButtonTextColor} size={20} />}
               onPress={() => {
-                const slug = publicSlug || event.publicSlug;
-                if (safeString(event.pricingMode, 'ticketed') === 'free' && slug) {
-                  navigation.navigate('PublicEventDetails', { slug });
-                  return;
-                }
                 navigation.navigate('TicketSelection', { eventId });
               }}
               disabled={!canRegister}
@@ -346,6 +389,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             />
           </View>
         </View>
+        {isAlreadyRegistered ? (
+          <Text style={styles.registrationStatusText}>Status: {registerStatusText}</Text>
+        ) : null}
 
         {isManageableByCurrentUser ? (
           <View style={styles.ownerActionsRow}>
@@ -533,7 +579,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000000' },
   scrollContent: { paddingBottom: 120 },
   imageCard: {
-    backgroundColor: '#141518',
+    backgroundColor: '#0B0B0C',
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     width: '100%',
@@ -544,7 +590,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...theme.shadows.premium,
   },
-  coverImage: { width: '100%', height: '100%' },
+  coverImage: { width: '100%', height: '100%', backgroundColor: '#0B0B0C' },
   coverPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1B1F24' },
   featuredPill: {
     position: 'absolute',
@@ -576,8 +622,15 @@ const styles = StyleSheet.create({
   calendarIcon: { width: 16, height: 16, backgroundColor: '#A3A3A3', borderRadius: 4, marginRight: 8 },
   calendarText: { color: '#A3A3A3', fontSize: 16, fontWeight: '500' },
   timeText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  actionRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12, marginBottom: 32 },
+  actionRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12, marginBottom: 16 },
   actionFlex1: { flex: 1 },
+  registrationStatusText: {
+    color: '#A3A3A3',
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
   ownerActionsRow: {
     flexDirection: 'row',
     paddingHorizontal: 20,

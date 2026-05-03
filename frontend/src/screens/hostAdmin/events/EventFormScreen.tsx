@@ -7,7 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Plus, X, Upload, HelpCircle, Edit2 } from 'lucide-react-native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState, Card, IconButton } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, LocationSearchInput } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { EventService, UploadService, SessionService, TicketService, VenueService } from '../../../api/services';
 import {
@@ -93,6 +93,15 @@ const prettifyQuestionType = (value: CustomQuestionType) => {
   return value.replace(/_/g, ' ').toUpperCase();
 };
 
+const extractCityFromAddress = (addressValue: string): string => {
+  const parts = addressValue
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return '';
+  return parts[Math.max(0, parts.length - 2)] || '';
+};
+
 interface AgendaItem {
   id?: string;
   sessionDate: string;
@@ -121,16 +130,16 @@ interface VenueDraft {
   capacity: string;
   type: EventType;
   contactInfo: string;
-  description: string;
+  lat: number | null;
+  lng: number | null;
 }
 
 type PickerType =
   | 'date'
   | 'startTime'
-  | 'endTime'
-  | 'agendaDate'
-  | 'agendaStartTime'
-  | 'agendaEndTime';
+  | 'endTime';
+
+type AgendaPickerField = 'sessionDate' | 'startTime' | 'endTime';
 
 export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -189,7 +198,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     capacity: '',
     type: 'physical',
     contactInfo: '',
-    description: '',
+    lat: null,
+    lng: null,
   });
   const [ticketDrafts, setTicketDrafts] = useState<TicketDraft[]>([]);
   const [isTicketModalVisible, setIsTicketModalVisible] = useState(false);
@@ -206,6 +216,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [activePicker, setActivePicker] = useState<PickerType | null>(null);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
+  const [agendaPickerField, setAgendaPickerField] = useState<AgendaPickerField | null>(null);
+  const [agendaPickerValue, setAgendaPickerValue] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchData();
@@ -305,14 +317,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       setPickerValue(date ? new Date(`${date}T00:00:00`) : new Date());
     } else if (type === 'startTime') {
       setPickerValue(toTimeDate(startTime || '09:00'));
-    } else if (type === 'endTime') {
-      setPickerValue(toTimeDate(endTime || startTime || '10:00'));
-    } else if (type === 'agendaDate') {
-      setPickerValue(agendaDraft.sessionDate ? new Date(`${agendaDraft.sessionDate}T00:00:00`) : (date ? new Date(`${date}T00:00:00`) : new Date()));
-    } else if (type === 'agendaStartTime') {
-      setPickerValue(toTimeDate(agendaDraft.startTime || '09:00'));
     } else {
-      setPickerValue(toTimeDate(agendaDraft.endTime || agendaDraft.startTime || '10:00'));
+      setPickerValue(toTimeDate(endTime || startTime || '10:00'));
     }
     setActivePicker(type);
   };
@@ -327,16 +333,42 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       setDate(toDateString(pickerValue));
     } else if (activePicker === 'startTime') {
       setStartTime(toTimeString(pickerValue));
-    } else if (activePicker === 'endTime') {
+    } else {
       setEndTime(toTimeString(pickerValue));
-    } else if (activePicker === 'agendaDate') {
-      setAgendaDraft((previous) => ({ ...previous, sessionDate: toDateString(pickerValue) }));
-    } else if (activePicker === 'agendaStartTime') {
-      setAgendaDraft((previous) => ({ ...previous, startTime: toTimeString(pickerValue) }));
-    } else if (activePicker === 'agendaEndTime') {
-      setAgendaDraft((previous) => ({ ...previous, endTime: toTimeString(pickerValue) }));
     }
     closePicker();
+  };
+
+  const openAgendaPicker = (field: AgendaPickerField) => {
+    Keyboard.dismiss();
+    if (field === 'sessionDate') {
+      setAgendaPickerValue(
+        agendaDraft.sessionDate
+          ? new Date(`${agendaDraft.sessionDate}T00:00:00`)
+          : (date ? new Date(`${date}T00:00:00`) : new Date()),
+      );
+    } else if (field === 'startTime') {
+      setAgendaPickerValue(toTimeDate(agendaDraft.startTime || '09:00'));
+    } else {
+      setAgendaPickerValue(toTimeDate(agendaDraft.endTime || agendaDraft.startTime || '10:00'));
+    }
+    setAgendaPickerField(field);
+  };
+
+  const closeAgendaPicker = () => {
+    setAgendaPickerField(null);
+  };
+
+  const confirmAgendaPickerSelection = () => {
+    if (!agendaPickerField) return;
+    if (agendaPickerField === 'sessionDate') {
+      setAgendaDraft((previous) => ({ ...previous, sessionDate: toDateString(agendaPickerValue) }));
+    } else if (agendaPickerField === 'startTime') {
+      setAgendaDraft((previous) => ({ ...previous, startTime: toTimeString(agendaPickerValue) }));
+    } else {
+      setAgendaDraft((previous) => ({ ...previous, endTime: toTimeString(agendaPickerValue) }));
+    }
+    closeAgendaPicker();
   };
 
   const handleUploadEventImage = async () => {
@@ -504,34 +536,51 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleCreateVenue = async () => {
     Keyboard.dismiss();
-    const parsedCapacity = Number.parseInt(venueDraft.capacity, 10);
-    if (!venueDraft.name.trim()) {
+    const trimmedName = venueDraft.name.trim();
+    const trimmedAddress = venueDraft.address.trim();
+    const trimmedCity = venueDraft.city.trim();
+    const resolvedCity = trimmedCity || extractCityFromAddress(trimmedAddress);
+    const hasLocationFromSearch = Number.isFinite(venueDraft.lat) && Number.isFinite(venueDraft.lng);
+    const hasManualLocation = Boolean(trimmedAddress && resolvedCity);
+
+    if (!trimmedName) {
       Alert.alert('Validation Error', 'Venue name is required.');
       return;
     }
-    if (!venueDraft.address.trim()) {
+
+    if (!hasLocationFromSearch && !hasManualLocation) {
+      Alert.alert('Validation Error', 'Select a location from search or enter both address and city.');
+      return;
+    }
+    if (!trimmedAddress) {
       Alert.alert('Validation Error', 'Venue address is required.');
       return;
     }
-    if (!venueDraft.city.trim()) {
+    if (!resolvedCity) {
       Alert.alert('Validation Error', 'Venue city is required.');
       return;
     }
-    if (!Number.isFinite(parsedCapacity) || parsedCapacity <= 0) {
-      Alert.alert('Validation Error', 'Venue capacity must be greater than 0.');
-      return;
+
+    let parsedCapacity: number | undefined;
+    if (venueDraft.capacity.trim()) {
+      const value = Number.parseInt(venueDraft.capacity, 10);
+      if (!Number.isFinite(value) || value <= 0) {
+        Alert.alert('Validation Error', 'Venue capacity must be greater than 0.');
+        return;
+      }
+      parsedCapacity = value;
     }
 
     try {
       setIsSavingVenue(true);
       const response = await VenueService.createVenue({
-        name: venueDraft.name.trim(),
-        description: venueDraft.description.trim(),
-        address: venueDraft.address.trim(),
-        city: venueDraft.city.trim(),
-        capacity: parsedCapacity,
+        name: trimmedName,
+        address: trimmedAddress,
+        city: resolvedCity,
+        ...(parsedCapacity !== undefined ? { capacity: parsedCapacity } : {}),
         type: venueDraft.type,
         contactInfo: venueDraft.contactInfo.trim(),
+        ...(hasLocationFromSearch ? { lat: venueDraft.lat, lng: venueDraft.lng } : {}),
       });
       const createdVenue = response?.data?.venue as Venue | undefined;
       if (!createdVenue?.id) {
@@ -548,7 +597,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         capacity: '',
         type: 'physical',
         contactInfo: '',
-        description: '',
+        lat: null,
+        lng: null,
       });
       setIsVenueModalVisible(false);
     } catch (error: any) {
@@ -559,6 +609,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
     Keyboard.dismiss();
     const parsedCapacity = Number.parseInt(capacity, 10);
     const trimmedDate = date.trim();
@@ -699,6 +750,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         location: selectedVenue ? {
           name: selectedVenue.name,
           address: selectedVenue.address || '',
+          ...(typeof selectedVenue.lat === 'number' && Number.isFinite(selectedVenue.lat)
+            ? { lat: selectedVenue.lat }
+            : {}),
+          ...(typeof selectedVenue.lng === 'number' && Number.isFinite(selectedVenue.lng)
+            ? { lng: selectedVenue.lng }
+            : {}),
         } : undefined,
         tags: tagsInput
           .split(',')
@@ -753,6 +810,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: 168 + Math.max(insets.bottom, 16) + 72 }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -875,7 +933,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                   capacity: '',
                   type: type === 'hybrid' ? 'hybrid' : 'physical',
                   contactInfo: '',
-                  description: '',
+                  lat: null,
+                  lng: null,
                 });
                 setIsVenueModalVisible(true);
               }}
@@ -884,7 +943,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             />
             {selectedVenue ? (
               <Text style={styles.questionMeta}>
-                Selected venue: {selectedVenue.address}, {selectedVenue.city} • Capacity {selectedVenue.capacity}
+                Selected venue: {selectedVenue.address}, {selectedVenue.city}
+                {Number.isFinite(Number(selectedVenue.capacity)) ? ` • Capacity ${selectedVenue.capacity}` : ''}
               </Text>
             ) : null}
           </Card>
@@ -1246,16 +1306,16 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.pickerModal}>
             <Text style={styles.pickerTitle}>
-              {activePicker === 'date' || activePicker === 'agendaDate'
+              {activePicker === 'date'
                 ? 'Select Date'
-                : activePicker === 'startTime' || activePicker === 'agendaStartTime'
+                : activePicker === 'startTime'
                   ? 'Select Start Time'
                   : 'Select End Time'}
             </Text>
             <View style={styles.pickerSurface}>
               <DateTimePicker
                 value={pickerValue}
-                mode={activePicker === 'date' || activePicker === 'agendaDate' ? 'date' : 'time'}
+                mode={activePicker === 'date' ? 'date' : 'time'}
                 display={Platform.OS === 'ios' ? 'spinner' : 'spinner'}
                 themeVariant="light"
                 textColor="#0B0B0C"
@@ -1274,34 +1334,67 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </Modal>
 
-      <Modal visible={isAgendaModalVisible} transparent animationType="slide">
+      <Modal
+        visible={isAgendaModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { closeAgendaPicker(); setIsAgendaModalVisible(false); setEditingAgendaIndex(null); }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.agendaModal}>
             <Text style={styles.sectionTitle}>{editingAgendaIndex === null ? 'New Agenda Item' : 'Edit Agenda Item'}</Text>
             <Text style={styles.label}>Date *</Text>
-            <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('agendaDate')}>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => openAgendaPicker('sessionDate')}>
               <Text style={styles.pickerValue}>{agendaDraft.sessionDate || 'Pick a date'}</Text>
             </TouchableOpacity>
             <View style={styles.row}>
               <View style={styles.flexHalf}>
                 <Text style={styles.label}>Start Time *</Text>
-                <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('agendaStartTime')}>
+                <TouchableOpacity style={styles.pickerButton} onPress={() => openAgendaPicker('startTime')}>
                   <Text style={styles.pickerValue}>{agendaDraft.startTime || 'Pick start time'}</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.flexHalf}>
                 <Text style={styles.label}>End Time *</Text>
-                <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('agendaEndTime')}>
+                <TouchableOpacity style={styles.pickerButton} onPress={() => openAgendaPicker('endTime')}>
                   <Text style={styles.pickerValue}>{agendaDraft.endTime || 'Pick end time'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
+            {agendaPickerField ? (
+              <View style={styles.inlineAgendaPicker}>
+                <Text style={styles.inlineAgendaPickerLabel}>
+                  {agendaPickerField === 'sessionDate'
+                    ? 'Select Date'
+                    : agendaPickerField === 'startTime'
+                      ? 'Select Start Time'
+                      : 'Select End Time'}
+                </Text>
+                <View style={styles.pickerSurface}>
+                  <DateTimePicker
+                    value={agendaPickerValue}
+                    mode={agendaPickerField === 'sessionDate' ? 'date' : 'time'}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'spinner'}
+                    themeVariant="light"
+                    textColor="#0B0B0C"
+                    accentColor="#0B0B0C"
+                    onChange={(_, selectedDate) => {
+                      if (selectedDate) setAgendaPickerValue(selectedDate);
+                    }}
+                  />
+                </View>
+                <View style={styles.pickerActions}>
+                  <Button title="Cancel" variant="outline" size="sm" onPress={closeAgendaPicker} style={styles.pickerActionButton} />
+                  <Button title="Confirm" variant="primary" size="sm" onPress={confirmAgendaPickerSelection} style={styles.pickerActionButton} />
+                </View>
+              </View>
+            ) : null}
             <Input label="Topic *" value={agendaDraft.title} onChangeText={t => setAgendaDraft({...agendaDraft, title: t})} placeholder="Keynote" />
             <Input label="Speaker Name" value={agendaDraft.speakerName} onChangeText={t => setAgendaDraft({...agendaDraft, speakerName: t})} placeholder="Jane Doe" />
             <Input label="Description" value={agendaDraft.description} onChangeText={t => setAgendaDraft({...agendaDraft, description: t})} placeholder="Topic description..." multiline />
             <View style={styles.row}>
               <View style={styles.flexHalf}>
-                <Button variant="secondary" title="Cancel" onPress={() => { setIsAgendaModalVisible(false); setEditingAgendaIndex(null); }} />
+                <Button variant="secondary" title="Cancel" onPress={() => { closeAgendaPicker(); setIsAgendaModalVisible(false); setEditingAgendaIndex(null); }} />
               </View>
               <View style={styles.flexHalf}>
                 <Button variant="primary" title={editingAgendaIndex === null ? 'Add' : 'Save'} onPress={() => {
@@ -1328,6 +1421,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                     speakerName: '',
                     description: '',
                   });
+                  closeAgendaPicker();
                   setEditingAgendaIndex(null);
                   setIsAgendaModalVisible(false);
                 }} />
@@ -1337,7 +1431,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </Modal>
 
-      <Modal visible={isTicketModalVisible} transparent animationType="slide">
+      <Modal
+        visible={isTicketModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setIsTicketModalVisible(false); setEditingTicketIndex(null); }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.agendaModal}>
             <Text style={styles.sectionTitle}>{editingTicketIndex === null ? 'New Ticket' : 'Edit Ticket'}</Text>
@@ -1448,10 +1547,28 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
               onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, name: value }))}
               placeholder="Main Hall"
             />
+            <LocationSearchInput
+              label="Search Location (OpenStreetMap)"
+              placeholder="Search by place name"
+              initialValue={venueDraft.address}
+              onSelect={(location) => {
+                if (!location) {
+                  setVenueDraft((previous) => ({ ...previous, lat: null, lng: null }));
+                  return;
+                }
+                setVenueDraft((previous) => ({
+                  ...previous,
+                  address: location.address || location.name || previous.address,
+                  city: (location.city || previous.city || '').trim(),
+                  lat: Number.isFinite(location.lat) ? location.lat : null,
+                  lng: Number.isFinite(location.lng) ? location.lng : null,
+                }));
+              }}
+            />
             <Input
               label="Address *"
               value={venueDraft.address}
-              onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, address: value }))}
+              onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, address: value, lat: null, lng: null }))}
               placeholder="123 Event Street"
             />
             <View style={styles.row}>
@@ -1459,13 +1576,13 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Input
                   label="City *"
                   value={venueDraft.city}
-                  onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, city: value }))}
+                  onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, city: value, lat: null, lng: null }))}
                   placeholder="Colombo"
                 />
               </View>
               <View style={styles.flexHalf}>
                 <Input
-                  label="Capacity *"
+                  label="Capacity"
                   value={venueDraft.capacity}
                   onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, capacity: value }))}
                   keyboardType="numeric"
@@ -1478,13 +1595,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
               value={venueDraft.contactInfo}
               onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, contactInfo: value }))}
               placeholder="contact@venue.com"
-            />
-            <Input
-              label="Description"
-              value={venueDraft.description}
-              onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, description: value }))}
-              placeholder="Venue details"
-              multiline
             />
 
             <Text style={styles.label}>Venue Type</Text>
@@ -1832,6 +1942,16 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  inlineAgendaPicker: {
+    marginTop: theme.spacing.s,
+    marginBottom: theme.spacing.s,
+  },
+  inlineAgendaPickerLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.xs,
+    marginLeft: 4,
   },
   pickerModal: {
     backgroundColor: '#FFFFFF',
