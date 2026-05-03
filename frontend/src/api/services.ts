@@ -33,11 +33,13 @@ export interface ForgotPasswordPayload {
 }
 
 export interface ResetPasswordPayload {
+  email: string;
   token: string;
   newPassword: string;
 }
 
 export interface VerifyResetOtpPayload {
+  email: string;
   token: string;
 }
 
@@ -849,8 +851,8 @@ export const UserService = {
     const response = await apiClient.put('/users/password', payload);
     return response.data;
   },
-  deactivateAccount: async () => {
-    const response = await apiClient.patch('/users/deactivate');
+  deleteAccount: async () => {
+    const response = await apiClient.delete('/users/me');
     return response.data;
   },
 };
