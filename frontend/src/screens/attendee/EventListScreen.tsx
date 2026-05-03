@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, RefreshControl, ScrollView } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
@@ -19,13 +19,26 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const normalizeEvents = (payload: any): Event[] => {
+    if (Array.isArray(payload?.data?.events)) return payload.data.events;
+    if (Array.isArray(payload?.events)) return payload.events;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload)) return payload;
+    return [];
+  };
+
   const fetchEvents = useCallback(async (query: string = '') => {
     try {
       setError(null);
-      const res = await EventService.searchEvents({ q: query });
-      setEvents(res.data.events || []);
-    } catch (e) {
-      setError('Failed to load events.');
+      const res = await EventService.getDiscoverEvents({ q: query });
+      setEvents(normalizeEvents(res));
+    } catch (e: any) {
+      console.error('Discovery events fetch failed', {
+        status: e?.response?.status,
+        message: e?.message,
+        response: e?.response?.data,
+      });
+      setError(e?.response?.data?.message || 'Failed to load events.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

@@ -16,7 +16,10 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
   const description = safeString(event.description, 'No description available.');
   const eventDate = safeString(event.date, 'TBA');
   const eventTime = safeString(event.startTime, 'TBA');
-  const eventLocation = safeString(event.city, 'Online / TBA');
+  const rawLocation = (event as any).location;
+  const eventLocation = typeof rawLocation === 'string'
+    ? safeString(rawLocation, 'Online / TBA')
+    : safeString(rawLocation?.name || event.city, 'Online / TBA');
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
@@ -31,6 +34,11 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
         <View style={styles.pricingBadge}>
           <Text style={styles.pricingText}>{event.pricingMode === 'free' ? 'FREE' : 'PAID'}</Text>
         </View>
+        {event.status === 'cancelled' ? (
+          <View style={styles.cancelledBadge}>
+            <Text style={styles.cancelledBadgeText}>CANCELLED</Text>
+          </View>
+        ) : null}
       </View>
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
@@ -87,6 +95,21 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  cancelledBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(250,82,82,0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  cancelledBadgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   placeholderImage: {
     backgroundColor: '#333',

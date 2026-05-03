@@ -1,15 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, Platform, Modal } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, Platform, Modal, Keyboard } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, Plus, X, Upload, HelpCircle } from 'lucide-react-native';
+import { ArrowLeft, Plus, X, Upload, HelpCircle, Edit2 } from 'lucide-react-native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, LocationSearchInput } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { EventService, UploadService, VenueService, SessionService } from '../../../api/services';
-import { Event, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode, Venue } from '../../../types';
+import { EventService, UploadService, SessionService } from '../../../api/services';
+import { Event, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode } from '../../../types';
 import { resolveImageUrl } from '../../../utils/imageUrl';
 import { useAuthStore } from '../../../store/auth.store';
 import { safeUpper } from '../../../utils/safeText';
@@ -59,6 +59,17 @@ const parseTimeToMinutes = (timeValue: string): number | null => {
   return (hours * 60) + minutes;
 };
 
+interface AgendaItem {
+  id?: string;
+  startTime: string;
+  endTime: string;
+  title: string;
+  speakerName: string;
+  description: string;
+}
+
+type PickerType = 'date' | 'startTime' | 'endTime';
+
 export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const eventId = route.params?.eventId;
   const isEditing = !!eventId;
@@ -67,7 +78,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isLoading, setIsLoading] = useState(isEditing);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [venues, setVenues] = useState<Venue[]>([]);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -95,27 +105,33 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [questionType, setQuestionType] = useState<CustomQuestionType>('text');
   const [questionRequired, setQuestionRequired] = useState(false);
 
-  const [agendaItems, setAgendaItems] = useState<{ id?: string, startTime: string, title: string, speakerName: string, description: string }[]>([]);
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
   const [isAgendaModalVisible, setIsAgendaModalVisible] = useState(false);
-  const [agendaDraft, setAgendaDraft] = useState({ startTime: '', title: '', speakerName: '', description: '' });
+  const [agendaDraft, setAgendaDraft] = useState<AgendaItem>({
+    startTime: '',
+    endTime: '',
+    title: '',
+    speakerName: '',
+    description: '',
+  });
+  const [editingAgendaIndex, setEditingAgendaIndex] = useState<number | null>(null);
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [activePicker, setActivePicker] = useState<PickerType | null>(null);
+  const [pickerValue, setPickerValue] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchData();
   }, [eventId]);
 
-  const requiresVenue = useMemo(() => type === 'physical' || type === 'hybrid', [type]);
+  const requiresLocation = type === 'physical' || type === 'hybrid';
 
   const fetchData = async () => {
     try {
-      const venuesResponse = await VenueService.getVenues();
-      setVenues(venuesResponse.data.venues || []);
-
       if (isEditing) {
-        const eventResponse = await EventService.getEvent(eventId!);
+        const [eventResponse, sessionsResponse] = await Promise.all([
+          EventService.getEvent(eventId!),
+          SessionService.getEventSessions(eventId!),
+        ]);
         const event: Event = eventResponse.data.event;
 
         setTitle(event.title || '');
@@ -125,10 +141,35 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setEndTime(event.endTime || '');
         setCapacity(String(event.capacity || ''));
         setCategory(event.category || '');
-        if (event.location) {
-          setLocation({ name: event.location.name, address: event.location.address || '', lat: event.location.lat, lng: event.location.lng });
+        const rawLocation = (event as any).location;
+        if (rawLocation && typeof rawLocation === 'object') {
+          const locationName = String(rawLocation.name || rawLocation.label || '').trim();
+          const locationAddress = String(rawLocation.address || '').trim();
+          const locationLat = typeof rawLocation.lat === 'number' && Number.isFinite(rawLocation.lat)
+            ? rawLocation.lat
+            : undefined;
+          const locationLng = typeof rawLocation.lng === 'number' && Number.isFinite(rawLocation.lng)
+            ? rawLocation.lng
+            : undefined;
+
+          if (locationName || locationAddress || (locationLat !== undefined && locationLng !== undefined)) {
+            setLocation({
+              name: locationName || locationAddress || String(event.city || '').trim(),
+              address: locationAddress,
+              ...(locationLat !== undefined ? { lat: locationLat } : {}),
+              ...(locationLng !== undefined ? { lng: locationLng } : {}),
+            });
+          } else if (event.city) {
+            setLocation({ name: event.city, address: '' });
+          } else {
+            setLocation(null);
+          }
+        } else if (typeof rawLocation === 'string' && rawLocation.trim()) {
+          setLocation({ name: rawLocation.trim(), address: '' });
         } else if (event.city) {
           setLocation({ name: event.city, address: '' });
+        } else {
+          setLocation(null);
         }
         setTagsInput((event.tags || []).join(', '));
         setMeetingLink(event.meetingLink || '');
@@ -142,12 +183,24 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setStatus(event.status || 'draft');
         setRequiresApproval(Boolean(event.requiresApproval));
         setCustomQuestions(event.customQuestions || event.registrationFields?.customQuestions || []);
+        const sessions = sessionsResponse.data?.sessions || [];
+        setAgendaItems(
+          sessions.map((session: any) => ({
+            id: session.id,
+            startTime: session.startTime || '',
+            endTime: session.endTime || session.startTime || '',
+            title: session.title || '',
+            speakerName: session.speakerName || '',
+            description: session.description || '',
+          }))
+        );
       } else {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         setDate(toDateString(tomorrow));
         setStartTime('09:00');
         setEndTime('11:00');
+        setAgendaItems([]);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load event details');
@@ -157,34 +210,32 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') setShowDatePicker(false);
-    if (event.type === 'set' && selectedDate) {
-      setDate(toDateString(selectedDate));
-      if (Platform.OS === 'ios') setShowDatePicker(false);
-    } else if (event.type === 'dismissed') {
-      setShowDatePicker(false);
+  const openPicker = (type: PickerType) => {
+    Keyboard.dismiss();
+    if (type === 'date') {
+      setPickerValue(date ? new Date(`${date}T00:00:00`) : new Date());
+    } else if (type === 'startTime') {
+      setPickerValue(toTimeDate(startTime || '09:00'));
+    } else {
+      setPickerValue(toTimeDate(endTime || startTime || '10:00'));
     }
+    setActivePicker(type);
   };
 
-  const handleStartTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') setShowStartTimePicker(false);
-    if (event.type === 'set' && selectedDate) {
-      setStartTime(toTimeString(selectedDate));
-      if (Platform.OS === 'ios') setShowStartTimePicker(false);
-    } else if (event.type === 'dismissed') {
-      setShowStartTimePicker(false);
-    }
+  const closePicker = () => {
+    setActivePicker(null);
   };
 
-  const handleEndTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') setShowEndTimePicker(false);
-    if (event.type === 'set' && selectedDate) {
-      setEndTime(toTimeString(selectedDate));
-      if (Platform.OS === 'ios') setShowEndTimePicker(false);
-    } else if (event.type === 'dismissed') {
-      setShowEndTimePicker(false);
+  const confirmPickerSelection = () => {
+    if (!activePicker) return;
+    if (activePicker === 'date') {
+      setDate(toDateString(pickerValue));
+    } else if (activePicker === 'startTime') {
+      setStartTime(toTimeString(pickerValue));
+    } else if (activePicker === 'endTime') {
+      setEndTime(toTimeString(pickerValue));
     }
+    closePicker();
   };
 
   const handleUploadEventImage = async () => {
@@ -237,6 +288,72 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     setQuestionRequired(false);
   };
 
+  const syncAgendaItems = async (targetEventId: string, sessionDate: string) => {
+    const normalizedAgendaItems = agendaItems.map((item) => ({
+      id: item.id,
+      startTime: item.startTime.trim(),
+      endTime: item.endTime.trim(),
+      title: item.title.trim(),
+      speakerName: item.speakerName.trim(),
+      description: item.description.trim(),
+    }));
+
+    const existingRes = await SessionService.getEventSessions(targetEventId);
+    const existingSessions = existingRes.data?.sessions || [];
+    const existingById = new Map<string, any>(existingSessions.map((session: any) => [session.id, session]));
+    const desiredSessionIds = new Set<string>();
+
+    const updateRequests: Promise<any>[] = [];
+    const createRequests: Promise<any>[] = [];
+
+    for (const item of normalizedAgendaItems) {
+      if (item.id && existingById.has(item.id)) {
+        desiredSessionIds.add(item.id);
+        const existing = existingById.get(item.id);
+        const shouldUpdate =
+          existing.title !== item.title
+          || (existing.description || '') !== item.description
+          || (existing.speakerName || '') !== item.speakerName
+          || existing.startTime !== item.startTime
+          || existing.endTime !== item.endTime
+          || existing.sessionDate !== sessionDate;
+
+        if (shouldUpdate) {
+          updateRequests.push(
+            SessionService.updateSession(item.id, {
+              title: item.title,
+              description: item.description,
+              speakerName: item.speakerName,
+              startTime: item.startTime,
+              endTime: item.endTime,
+              sessionDate,
+              status: existing.status || 'scheduled',
+            })
+          );
+        }
+      } else {
+        createRequests.push(
+          SessionService.createSession({
+            eventId: targetEventId,
+            title: item.title,
+            description: item.description,
+            speakerName: item.speakerName,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            sessionDate,
+            status: 'scheduled',
+          })
+        );
+      }
+    }
+
+    const deleteRequests = existingSessions
+      .filter((session: any) => !desiredSessionIds.has(session.id))
+      .map((session: any) => SessionService.deleteSession(session.id));
+
+    await Promise.all([...updateRequests, ...createRequests, ...deleteRequests]);
+  };
+
   const handleSave = async () => {
     const parsedCapacity = Number.parseInt(capacity, 10);
     const trimmedDate = date.trim();
@@ -273,7 +390,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
-    if (requiresVenue && !location?.name?.trim()) {
+    if (requiresLocation && !location?.name?.trim()) {
       Alert.alert('Validation Error', 'Please select a location for physical/hybrid events.');
       return;
     }
@@ -281,6 +398,21 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     if ((type === 'online' || type === 'hybrid') && !trimmedMeetingLink) {
       Alert.alert('Validation Error', 'Meeting link is required for online and hybrid events.');
       return;
+    }
+
+    for (let index = 0; index < agendaItems.length; index += 1) {
+      const item = agendaItems[index];
+      const itemLabel = `Agenda item #${index + 1}`;
+      if (!item.title.trim() || !item.startTime.trim() || !item.endTime.trim()) {
+        Alert.alert('Validation Error', `${itemLabel} requires topic, start time, and end time.`);
+        return;
+      }
+      const agendaStart = parseTimeToMinutes(item.startTime.trim());
+      const agendaEnd = parseTimeToMinutes(item.endTime.trim());
+      if (agendaStart === null || agendaEnd === null || agendaEnd <= agendaStart) {
+        Alert.alert('Validation Error', `${itemLabel} must have an end time after start time.`);
+        return;
+      }
     }
 
     if (trimmedMeetingLink) {
@@ -329,27 +461,18 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         },
       };
 
+      let targetEventId = eventId!;
+
       if (isEditing) {
         await EventService.updateEvent(eventId!, eventData);
-        // We do not save new agenda items on edit directly here, to avoid complexity.
-        // Usually edits are done in Manage Sessions.
       } else {
         const response = await EventService.createEvent(eventData);
         const newEventId = response.data?.event?.id;
-        if (newEventId && agendaItems.length > 0) {
-          await Promise.all(
-            agendaItems.map(item => SessionService.createSession({
-              eventId: newEventId,
-              title: item.title,
-              description: item.description,
-              speakerName: item.speakerName,
-              startTime: item.startTime,
-              endTime: item.startTime, // fallback
-              sessionDate: trimmedDate,
-              status: 'scheduled'
-            }))
-          ).catch(e => console.log('Failed to save some agenda items', e));
-        }
+        targetEventId = newEventId || '';
+      }
+
+      if (targetEventId) {
+        await syncAgendaItems(targetEventId, trimmedDate);
       }
 
       navigation.goBack();
@@ -405,7 +528,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.row}>
           <View style={styles.flexHalf}>
             <Text style={styles.label}>Date *</Text>
-            <TouchableOpacity style={styles.pickerButton} onPress={() => setShowDatePicker(true)}>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('date')}>
               <Text style={styles.pickerValue}>{date || 'Pick a date'}</Text>
             </TouchableOpacity>
           </View>
@@ -423,13 +546,13 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.row}>
           <View style={styles.flexHalf}>
             <Text style={styles.label}>Start Time *</Text>
-            <TouchableOpacity style={styles.pickerButton} onPress={() => setShowStartTimePicker(true)}>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('startTime')}>
               <Text style={styles.pickerValue}>{startTime || 'Pick start time'}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.flexHalf}>
             <Text style={styles.label}>End Time *</Text>
-            <TouchableOpacity style={styles.pickerButton} onPress={() => setShowEndTimePicker(true)}>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('endTime')}>
               <Text style={styles.pickerValue}>{endTime || 'Pick end time'}</Text>
             </TouchableOpacity>
           </View>
@@ -526,25 +649,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           ))}
         </View>
-
-        <Text style={styles.label}>{requiresVenue ? 'Select Venue *' : 'Select Venue (Optional)'}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.venueRow}>
-          {!requiresVenue ? (
-            <TouchableOpacity style={[styles.chip, !venueId && styles.chipSelected]} onPress={() => setVenueId('')}>
-              <Text style={[styles.chipText, !venueId && styles.chipTextSelected]}>NO VENUE</Text>
-            </TouchableOpacity>
-          ) : null}
-          {venues.map((venue) => (
-            <TouchableOpacity
-              key={venue.id}
-              style={[styles.chip, venueId === venue.id && styles.chipSelected]}
-              onPress={() => setVenueId(venue.id)}
-            >
-              <Text style={[styles.chipText, venueId === venue.id && styles.chipTextSelected]}>{venue.name}</Text>
-            </TouchableOpacity>
-          ))}
-          {!venues.length ? <Text style={styles.noVenueText}>No venues available. Create a venue first.</Text> : null}
-        </ScrollView>
 
         {(type === 'online' || type === 'hybrid') ? (
           <Input
@@ -683,16 +787,33 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           />
         </Card>
 
-        {!isEditing && (
-          <Card variant="raised" style={styles.questionCard}>
-            <Text style={styles.sectionTitle}>Agenda</Text>
-            {agendaItems.length > 0 ? (
-              agendaItems.map((item, index) => (
-                <View key={index} style={styles.questionRow}>
-                  <View style={styles.questionInfo}>
-                    <Text style={styles.questionText}>{item.startTime} - {item.title}</Text>
-                    <Text style={styles.questionMeta}>{item.speakerName} • {item.description}</Text>
-                  </View>
+        <Card variant="raised" style={styles.questionCard}>
+          <Text style={styles.sectionTitle}>Agenda</Text>
+          {agendaItems.length > 0 ? (
+            agendaItems.map((item, index) => (
+              <View key={`${item.id || 'new'}-${index}`} style={styles.questionRow}>
+                <View style={styles.questionInfo}>
+                  <Text style={styles.questionText}>{item.startTime} - {item.endTime} • {item.title}</Text>
+                  <Text style={styles.questionMeta}>{item.speakerName} {item.speakerName && item.description ? '•' : ''} {item.description}</Text>
+                </View>
+                <View style={styles.agendaRowActions}>
+                  <IconButton
+                    icon={<Edit2 size={14} color={theme.colors.primary} />}
+                    onPress={() => {
+                      setEditingAgendaIndex(index);
+                      setAgendaDraft({
+                        id: item.id,
+                        startTime: item.startTime,
+                        endTime: item.endTime,
+                        title: item.title,
+                        speakerName: item.speakerName,
+                        description: item.description,
+                      });
+                      setIsAgendaModalVisible(true);
+                    }}
+                    variant="ghost"
+                    size={30}
+                  />
                   <IconButton
                     icon={<X size={14} color={theme.colors.error} />}
                     onPress={() => setAgendaItems(prev => prev.filter((_, i) => i !== index))}
@@ -700,18 +821,22 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                     size={30}
                   />
                 </View>
-              ))
-            ) : (
-              <Text style={styles.noQuestionText}>No agenda items added yet.</Text>
-            )}
-            <Button
-              variant="secondary"
-              title="Add Agenda Item"
-              onPress={() => setIsAgendaModalVisible(true)}
-              icon={<Plus size={16} color={theme.colors.text} />}
-            />
-          </Card>
-        )}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noQuestionText}>No agenda items added yet.</Text>
+          )}
+          <Button
+            variant="secondary"
+            title="Add Agenda Item"
+            onPress={() => {
+              setEditingAgendaIndex(null);
+              setAgendaDraft({ startTime: '', endTime: '', title: '', speakerName: '', description: '' });
+              setIsAgendaModalVisible(true);
+            }}
+            icon={<Plus size={16} color={theme.colors.text} />}
+          />
+        </Card>
 
         <Button
           variant="primary"
@@ -723,52 +848,66 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       </ScrollView>
 
-      {showDatePicker ? (
-        <DateTimePicker
-          value={date ? new Date(`${date}T00:00:00`) : new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
-      ) : null}
-      {showStartTimePicker ? (
-        <DateTimePicker
-          value={toTimeDate(startTime)}
-          mode="time"
-          display="default"
-          onChange={handleStartTimeChange}
-        />
-      ) : null}
-      {showEndTimePicker ? (
-        <DateTimePicker
-          value={toTimeDate(endTime)}
-          mode="time"
-          display="default"
-          onChange={handleEndTimeChange}
-        />
-      ) : null}
+      <Modal visible={Boolean(activePicker)} transparent animationType="fade" onRequestClose={closePicker}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.pickerModal}>
+            <Text style={styles.pickerTitle}>
+              {activePicker === 'date' ? 'Select Date' : activePicker === 'startTime' ? 'Select Start Time' : 'Select End Time'}
+            </Text>
+            <View style={styles.pickerSurface}>
+              <DateTimePicker
+                value={pickerValue}
+                mode={activePicker === 'date' ? 'date' : 'time'}
+                display={Platform.OS === 'ios' ? 'spinner' : 'spinner'}
+                themeVariant="light"
+                textColor="#0B0B0C"
+                accentColor="#0B0B0C"
+                onChange={(_, selectedDate) => {
+                  if (selectedDate) setPickerValue(selectedDate);
+                }}
+                minimumDate={activePicker === 'date' ? new Date() : undefined}
+              />
+            </View>
+            <View style={styles.pickerActions}>
+              <Button title="Cancel" variant="outline" size="sm" onPress={closePicker} style={styles.pickerActionButton} />
+              <Button title="Confirm" variant="primary" size="sm" onPress={confirmPickerSelection} style={styles.pickerActionButton} />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={isAgendaModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.agendaModal}>
-            <Text style={styles.sectionTitle}>New Agenda Item</Text>
+            <Text style={styles.sectionTitle}>{editingAgendaIndex === null ? 'New Agenda Item' : 'Edit Agenda Item'}</Text>
             <Input label="Time *" value={agendaDraft.startTime} onChangeText={t => setAgendaDraft({...agendaDraft, startTime: t})} placeholder="09:00" />
+            <Input label="End Time *" value={agendaDraft.endTime} onChangeText={t => setAgendaDraft({...agendaDraft, endTime: t})} placeholder="10:00" />
             <Input label="Topic *" value={agendaDraft.title} onChangeText={t => setAgendaDraft({...agendaDraft, title: t})} placeholder="Keynote" />
             <Input label="Speaker Name" value={agendaDraft.speakerName} onChangeText={t => setAgendaDraft({...agendaDraft, speakerName: t})} placeholder="Jane Doe" />
             <Input label="Description" value={agendaDraft.description} onChangeText={t => setAgendaDraft({...agendaDraft, description: t})} placeholder="Topic description..." multiline />
             <View style={styles.row}>
               <View style={styles.flexHalf}>
-                <Button variant="secondary" title="Cancel" onPress={() => setIsAgendaModalVisible(false)} />
+                <Button variant="secondary" title="Cancel" onPress={() => { setIsAgendaModalVisible(false); setEditingAgendaIndex(null); }} />
               </View>
               <View style={styles.flexHalf}>
-                <Button variant="primary" title="Add" onPress={() => {
-                  if (!agendaDraft.startTime || !agendaDraft.title) {
-                    Alert.alert('Error', 'Time and Topic are required');
+                <Button variant="primary" title={editingAgendaIndex === null ? 'Add' : 'Save'} onPress={() => {
+                  if (!agendaDraft.startTime || !agendaDraft.endTime || !agendaDraft.title.trim()) {
+                    Alert.alert('Error', 'Start time, end time, and topic are required');
                     return;
                   }
-                  setAgendaItems(prev => [...prev, { ...agendaDraft }]);
-                  setAgendaDraft({ startTime: '', title: '', speakerName: '', description: '' });
+                  const draftStart = parseTimeToMinutes(agendaDraft.startTime);
+                  const draftEnd = parseTimeToMinutes(agendaDraft.endTime);
+                  if (draftStart === null || draftEnd === null || draftEnd <= draftStart) {
+                    Alert.alert('Error', 'End time must be after start time');
+                    return;
+                  }
+                  if (editingAgendaIndex !== null) {
+                    setAgendaItems((prev) => prev.map((item, index) => (index === editingAgendaIndex ? { ...item, ...agendaDraft } : item)));
+                  } else {
+                    setAgendaItems(prev => [...prev, { ...agendaDraft }]);
+                  }
+                  setAgendaDraft({ startTime: '', endTime: '', title: '', speakerName: '', description: '' });
+                  setEditingAgendaIndex(null);
                   setIsAgendaModalVisible(false);
                 }} />
               </View>
@@ -1023,6 +1162,11 @@ const styles = StyleSheet.create({
   questionInfo: {
     flex: 1,
   },
+  agendaRowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   questionText: {
     ...theme.typography.body,
     color: theme.colors.text,
@@ -1052,5 +1196,33 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  pickerModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0B0B0C',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  pickerSurface: {
+    borderRadius: 12,
+    backgroundColor: '#F7F7F8',
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pickerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  pickerActionButton: {
+    flex: 1,
   },
 });
