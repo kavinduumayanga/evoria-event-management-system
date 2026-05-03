@@ -223,6 +223,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     fetchData();
   }, [eventId]);
 
+  useEffect(() => {
+    if (pricingMode === 'ticketed' && requiresApproval) {
+      setRequiresApproval(false);
+    }
+  }, [pricingMode, requiresApproval]);
+
   const requiresVenue = type === 'physical' || type === 'hybrid';
 
   const fetchData = async () => {
@@ -1035,20 +1041,24 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           ))}
         </View>
 
-        <Text style={styles.label}>Requires Approval *</Text>
-        <View style={styles.segmentRow}>
-          {[true, false].map((option) => (
-            <TouchableOpacity
-              key={option ? 'requires-approval' : 'no-approval'}
-              style={[styles.segment, requiresApproval === option && styles.segmentSelected]}
-              onPress={() => setRequiresApproval(option)}
-            >
-              <Text style={[styles.segmentText, requiresApproval === option && styles.segmentTextSelected]}>
-                {option ? 'YES' : 'NO'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {pricingMode === 'free' ? (
+          <>
+            <Text style={styles.label}>Requires Approval *</Text>
+            <View style={styles.segmentRow}>
+              {[true, false].map((option) => (
+                <TouchableOpacity
+                  key={option ? 'requires-approval' : 'no-approval'}
+                  style={[styles.segment, requiresApproval === option && styles.segmentSelected]}
+                  onPress={() => setRequiresApproval(option)}
+                >
+                  <Text style={[styles.segmentText, requiresApproval === option && styles.segmentTextSelected]}>
+                    {option ? 'YES' : 'NO'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {(type === 'online' || type === 'hybrid') ? (
           <Input

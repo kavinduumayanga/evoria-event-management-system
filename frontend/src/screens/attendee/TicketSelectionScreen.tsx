@@ -123,6 +123,14 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
     return Object.keys(errors).length === 0;
   };
 
+  const validateAnswersOrNotify = () => {
+    const isValid = validateAnswers();
+    if (!isValid) {
+      Alert.alert('Registration Form Incomplete', 'Please complete the registration form.');
+    }
+    return isValid;
+  };
+
   const getCustomAnswersPayload = () => (
     registrationQuestions
       .map((question) => ({
@@ -134,7 +142,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
 
   const createFreeBooking = async () => {
     if (!eventId || !event) return;
-    if (!validateAnswers()) return;
+    if (!validateAnswersOrNotify()) return;
 
     try {
       setIsBooking(true);
@@ -159,37 +167,16 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
     if (!eventId || !event) return;
 
     if (isFreeEvent) {
-      if (registrationQuestions.length === 0) {
-        Alert.alert('Confirm Registration', 'Register for this free event now?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Register', onPress: () => { void createFreeBooking(); } },
-        ]);
-        return;
-      }
       await createFreeBooking();
       return;
     }
 
-    if (!selectedTicket) return;
+    if (!selectedTicket) {
+      Alert.alert('Ticket Required', 'Please select a ticket.');
+      return;
+    }
 
-    if (!validateAnswers()) return;
-
-    if (selectedTicket.isFree) {
-      try {
-        setIsBooking(true);
-        const response = await BookingService.createBooking({
-          eventId,
-          ticketTypeId: selectedTicket.id,
-          quantity,
-          customAnswers: getCustomAnswersPayload(),
-          allowWaitlist: false,
-        });
-        navigation.replace('BookingConfirmation', { bookingId: response.data.booking.id });
-      } catch (err: any) {
-        Alert.alert(err?.response?.status === 409 ? 'Already Registered' : 'Booking Failed', err?.response?.data?.message || 'Booking failed');
-      } finally {
-        setIsBooking(false);
-      }
+    if (!validateAnswersOrNotify()) {
       return;
     }
 

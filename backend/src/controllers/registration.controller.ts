@@ -173,7 +173,8 @@ export const createRegistration = async (req: Request, res: Response, next: Next
     }
 
     const totalAmount = ticket.price * validatedData.quantity;
-    const approvalStatus: ApprovalStatus = event.requiresApproval ? 'pending' : 'approved';
+    const pricingMode = event.pricingMode === 'free' ? 'free' : 'ticketed';
+    const approvalStatus: ApprovalStatus = pricingMode === 'free' ? 'pending' : 'approved';
     const rsvpStatus: RsvpStatus = validatedData.rsvpStatus;
 
     const waitlistPosition = eventAtCapacity

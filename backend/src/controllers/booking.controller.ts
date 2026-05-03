@@ -378,11 +378,12 @@ export const createBooking = async (req: Request, res: Response, next: NextFunct
       });
     }
 
-    // Free tickets are immediately confirmed; paid tickets use mock payment simulation in-app.
+    // Free-event registrations stay pending host approval; ticketed bookings are auto-approved after successful checkout.
+    const approvalStatusForConfirmedBooking: 'pending' | 'approved' = pricingMode === 'free' ? 'pending' : 'approved';
     const newBookingDoc = await createConfirmedBooking(
       req.user!.id,
       validatedData.eventId,
-      event.requiresApproval ? 'pending' : 'approved',
+      approvalStatusForConfirmedBooking,
       ticket,
       validatedData.quantity,
       pricing.finalAmount,
