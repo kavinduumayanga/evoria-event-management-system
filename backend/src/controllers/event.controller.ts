@@ -1666,3 +1666,131 @@ export const removeEventAdmin = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+const addEventCoHostSchema = z.object({
+  email: z.string().trim().email('Please provide a valid email address'),
+}).strict();
+
+export const addEventCoHost = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.eventId as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (!isEventOwner(req.user!.id, event)) {
+      return next(new AppError('Only the event owner can add co-hosts', 403));
+    }
+
+    const { email } = addEventCoHostSchema.parse(req.body);
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await UserModel.findOne({ email: normalizedEmail }).select('_id email name profileImage');
+    if (!user) {
+      return next(new AppError('User not found for the provided email', 404));
+    }
+
+    const ownerId = resolveEventOwnerId(event);
+    if (user.id === ownerId) {
+      return next(new AppError('Event owner cannot be a co-host', 400));
+    }
+
+    const existingCoHosts = Array.from(new Set((event.coHostIds || []).map((id: string) => id.trim()).filter(Boolean)));
+    if (existingCoHosts.includes(user.id)) {
+      return next(new AppError('User is already a co-host', 409));
+    }
+
+    const nextCoHostIds = [...existingCoHosts, user.id];
+
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      { coHostIds: nextCoHostIds },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: updatedEvent!.toJSON(),
+        coHost: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          profileImage: user.profileImage,
+        },
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
+    }
+    next(error);
+  }
+};
+
+export const getEventCoHosts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.eventId as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (!canManageEvent(req.user!.id, event)) {
+      return next(new AppError('Not authorized to access co-host list', 403));
+    }
+
+    const coHostIds = Array.from(new Set((event.coHostIds || []).map((id: string) => id.trim()).filter(Boolean)));
+    const users = await UserModel.find({ _id: { $in: coHostIds } }).select('_id email name profileImage');
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        coHosts: users.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          profileImage: user.profileImage,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeEventCoHost = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await EventModel.findById(req.params.eventId as string);
+    if (!event) return next(new AppError('Event not found', 404));
+
+    if (!isEventOwner(req.user!.id, event)) {
+      return next(new AppError('Only the event owner can remove co-hosts', 403));
+    }
+
+    const ownerId = resolveEventOwnerId(event);
+    const userId = String(req.params.userId || '').trim();
+    if (!userId) {
+      return next(new AppError('userId is required', 400));
+    }
+
+    if (userId === ownerId) {
+      return next(new AppError('Event owner cannot remove themselves', 400));
+    }
+
+    const existingCoHosts = Array.from(new Set((event.coHostIds || []).map((id: string) => id.trim()).filter(Boolean)));
+    if (!existingCoHosts.includes(userId)) {
+      return next(new AppError('User is not a co-host', 404));
+    }
+
+    const nextCoHostIds = existingCoHosts.filter((id) => id !== userId);
+    const updatedEvent = await EventModel.findByIdAndUpdate(
+      event.id,
+      { coHostIds: nextCoHostIds },
+      { new: true },
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: updatedEvent!.toJSON(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

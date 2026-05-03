@@ -2,6 +2,7 @@ interface EventPermissionTarget {
   ownerId?: string | null;
   hostAdminId?: string | null;
   adminIds?: string[] | null;
+  coHostIds?: string[] | null;
 }
 
 const normalizeId = (value: unknown): string => {
@@ -41,10 +42,18 @@ export const isEventAdmin = (userId: string, event: EventPermissionTarget | null
   return normalizeAdminIds(event.adminIds).includes(normalizedUserId);
 };
 
+export const isEventCoHost = (userId: string, event: EventPermissionTarget | null | undefined): boolean => {
+  if (!event) return false;
+  const normalizedUserId = normalizeId(userId);
+  if (!normalizedUserId) return false;
+
+  return normalizeAdminIds(event.coHostIds).includes(normalizedUserId);
+};
+
 export const canManageEvent = (userId: string, event: EventPermissionTarget | null | undefined): boolean => {
-  return isEventOwner(userId, event) || isEventAdmin(userId, event);
+  return isEventOwner(userId, event) || isEventAdmin(userId, event) || isEventCoHost(userId, event);
 };
 
 export const manageableEventQuery = (userId: string) => ({
-  $or: [{ ownerId: userId }, { hostAdminId: userId }, { adminIds: userId }],
+  $or: [{ ownerId: userId }, { hostAdminId: userId }, { adminIds: userId }, { coHostIds: userId }],
 });

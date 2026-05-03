@@ -19,6 +19,9 @@ import {
   addEventAdmin,
   removeEventAdmin,
   updateEventRegistrationFields,
+  addEventCoHost,
+  getEventCoHosts,
+  removeEventCoHost,
 } from '../controllers/event.controller';
 import { getEventDashboard } from '../controllers/eventDashboard.controller';
 import { getEventRegistrationsForManagers } from '../controllers/eventRegistration.controller';
@@ -67,5 +70,8 @@ router.post('/:eventId/reviews', createEventReview);
 router.patch('/:id/feature', toggleEventFeatured);
 router.post('/:id/admins', addEventAdmin);
 router.delete('/:id/admins/:userId', removeEventAdmin);
+router.post('/:eventId/co-hosts', addEventCoHost);
+router.get('/:eventId/co-hosts', getEventCoHosts);
+router.delete('/:eventId/co-hosts/:userId', removeEventCoHost);
 
 export default router;

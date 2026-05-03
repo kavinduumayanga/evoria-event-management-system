@@ -10,7 +10,7 @@ import {
 import { theme } from '../../../constants/theme';
 import { EventRegistrationStatus } from '../../../types';
 import { GuestRecord, GuestService } from '../../../api/services';
-import { ArrowLeft, UserCheck, Search, Users, Download } from 'lucide-react-native';
+import { ArrowLeft, UserCheck, Search, Users } from 'lucide-react-native';
 import { safeArray } from '../../../utils/safeData';
 import { safeString } from '../../../utils/safeText';
 
@@ -93,16 +93,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
     }
   };
 
-  const exportCsv = async () => {
-    try {
-      const csv = await GuestService.exportEventGuests(eventId, queryParams);
-      const dataUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
-      await Linking.openURL(dataUrl);
-      Alert.alert('Export Ready', 'Guest CSV exported successfully.');
-    } catch (err: any) {
-      Alert.alert('Export Failed', err?.response?.data?.message || 'Unable to export guest CSV.');
-    }
-  };
+
 
   if (isLoading && !isRefreshing) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchGuests} /></ScreenContainer>;
@@ -133,14 +124,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
                   <Text style={styles.guestCount}>{guests.length} registered</Text>
                 </View>
               </View>
-              <Button
-                title="Export CSV"
-                onPress={exportCsv}
-                variant="secondary"
-                size="sm"
-                icon={<Download size={14} color={theme.colors.text} />}
-                fullWidth={false}
-              />
+
             </View>
 
             {/* Search + Date */}

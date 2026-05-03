@@ -81,6 +81,82 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
 
+  // Validation States
+  const [nameError, setNameError] = useState('');
+  const [cardError, setCardError] = useState('');
+  const [expiryError, setExpiryError] = useState('');
+  const [cvvError, setCvvError] = useState('');
+
+  const handleCardNumberChange = (text: string) => {
+    // Remove all non-digits
+    const digits = text.replace(/\D/g, '');
+    // Format with spaces
+    const formatted = digits.replace(/(\d{4})/g, '$1 ').trim();
+    setCardNumber(formatted);
+    if (formatted.replace(/\s+/g, '').length === 16 || formatted.length === 0) {
+      setCardError('');
+    } else {
+      setCardError('Card number must be 16 digits');
+    }
+  };
+
+  const handleExpiryChange = (text: string) => {
+    // Allow deleting slash properly
+    if (expiry.endsWith('/') && text.length < expiry.length) {
+      setExpiry(text.slice(0, -1));
+      return;
+    }
+    // Remove all non-digits
+    let digits = text.replace(/\D/g, '');
+    if (digits.length >= 2) {
+      digits = digits.slice(0, 2) + '/' + digits.slice(2, 4);
+    }
+    setExpiry(digits);
+    
+    // Validate
+    if (digits.length === 0) {
+      setExpiryError('');
+      return;
+    }
+    if (digits.length === 5) {
+      const [mm, yy] = digits.split('/');
+      const month = parseInt(mm, 10);
+      const year = parseInt(`20${yy}`, 10);
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+
+      if (month < 1 || month > 12) {
+        setExpiryError('Invalid month');
+      } else if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        setExpiryError('Card expired');
+      } else {
+        setExpiryError('');
+      }
+    } else {
+      setExpiryError('Use MM/YY format');
+    }
+  };
+
+  const handleCvvChange = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 4);
+    setCvv(digits);
+    if (digits.length >= 3 || digits.length === 0) {
+      setCvvError('');
+    } else {
+      setCvvError('CVV must be 3 or 4 digits');
+    }
+  };
+
+  const handleNameChange = (text: string) => {
+    setCardholderName(text);
+    if (text.trim().length >= 2 || text.length === 0) {
+      setNameError('');
+    } else {
+      setNameError('Name too short');
+    }
+  };
+
   useEffect(() => { void fetchSummary(); }, [ticketTypeId, quantity, promoCode, unlockCode, eventId]);
 
   const fetchSummary = async () => {
@@ -112,22 +188,26 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
     if (!eventId || !ticketTypeId || !quantity) return;
 
     const normalizedCardNumber = cardNumber.replace(/\s+/g, '');
-    if (!cardholderName.trim()) {
-      Alert.alert('Validation', 'Cardholder name is required.');
-      return;
+    let isValid = true;
+
+    if (!cardholderName.trim() || cardholderName.trim().length < 2) {
+      setNameError('Cardholder name is required');
+      isValid = false;
     }
     if (!/^\d{16}$/.test(normalizedCardNumber)) {
-      Alert.alert('Validation', 'Card number must be 16 digits.');
-      return;
+      setCardError('Card number must be 16 digits');
+      isValid = false;
     }
-    if (!/^\d{2}\/\d{2}$/.test(expiry.trim())) {
-      Alert.alert('Validation', 'Expiry must be in MM/YY format.');
-      return;
+    if (!/^\d{2}\/\d{2}$/.test(expiry.trim()) || expiryError) {
+      setExpiryError(expiryError || 'Expiry must be in MM/YY format');
+      isValid = false;
     }
     if (!/^\d{3,4}$/.test(cvv.trim())) {
-      Alert.alert('Validation', 'CVV must be 3 or 4 digits.');
-      return;
+      setCvvError('CVV must be 3 or 4 digits');
+      isValid = false;
     }
+
+    if (!isValid) return;
 
     try {
       setIsConfirming(true);
@@ -251,19 +331,22 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
                     <Input
                       label="Cardholder name"
                       value={cardholderName}
-                      onChangeText={setCardholderName}
+                      onChangeText={handleNameChange}
                       placeholder="John Doe"
                       returnKeyType="next"
+                      error={nameError}
                       onSubmitEditing={() => cardNumberRef.current?.focus()}
                     />
                     <Input
                       ref={cardNumberRef}
                       label="Card number"
                       value={cardNumber}
-                      onChangeText={setCardNumber}
+                      onChangeText={handleCardNumberChange}
                       keyboardType="number-pad"
-                      placeholder="4111111111111111"
+                      placeholder="4111 1111 1111 1111"
                       returnKeyType="next"
+                      error={cardError}
+                      maxLength={19}
                       onSubmitEditing={() => expiryRef.current?.focus()}
                     />
                     <View style={styles.formRow}>
@@ -271,22 +354,26 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
                         ref={expiryRef}
                         label="Expiry (MM/YY)"
                         value={expiry}
-                        onChangeText={setExpiry}
+                        onChangeText={handleExpiryChange}
                         keyboardType="number-pad"
                         placeholder="12/30"
                         containerStyle={styles.flexInput}
                         returnKeyType="next"
+                        error={expiryError}
+                        maxLength={5}
                         onSubmitEditing={() => cvvRef.current?.focus()}
                       />
                       <Input
                         ref={cvvRef}
                         label="CVV"
                         value={cvv}
-                        onChangeText={setCvv}
+                        onChangeText={handleCvvChange}
                         keyboardType="number-pad"
                         placeholder="123"
                         containerStyle={styles.flexInput}
                         returnKeyType="done"
+                        error={cvvError}
+                        maxLength={4}
                         blurOnSubmit
                       />
                     </View>
