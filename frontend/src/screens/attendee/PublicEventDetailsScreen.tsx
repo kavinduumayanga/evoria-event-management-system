@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Linking, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Keyboard, Linking, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Calendar as CalendarIcon, Clock, MapPin, Share2, Link as LinkIcon, Phone, Mail, Ticket as TicketIcon, Star, CalendarPlus } from 'lucide-react-native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Button, Card, ErrorState, IconButton, Input, LoadingState, ScreenContainer, StatusBadge } from '../../components';
@@ -10,14 +11,38 @@ import { EventService, PublicEventDetails, RegistrationService } from '../../api
 import { theme } from '../../constants/theme';
 import { useAuthStore } from '../../store/auth.store';
 import { safeArray } from '../../utils/safeData';
-import { formatSafeDate, formatSafeTime, logDevMissing, safeLower, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
+import { formatSafeDate, formatSafeTime, logDevMissing, safeInitials, safeLower, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
 import { resolveImageUrl } from '../../utils/imageUrl';
 
 type PublicEventNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
 type PublicEventRouteProp = RouteProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
 interface Props { navigation: PublicEventNavigationProp; route: PublicEventRouteProp; }
 
+const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const CHOICE_TYPES = new Set(['choice', 'dropdown', 'radio', 'checkbox', 'multiple_choice']);
+
+const normalizeHexColor = (value: unknown, fallback: string) => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  return HEX_COLOR_REGEX.test(normalized) ? normalized : fallback;
+};
+
+const normalizeQuestionOptions = (raw: unknown): string[] => {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const options: string[] = [];
+  for (const item of raw) {
+    const value = typeof item === 'string' ? item.trim() : String(item || '').trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    options.push(value);
+  }
+  return options;
+};
+
 export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const slug = route.params?.slug;
   const currentUser = useAuthStore((s) => s.user);
 
@@ -33,6 +58,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
   const [isSubmittingRegistration, setIsSubmittingRegistration] = useState(false);
   const [reviewSummary, setReviewSummary] = useState<{ averageRating: number; totalReviews: number } | null>(null);
+  const [hasHostImageError, setHasHostImageError] = useState(false);
 
   const fetchPublicEvent = async () => {
     if (!slug) return;
@@ -40,6 +66,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
       setError(null);
       const res = await EventService.getPublicEventBySlug(slug);
       setPublicData(res.data);
+      setHasHostImageError(false);
       try {
         const summaryRes = await EventService.getEventReviewSummary(res.data.event.id);
         setReviewSummary(summaryRes.data);
@@ -119,8 +146,24 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
     if (!mobile.trim()) errors.mobile = 'Mobile is required';
     if (!nic.trim()) errors.nic = 'NIC is required';
     for (const q of registrationQuestions) {
-      if (!requiredQuestionIds.has(q.id)) continue;
-      if (!(customAnswerMap[q.id] || '').trim()) errors[`q_${q.id}`] = 'This field is required';
+      const answer = (customAnswerMap[q.id] || '').trim();
+      const options = normalizeQuestionOptions((q as any).options);
+      const isChoiceQuestion = CHOICE_TYPES.has(safeLower(q.type));
+      if (requiredQuestionIds.has(q.id) && !answer) {
+        errors[`q_${q.id}`] = 'This field is required';
+        continue;
+      }
+      if (isChoiceQuestion && answer) {
+        const normalizedOptionSet = new Set(options.map((option) => option.toLowerCase()));
+        if (safeLower(q.type) === 'checkbox' || safeLower(q.type) === 'multiple_choice') {
+          const selectedValues = answer.split(',').map((item) => item.trim()).filter(Boolean).map((item) => item.toLowerCase());
+          if (!selectedValues.length || selectedValues.some((item) => !normalizedOptionSet.has(item))) {
+            errors[`q_${q.id}`] = 'Please select a valid option.';
+          }
+        } else if (!normalizedOptionSet.has(answer.toLowerCase())) {
+          errors[`q_${q.id}`] = 'Please select a valid option.';
+        }
+      }
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -128,6 +171,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
 
   const handleSubmitRegistration = async () => {
     if (!event) return;
+    Keyboard.dismiss();
     if (!validateForm()) return;
     try {
       setIsSubmittingRegistration(true);
@@ -165,7 +209,13 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
 
   const eventType = safeLower(event.type, 'physical');
   const host = typeof event.host === 'object' && event.host ? event.host : null;
-  const hostName = safeTitle(host?.name, 'Host unavailable');
+  const hostName = safeTitle(host?.name, 'Evoria Host');
+  const hostImage = resolveImageUrl(safeString(host?.profileImage, ''));
+  const hostInitials = safeInitials(hostName, 'EH');
+  const brandPrimary = normalizeHexColor(event.branding?.primaryColor, theme.colors.primary);
+  const brandAccent = normalizeHexColor(event.branding?.accentColor, theme.colors.secondary);
+  const brandButtonTextColor = '#FFFFFF';
+
   const locationName = safeString(
     event.location?.name || event.location?.label,
     eventType === 'online' ? 'Online' : 'Location not specified',
@@ -228,22 +278,22 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
 
         <View style={styles.content}>
           {/* Title + topic */}
-          <Text style={styles.eventTitle}>{titleLabel}</Text>
+          <Text style={[styles.eventTitle, { color: brandPrimary }]}>{titleLabel}</Text>
           {topicLabel ? <Text style={styles.topic}>{topicLabel}</Text> : null}
 
           {/* Meta card */}
           <Card variant="raised" style={styles.metaCard} noPadding>
             <View style={styles.metaCardInner}>
               <View style={styles.metaRow}>
-                <CalendarIcon size={14} color={theme.colors.primary} />
+                <CalendarIcon size={14} color={brandPrimary} />
                 <Text style={styles.metaText}>{dateLabel}</Text>
               </View>
               <View style={styles.metaRow}>
-                <Clock size={14} color={theme.colors.secondary} />
+                <Clock size={14} color={brandAccent} />
                 <Text style={styles.metaText}>{startTimeLabel} – {endTimeLabel}</Text>
               </View>
               <View style={styles.metaRow}>
-                <MapPin size={14} color={theme.colors.accent} />
+                <MapPin size={14} color={brandAccent} />
                 <Text style={styles.metaText}>{locationName}</Text>
               </View>
               <View style={styles.metaDivider} />
@@ -251,7 +301,16 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                 <StatusBadge status="info" label={safeString(event.type, 'unknown')} />
                 <StatusBadge status={event.visibility === 'public' ? 'success' : 'warning'} label={safeString(event.visibility, 'unknown')} />
               </View>
-              {hostName ? <Text style={styles.hostText}>Hosted by {hostName}</Text> : null}
+              <View style={styles.hostRow}>
+                {hostImage && !hasHostImageError ? (
+                  <Image source={{ uri: hostImage }} style={styles.hostAvatar} onError={() => setHasHostImageError(true)} />
+                ) : (
+                  <View style={[styles.hostAvatar, { backgroundColor: brandAccent }]}>
+                    <Text style={styles.hostInitials}>{hostInitials}</Text>
+                  </View>
+                )}
+                <Text style={styles.hostText}>{hostName}</Text>
+              </View>
             </View>
           </Card>
 
@@ -357,6 +416,11 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                   <Card key={`${safeString(session.id, 'session')}-${index}`} variant="raised" style={styles.sessionCard} noPadding>
                     <View style={styles.sessionInner}>
                       <Text style={styles.sessionTitle}>{sessionTitle}</Text>
+                      {safeString(session.sessionDate, '').trim() ? (
+                        <Text style={styles.sessionMeta}>
+                          {formatSafeDate(session.sessionDate, 'Date unavailable', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </Text>
+                      ) : null}
                       {(hasStart || hasEnd) ? (
                         <Text style={styles.sessionMeta}>
                           {hasStart && hasEnd ? `${session.startTime} - ${session.endTime}` : (session.startTime || session.endTime)}
@@ -413,20 +477,70 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                   <Input label="Mobile *" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" error={formErrors.mobile} />
                   <Input label="NIC *" value={nic} onChangeText={setNic} placeholder="200012345678" error={formErrors.nic} />
 
-                  {registrationQuestions.map((q, index) => (
-                    <Input
-                      key={safeString(q.id, `question-${index}`)}
-                      label={`${q.question}${q.required ? ' *' : ''}`}
-                      value={customAnswerMap[q.id] || ''}
-                      onChangeText={(v) => {
-                        setCustomAnswerMap((p) => ({ ...p, [q.id]: v }));
-                        setFormErrors((p) => ({ ...p, [`q_${q.id}`]: '' }));
-                      }}
-                      placeholder={q.type === 'number' ? 'Enter a number' : 'Your answer'}
-                      keyboardType={q.type === 'number' ? 'numeric' : 'default'}
-                      error={formErrors[`q_${q.id}`]}
-                    />
-                  ))}
+                  {registrationQuestions.map((q, index) => {
+                    const questionType = safeLower(q.type);
+                    const isChoiceQuestion = CHOICE_TYPES.has(questionType);
+                    const options = normalizeQuestionOptions((q as any).options);
+                    const value = customAnswerMap[q.id] || '';
+
+                    if (isChoiceQuestion && options.length > 0) {
+                      const selectedValues = value
+                        .split(',')
+                        .map((item) => item.trim())
+                        .filter(Boolean);
+                      const isMultiSelect = questionType === 'checkbox' || questionType === 'multiple_choice';
+
+                      return (
+                        <View key={safeString(q.id, `question-${index}`)} style={styles.choiceQuestionBlock}>
+                          <Text style={styles.choiceQuestionLabel}>{q.question}{q.required ? ' *' : ''}</Text>
+                          <View style={styles.choiceOptionsRow}>
+                            {options.map((option, optionIndex) => {
+                              const isSelected = isMultiSelect
+                                ? selectedValues.some((selected) => selected.toLowerCase() === option.toLowerCase())
+                                : value.trim().toLowerCase() === option.toLowerCase();
+                              return (
+                                <TouchableOpacity
+                                  key={`${q.id}-${optionIndex}`}
+                                  style={[styles.choiceOptionChip, isSelected && styles.choiceOptionChipSelected]}
+                                  onPress={() => {
+                                    if (isMultiSelect) {
+                                      const nextValues = isSelected
+                                        ? selectedValues.filter((selected) => selected.toLowerCase() !== option.toLowerCase())
+                                        : [...selectedValues, option];
+                                      setCustomAnswerMap((previous) => ({ ...previous, [q.id]: nextValues.join(', ') }));
+                                    } else {
+                                      setCustomAnswerMap((previous) => ({ ...previous, [q.id]: option }));
+                                    }
+                                    setFormErrors((previous) => ({ ...previous, [`q_${q.id}`]: '' }));
+                                  }}
+                                >
+                                  <Text style={[styles.choiceOptionChipText, isSelected && styles.choiceOptionChipTextSelected]}>
+                                    {option}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                          {formErrors[`q_${q.id}`] ? <Text style={styles.choiceErrorText}>{formErrors[`q_${q.id}`]}</Text> : null}
+                        </View>
+                      );
+                    }
+
+                    return (
+                      <Input
+                        key={safeString(q.id, `question-${index}`)}
+                        label={`${q.question}${q.required ? ' *' : ''}`}
+                        value={value}
+                        onChangeText={(v) => {
+                          setCustomAnswerMap((p) => ({ ...p, [q.id]: v }));
+                          setFormErrors((p) => ({ ...p, [`q_${q.id}`]: '' }));
+                        }}
+                        placeholder={q.type === 'number' ? 'Enter a number' : 'Your answer'}
+                        keyboardType={q.type === 'number' ? 'numeric' : 'default'}
+                        error={formErrors[`q_${q.id}`]}
+                      />
+                    );
+                  })}
 
                   {registrationStatus && (
                     <View style={styles.statusBanner}>
@@ -445,7 +559,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
       </ScrollView>
 
       {/* Sticky footer CTA */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 72 }]}>
         <Button
           title={
             isTicketedEvent
@@ -460,6 +574,8 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
           isLoading={isSubmittingRegistration}
           variant="primary"
           size="lg"
+          style={{ backgroundColor: brandAccent, borderColor: brandAccent }}
+          textStyle={{ color: brandButtonTextColor }}
         />
       </View>
     </ScreenContainer>
@@ -484,6 +600,9 @@ const styles = StyleSheet.create({
   metaText: { ...theme.typography.body, color: theme.colors.textSecondary },
   metaDivider: { height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.xs },
   metaTagRow: { flexDirection: 'row', gap: theme.spacing.s, flexWrap: 'wrap' },
+  hostRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s },
+  hostAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  hostInitials: { ...theme.typography.caption, color: '#FFFFFF', fontWeight: '700' },
   hostText: { ...theme.typography.caption, color: theme.colors.textMuted },
   locationCard: { marginTop: theme.spacing.m, borderRadius: theme.borderRadius.l, overflow: 'hidden' },
   locationCardInner: { padding: theme.spacing.m },
@@ -546,6 +665,24 @@ const styles = StyleSheet.create({
   ticketPrice: { ...theme.typography.caption, color: theme.colors.primary, marginTop: 2, fontWeight: '600' },
   registrationCard: { borderRadius: theme.borderRadius.l, overflow: 'hidden', marginTop: theme.spacing.s },
   registrationInner: { padding: theme.spacing.m },
+  choiceQuestionBlock: { marginBottom: theme.spacing.m },
+  choiceQuestionLabel: { ...theme.typography.caption, color: theme.colors.textMuted, marginBottom: theme.spacing.xs, marginLeft: 4 },
+  choiceOptionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.s },
+  choiceOptionChip: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.borderRadius.round,
+  },
+  choiceOptionChipSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySubtle,
+  },
+  choiceOptionChipText: { ...theme.typography.caption, color: theme.colors.textMuted, fontWeight: '600' },
+  choiceOptionChipTextSelected: { color: theme.colors.primaryLight },
+  choiceErrorText: { ...theme.typography.caption, color: theme.colors.error, marginTop: 6, marginLeft: 4 },
   statusBanner: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     padding: theme.spacing.m, backgroundColor: theme.colors.successSubtle,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Keyboard,
+  TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import { Input, Button, IconButton } from '../../components';
@@ -19,7 +21,10 @@ import { getApiErrorMessage } from '../../utils/apiError';
 
 export const ChangePasswordScreen = () => {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const login = useAuthStore((state) => state.login);
+  const newPasswordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -27,6 +32,7 @@ export const ChangePasswordScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChangePassword = async () => {
+    Keyboard.dismiss();
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert('Validation', 'Please fill in all password fields.');
       return;
@@ -94,8 +100,11 @@ export const ChangePasswordScreen = () => {
               value={currentPassword}
               onChangeText={setCurrentPassword}
               leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+              returnKeyType="next"
+              onSubmitEditing={() => newPasswordRef.current?.focus()}
             />
             <Input
+              ref={newPasswordRef}
               label="New password"
               placeholder="At least 6 characters"
               isPassword
@@ -104,8 +113,11 @@ export const ChangePasswordScreen = () => {
               value={newPassword}
               onChangeText={setNewPassword}
               leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+              returnKeyType="next"
+              onSubmitEditing={() => confirmPasswordRef.current?.focus()}
             />
             <Input
+              ref={confirmPasswordRef}
               label="Confirm new password"
               placeholder="Re-enter your new password"
               isPassword
@@ -115,6 +127,7 @@ export const ChangePasswordScreen = () => {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+              onSubmitEditing={handleChangePassword}
             />
           </ScrollView>
         </KeyboardAvoidingView>
@@ -126,6 +139,7 @@ export const ChangePasswordScreen = () => {
             isLoading={isLoading}
             variant="primary"
             size="lg"
+            style={{ marginBottom: Math.max(insets.bottom, 16) + 84 }}
           />
         </View>
       </SafeAreaView>

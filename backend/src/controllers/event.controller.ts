@@ -10,13 +10,17 @@ import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
 import { EventCustomQuestion, EventPricingMode, EventStatus, EventType, EventVisibility } from '../types';
 import { canManageEvent, isEventOwner, manageableEventQuery } from '../utils/eventPermissions';
-import { getEventRegistrationQuestions } from '../utils/eventRegistrationFields';
+import {
+  getEventRegistrationQuestions,
+  isChoiceBasedQuestionType,
+  normalizeQuestionOptions,
+} from '../utils/eventRegistrationFields';
 
 const EVENT_TYPES = ['online', 'physical', 'hybrid'] as const;
 const EVENT_PRICING_MODES = ['free', 'ticketed'] as const;
 const EVENT_VISIBILITIES = ['public', 'private', 'unlisted'] as const;
 const EVENT_STATUSES = ['draft', 'published', 'cancelled'] as const;
-const CUSTOM_QUESTION_TYPES = ['text', 'number', 'choice'] as const;
+const CUSTOM_QUESTION_TYPES = ['text', 'number', 'choice', 'dropdown', 'radio', 'checkbox', 'multiple_choice'] as const;
 const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 const STATUS_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
@@ -30,6 +34,7 @@ const customQuestionSchema = z.object({
   question: z.string().trim().min(1, 'Custom question text is required'),
   type: z.enum(CUSTOM_QUESTION_TYPES),
   required: z.boolean().optional(),
+  options: z.array(z.string().trim().min(1, 'Question options cannot be empty')).optional().default([]),
 });
 
 const contactDetailsSchema = z.object({
@@ -342,7 +347,7 @@ const resolveRequester = async (req: Request): Promise<{ id: string } | null> =>
   }
 };
 
-const validateVenueRules = async (type: EventType, venueId: string | null) => {
+const validateVenueRules = async (type: EventType, venueId: string | null, ownerId?: string) => {
   if (!EVENT_TYPES.includes(type)) {
     throw new AppError('Event type is invalid', 400);
   }
@@ -352,10 +357,14 @@ const validateVenueRules = async (type: EventType, venueId: string | null) => {
     if (!venue) {
       throw new AppError('Selected venue is invalid', 400);
     }
+
+    if (ownerId && venue.ownerId && String(venue.ownerId).trim() !== ownerId.trim()) {
+      throw new AppError('Selected venue does not belong to your account', 403);
+    }
   }
 };
 
-const validateEventData = async (eventInput: EventInput) => {
+const validateEventData = async (eventInput: EventInput, ownerId?: string) => {
   if (!isIsoLikeDate(eventInput.date)) {
     throw new AppError('Date must be a valid ISO date string', 400);
   }
@@ -431,9 +440,14 @@ const validateEventData = async (eventInput: EventInput) => {
       throw new AppError('Custom question ids must be unique', 400);
     }
     duplicateQuestionIds.add(normalizedId);
+
+    const normalizedOptions = normalizeQuestionOptions(customQuestion.options);
+    if (isChoiceBasedQuestionType(customQuestion.type) && normalizedOptions.length < 2) {
+      throw new AppError(`Question "${customQuestion.question}" must have at least 2 options`, 400);
+    }
   }
 
-  await validateVenueRules(eventInput.type, eventInput.venueId);
+  await validateVenueRules(eventInput.type, eventInput.venueId, ownerId);
 };
 
 const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>): EventInput => {
@@ -463,6 +477,7 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
       question: question.question.trim(),
       type: question.type,
       required: question.required ?? false,
+      options: normalizeQuestionOptions(question.options),
     })),
   };
 };
@@ -509,6 +524,7 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
           question: question.question.trim(),
           type: question.type,
           required: question.required ?? false,
+          options: normalizeQuestionOptions(question.options),
         }))
       : getEventRegistrationQuestions(event),
   };
@@ -562,6 +578,7 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
       question: question.question.trim(),
       type: question.type,
       required: question.required ?? false,
+      options: normalizeQuestionOptions(question.options),
     }));
     payload.customQuestions = normalizedQuestions;
     payload.registrationFields = { customQuestions: normalizedQuestions };
@@ -583,7 +600,7 @@ const ensurePublishable = async (event: any) => {
     throw new AppError('Event must be moderation-approved before publishing', 400);
   }
 
-  await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId));
+  await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId), resolveEventOwnerId(event));
 
   if (event.type === 'physical' || event.type === 'hybrid') {
     const locationName = resolveLocationNameFromEventRecord(event);
@@ -1074,7 +1091,7 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
     const eventInput = toEventInputForCreate(validatedData);
     const publicSlug = await generateUniquePublicSlug(eventInput.title);
 
-    await validateEventData(eventInput);
+    await validateEventData(eventInput, req.user!.id);
 
     const newEventDoc = await EventModel.create({
       ownerId: req.user!.id,
@@ -1131,7 +1148,34 @@ export const getEvent = async (req: Request, res: Response, next: NextFunction) 
     const requester = await resolveRequester(req);
     ensureEventReadableByUser(event, requester);
 
-    res.status(200).json({ status: 'success', data: { event: event.toJSON() } });
+    const ownerId = resolveEventOwnerId(event);
+    const host = ownerId
+      ? await UserModel.findById(ownerId).select('_id name email phone profileImage')
+      : null;
+    const registrationQuestions = getEventRegistrationQuestions(event);
+    const eventPayload = event.toJSON() as any;
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        event: {
+          ...eventPayload,
+          host: host
+            ? {
+                id: host.id,
+                name: host.name,
+                email: host.email,
+                phone: host.phone || null,
+                profileImage: host.profileImage || null,
+              }
+            : null,
+          customQuestions: registrationQuestions,
+          registrationFields: {
+            customQuestions: registrationQuestions,
+          },
+        },
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -1333,7 +1377,7 @@ export const updateEvent = async (req: Request, res: Response, next: NextFunctio
 
     const mergedEventInput = toMergedEventInputForUpdate(event, updates);
     await validatePricingModeTransition(event, mergedEventInput.pricingMode);
-    await validateEventData(mergedEventInput);
+    await validateEventData(mergedEventInput, resolveEventOwnerId(event));
 
     const updatedEvent = await EventModel.findByIdAndUpdate(
       req.params.id as string,
@@ -1457,12 +1501,16 @@ export const updateEventRegistrationFields = async (req: Request, res: Response,
       question: question.question.trim(),
       type: question.type,
       required: question.required ?? false,
+      options: normalizeQuestionOptions(question.options),
     }));
 
     const seenQuestionIds = new Set<string>();
     for (const question of normalizedQuestions) {
       if (seenQuestionIds.has(question.id)) {
         return next(new AppError('Custom question ids must be unique', 400));
+      }
+      if (isChoiceBasedQuestionType(question.type) && normalizeQuestionOptions(question.options).length < 2) {
+        return next(new AppError(`Question "${question.question}" must have at least 2 options`, 400));
       }
       seenQuestionIds.add(question.id);
     }

@@ -12,7 +12,14 @@ export type RegistrationType = 'free' | 'paid';
 export type PromoDiscountType = 'percentage' | 'fixed';
 export type VenueType = 'physical' | 'online' | 'hybrid';
 export type SessionStatus = 'scheduled' | 'cancelled' | 'completed';
-export type CustomQuestionType = 'text' | 'number' | 'choice';
+export type CustomQuestionType =
+  | 'text'
+  | 'number'
+  | 'choice'
+  | 'dropdown'
+  | 'radio'
+  | 'checkbox'
+  | 'multiple_choice';
 export type NotificationType = 'booking' | 'reminder' | 'announcement' | 'checkin' | 'system';
 export type NotificationChannel = 'in_app' | 'email_mock' | 'sms_mock';
 export type NotificationStatus = 'sent' | 'scheduled' | 'failed';
@@ -23,6 +30,7 @@ export interface EventCustomQuestion {
   question: string;
   type: CustomQuestionType;
   required?: boolean;
+  options?: string[];
 }
 
 export interface RegistrationAnswer {
@@ -78,6 +86,13 @@ export interface Event {
   registrationFields?: {
     customQuestions: EventCustomQuestion[];
   };
+  host?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string | null;
+    profileImage?: string | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -143,7 +158,9 @@ export interface Booking {
 
 export interface Venue {
   id: string;
+  ownerId?: string;
   name: string;
+  description?: string;
   address: string;
   city: string;
   capacity: number;

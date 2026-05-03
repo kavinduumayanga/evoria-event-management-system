@@ -37,6 +37,10 @@ export interface ResetPasswordPayload {
   newPassword: string;
 }
 
+export interface VerifyResetOtpPayload {
+  token: string;
+}
+
 export interface UpdateProfilePayload {
   name?: string;
   phone?: string;
@@ -371,6 +375,10 @@ export const AuthService = {
   },
   resetPassword: async (payload: ResetPasswordPayload) => {
     const response = await apiClient.post('/auth/reset-password', payload);
+    return response.data;
+  },
+  verifyResetOtp: async (payload: VerifyResetOtpPayload) => {
+    const response = await apiClient.post('/auth/verify-reset-otp', payload);
     return response.data;
   },
   googleLogin: async () => {
@@ -779,6 +787,10 @@ export const CheckInService = {
 };
 
 export const VenueService = {
+  getHostVenues: async (hostId: string) => {
+    const response = await apiClient.get(`/venues/host/${hostId}`);
+    return response.data;
+  },
   getVenues: async () => {
     const response = await apiClient.get('/venues');
     return response.data;
