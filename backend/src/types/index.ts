@@ -50,7 +50,10 @@ export interface User {
   profileImage?: string;
   isActive: boolean;
   isSuspended: boolean;
+  emailVerified: boolean;
   reportCount: number;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: string;
   createdAt: string;

@@ -18,8 +18,8 @@ import { AuthStackParamList } from '../../types/navigation';
 import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
-import { safeLower } from '../../utils/safeText';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { normalizeEmail, validateAccountEmail } from '../../utils/emailValidation';
 import { goBackOrFallback } from '../../utils/navigationBack';
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
@@ -27,8 +27,6 @@ type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackPar
 interface Props {
   navigation: ForgotPasswordScreenNavigationProp;
 }
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type ResetFlowStep = 'email' | 'otp' | 'reset';
 
@@ -46,7 +44,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
-  const normalizedEmail = safeLower(email.trim());
+  const normalizedEmail = normalizeEmail(email);
 
   const handleSendOtp = async () => {
     Keyboard.dismiss();
@@ -56,8 +54,9 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    if (!emailRegex.test(normalizedEmail)) {
-      Alert.alert('Validation', 'Please enter a valid email address.');
+    const emailValidation = validateAccountEmail(normalizedEmail);
+    if (!emailValidation.isValid) {
+      Alert.alert('Validation', emailValidation.message || 'Please enter a valid email address.');
       return;
     }
 
@@ -77,8 +76,9 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const handleVerifyOtp = async () => {
     Keyboard.dismiss();
 
-    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
-      Alert.alert('Validation', 'Please enter a valid email address.');
+    const emailValidation = validateAccountEmail(normalizedEmail);
+    if (!emailValidation.isValid) {
+      Alert.alert('Validation', emailValidation.message || 'Please enter a valid email address.');
       return;
     }
 
@@ -104,8 +104,9 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const handleResetPassword = async () => {
     Keyboard.dismiss();
 
-    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
-      Alert.alert('Validation', 'Please enter a valid email address.');
+    const emailValidation = validateAccountEmail(normalizedEmail);
+    if (!emailValidation.isValid) {
+      Alert.alert('Validation', emailValidation.message || 'Please enter a valid email address.');
       return;
     }
     if (!otp.trim()) {
@@ -167,7 +168,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
               <Input
                 label="Email address"
-                placeholder="name@example.com"
+                placeholder="name@yourdomain.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}

@@ -19,6 +19,7 @@ import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { normalizeEmail, validateAccountEmail } from '../../utils/emailValidation';
 import { goBackOrFallback } from '../../utils/navigationBack';
 
 type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ResetPassword'>;
@@ -41,8 +42,10 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleResetPassword = async () => {
     Keyboard.dismiss();
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      Alert.alert('Validation', 'Please enter a valid email address.');
+    const normalizedEmail = normalizeEmail(email);
+    const emailValidation = validateAccountEmail(normalizedEmail);
+    if (!emailValidation.isValid) {
+      Alert.alert('Validation', emailValidation.message || 'Please enter a valid email address.');
       return;
     }
     if (!token.trim()) {
@@ -60,7 +63,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       setIsLoading(true);
-      await AuthService.resetPassword({ email: email.trim().toLowerCase(), token: token.trim(), newPassword });
+      await AuthService.resetPassword({ email: normalizedEmail, token: token.trim(), newPassword });
       Alert.alert('Success', 'Password reset complete. Please sign in with your new password.', [
         { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
@@ -99,7 +102,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
               <Input
                 label="Email address"
-                placeholder="name@example.com"
+                placeholder="name@yourdomain.com"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"

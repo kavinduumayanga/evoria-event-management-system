@@ -7,8 +7,8 @@ import { AuthStackParamList } from '../../types/navigation';
 import { Button, Card, IconButton, Input } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
-import { safeLower } from '../../utils/safeText';
-import { useAuthStore } from '../../store/auth.store';
+import { getApiErrorMessage } from '../../utils/apiError';
+import { normalizeEmail, validateAccountEmail } from '../../utils/emailValidation';
 import { goBackOrFallback } from '../../utils/navigationBack';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
@@ -21,26 +21,39 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const login = useAuthStore((state) => state.login);
-  const strictEmailRegex = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+  const [emailTouched, setEmailTouched] = useState(false);
+
+  const emailValidation = validateAccountEmail(email);
+  const emailError = emailTouched && !emailValidation.isValid ? emailValidation.message : undefined;
 
   const handleRegister = async () => {
     Keyboard.dismiss();
     const trimmedName = name.trim();
-    const trimmedEmail = safeLower(email.trim());
-    if (!trimmedName || !trimmedEmail || !password) return Alert.alert('Validation', 'Please fill all fields.');
-    if (!strictEmailRegex.test(trimmedEmail)) {
-      Alert.alert('Validation', 'Please enter a valid email address.');
+    const normalizedEmail = normalizeEmail(email);
+    const validation = validateAccountEmail(normalizedEmail);
+
+    if (!trimmedName || !normalizedEmail || !password) {
+      Alert.alert('Validation', 'Please fill all fields.');
       return;
     }
+
+    if (!validation.isValid) {
+      setEmailTouched(true);
+      Alert.alert('Validation', validation.message || 'Please enter a valid email address.');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const res = await AuthService.register({ name: trimmedName, email: trimmedEmail, password });
-      if (res.token && (res.user || res.data?.user)) {
-        await login(res.user || res.data?.user, res.token);
-      }
-    } catch (e: any) {
-      Alert.alert('Registration Failed', e.response?.data?.message || 'Error occurred.');
+      const res = await AuthService.register({ name: trimmedName, email: normalizedEmail, password });
+      Alert.alert('Verify Your Email', res?.message || 'Please verify your email before logging in.', [
+        {
+          text: 'Continue',
+          onPress: () => navigation.navigate('VerifyEmail', { email: normalizedEmail }),
+        },
+      ]);
+    } catch (error: any) {
+      Alert.alert('Registration Failed', getApiErrorMessage(error, 'Error occurred.'));
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +70,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         />
       </View>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.titleZone}>
             <Text style={styles.greeting}>Create Account</Text>
             <Text style={styles.subtitle}>Join Evoria to discover and manage premium events.</Text>
@@ -76,11 +89,16 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               <Input
                 ref={emailRef}
                 label="Email Address"
-                placeholder="hello@example.com"
+                placeholder="hello@yourdomain.com"
                 autoCapitalize="none"
                 keyboardType="email-address"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  if (!emailTouched) setEmailTouched(true);
+                }}
+                onBlur={() => setEmailTouched(true)}
+                error={emailError}
                 leftIcon={<Mail size={20} color={theme.colors.primary} />}
                 returnKeyType="next"
                 onSubmitEditing={() => passwordRef.current?.focus()}
