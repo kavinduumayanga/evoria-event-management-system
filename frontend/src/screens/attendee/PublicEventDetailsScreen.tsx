@@ -169,8 +169,16 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
     eventType === 'online' ? 'Online' : 'Location not specified',
   );
   const locationAddress = safeString(event.location?.address, '');
-  const locationLat = typeof event.location?.lat === 'number' ? event.location.lat : null;
-  const locationLng = typeof event.location?.lng === 'number' ? event.location.lng : null;
+  const toFiniteCoordinate = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+  const locationLat = toFiniteCoordinate(event.location?.lat);
+  const locationLng = toFiniteCoordinate(event.location?.lng);
   const hasLocationCoordinates = locationLat !== null && locationLng !== null && (locationLat !== 0 || locationLng !== 0);
   const dateLabel = formatSafeDate(event.date, 'Date unavailable');
   const startTimeLabel = formatSafeTime(event.startTime, 'Time unavailable');
@@ -265,6 +273,20 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                 </TouchableOpacity>
               </View>
             </Card>
+          ) : eventType !== 'online' && locationName ? (
+            <Card variant="raised" style={styles.locationCard} noPadding>
+              <View style={styles.locationCardInner}>
+                <Text style={styles.locationTitle}>{locationName}</Text>
+                {locationAddress ? <Text style={styles.locationAddress}>{locationAddress}</Text> : null}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.mapPreview, styles.mapPreviewFallback]}
+                  onPress={() => Linking.openURL(`https://www.openstreetmap.org/search?query=${encodeURIComponent(locationAddress || locationName)}`)}
+                >
+                  <Text style={styles.mapPreviewFallbackText}>Open location in maps</Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
           ) : null}
 
           {/* Action buttons */}
@@ -317,20 +339,35 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
           </View>
 
           {/* Agenda */}
-          {sessions.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Agenda</Text>
-              {sessions.map((session) => (
-                <Card key={session.id} variant="raised" style={styles.sessionCard} noPadding>
-                  <View style={styles.sessionInner}>
-                    <Text style={styles.sessionTitle}>{session.title}</Text>
-                    <Text style={styles.sessionMeta}>{session.sessionDate} · {session.startTime} – {session.endTime}</Text>
-                    {session.speakerName && <Text style={styles.sessionMeta}>Speaker: {session.speakerName}</Text>}
-                  </View>
-                </Card>
-              ))}
-            </View>
-          )}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Agenda</Text>
+            {sessions.length === 0 ? (
+              <Text style={styles.sectionText}>No agenda has been added for this event yet.</Text>
+            ) : (
+              sessions.map((session) => {
+                const sessionTitle = safeString(session.title, 'Session');
+                const hasStart = safeString(session.startTime, '').trim().length > 0;
+                const hasEnd = safeString(session.endTime, '').trim().length > 0;
+                const speaker = safeString(session.speakerName, '').trim() || safeString(host?.name, '').trim();
+                const description = safeString(session.description, '').trim();
+
+                return (
+                  <Card key={session.id} variant="raised" style={styles.sessionCard} noPadding>
+                    <View style={styles.sessionInner}>
+                      <Text style={styles.sessionTitle}>{sessionTitle}</Text>
+                      {(hasStart || hasEnd) ? (
+                        <Text style={styles.sessionMeta}>
+                          {hasStart && hasEnd ? `${session.startTime} - ${session.endTime}` : (session.startTime || session.endTime)}
+                        </Text>
+                      ) : null}
+                      {speaker ? <Text style={styles.sessionMeta}>Speaker: {speaker}</Text> : null}
+                      {description ? <Text style={styles.sessionDescription}>{description}</Text> : null}
+                    </View>
+                  </Card>
+                );
+              })
+            )}
+          </View>
 
           {/* Tickets */}
           <View style={styles.section}>
@@ -461,6 +498,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  mapPreviewFallback: {
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  mapPreviewFallbackText: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+    fontWeight: '700',
+  },
   mapPinMarker: {
     width: 32,
     height: 32,
@@ -487,6 +532,12 @@ const styles = StyleSheet.create({
   sessionInner: { padding: theme.spacing.m },
   sessionTitle: { ...theme.typography.bodyMedium, color: theme.colors.text },
   sessionMeta: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 2 },
+  sessionDescription: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    lineHeight: 18,
+  },
   ticketCard: { borderRadius: theme.borderRadius.m, overflow: 'hidden', marginBottom: theme.spacing.sm },
   ticketInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: theme.spacing.m },
   ticketName: { ...theme.typography.bodyMedium, color: theme.colors.text },

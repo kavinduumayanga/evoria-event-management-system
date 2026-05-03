@@ -219,15 +219,41 @@ const normalizeMeetingLink = (meetingLink: string | undefined): string | undefin
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const toFiniteLocationNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const extractLocationName = (location: unknown): string => {
+  if (typeof location === 'string') return location.trim();
+  if (!location || typeof location !== 'object') return '';
+  const locationObj = location as Record<string, unknown>;
+  const fromName = String(locationObj.name || '').trim();
+  if (fromName) return fromName;
+  return String(locationObj.label || '').trim();
+};
+
 const normalizeLocation = (
-  location: { name?: string; address?: string; lat?: number; lng?: number } | null | undefined,
+  location: unknown,
 ) => {
   if (!location) return null;
+  if (typeof location !== 'object') {
+    const legacyName = extractLocationName(location);
+    return legacyName ? { name: legacyName, address: '' } : null;
+  }
 
-  const name = String(location.name || '').trim();
-  const address = String(location.address || '').trim();
-  const hasLat = typeof location.lat === 'number' && Number.isFinite(location.lat);
-  const hasLng = typeof location.lng === 'number' && Number.isFinite(location.lng);
+  const locationObj = location as Record<string, unknown>;
+
+  const name = extractLocationName(locationObj);
+  const address = String(locationObj.address || '').trim();
+  const latValue = toFiniteLocationNumber(locationObj.lat);
+  const lngValue = toFiniteLocationNumber(locationObj.lng);
+  const hasLat = latValue !== null;
+  const hasLng = lngValue !== null;
 
   if (!name && !address && !hasLat && !hasLng) {
     return null;
@@ -236,15 +262,21 @@ const normalizeLocation = (
   return {
     ...(name ? { name } : {}),
     address,
-    ...(hasLat ? { lat: location.lat } : {}),
-    ...(hasLng ? { lng: location.lng } : {}),
+    ...(hasLat ? { lat: latValue } : {}),
+    ...(hasLng ? { lng: lngValue } : {}),
   };
 };
 
 const resolveLocationLabel = (eventInput: Pick<EventInput, 'location' | 'city'>): string => {
-  const locationName = String(eventInput.location?.name || '').trim();
+  const locationName = extractLocationName(eventInput.location);
   if (locationName) return locationName;
   return String(eventInput.city || '').trim();
+};
+
+const resolveLocationNameFromEventRecord = (event: any): string => {
+  const normalizedLocation = normalizeLocation(event?.location);
+  if (normalizedLocation?.name) return normalizedLocation.name;
+  return String(event?.city || '').trim();
 };
 
 const normalizePricingMode = (pricingMode: unknown): EventPricingMode => {
@@ -554,7 +586,7 @@ const ensurePublishable = async (event: any) => {
   await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId));
 
   if (event.type === 'physical' || event.type === 'hybrid') {
-    const locationName = String(event.location?.name || '').trim();
+    const locationName = resolveLocationNameFromEventRecord(event);
     const city = String(event.city || '').trim();
     if (!locationName && !city) {
       throw new AppError('Location is required before publishing physical and hybrid events', 400);
@@ -752,6 +784,79 @@ export const searchEvents = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+export const getDiscoverEvents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+    const city = typeof req.query.city === 'string' ? req.query.city.trim() : '';
+    const date = typeof req.query.date === 'string' ? req.query.date.trim() : '';
+    const tags = parseTagsParam(req.query.tags as string | string[] | undefined);
+
+    const query: Record<string, any> = {
+      status: 'published',
+      visibility: 'public',
+      ...approvedModerationFilter(),
+    };
+
+    if (q) {
+      const regex = new RegExp(q, 'i');
+      query.$or = [{ title: regex }, { description: regex }];
+    }
+
+    if (category) {
+      query.category = new RegExp(`^${category}$`, 'i');
+    }
+
+    if (city) {
+      query.city = new RegExp(`^${city}$`, 'i');
+    }
+
+    if (tags.length > 0) {
+      query.tags = { $in: tags };
+    }
+
+    if (date) {
+      query.date = { $regex: `^${date}` };
+    }
+
+    const events = await EventModel.find(query).sort({ isFeatured: -1, date: 1, startTime: 1 });
+    const ownerIds = Array.from(new Set(
+      events
+        .map((event) => String(event.ownerId || event.hostAdminId || '').trim())
+        .filter(Boolean)
+    ));
+    const owners = ownerIds.length > 0
+      ? await UserModel.find({ _id: { $in: ownerIds } }).select('_id name profileImage')
+      : [];
+    const ownersById = new Map(owners.map((owner) => [owner.id, owner]));
+
+    const payload = events.map((event) => {
+      const eventJson = event.toJSON() as any;
+      const ownerId = String(event.ownerId || event.hostAdminId || '').trim();
+      const owner = ownerId ? ownersById.get(ownerId) : null;
+
+      return {
+        ...eventJson,
+        host: owner
+          ? {
+              id: owner.id,
+              name: owner.name,
+              profileImage: owner.profileImage || null,
+            }
+          : null,
+      };
+    });
+
+    res.status(200).json({
+      status: 'success',
+      results: payload.length,
+      data: { events: payload },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getTrendingEvents = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const limitParam = typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : 10;
@@ -857,9 +962,10 @@ export const getEventCalendar = async (req: Request, res: Response, next: NextFu
 
     const startDate = combineDateAndTime(event.date, event.startTime);
     const endDate = combineDateAndTime(event.date, event.endTime);
+    const normalizedLocation = normalizeLocation(event.location);
     let location = event.type === 'online'
       ? (event.meetingLink || 'Online')
-      : (event.location?.name || event.city || 'Venue');
+      : (normalizedLocation?.name || event.city || 'Venue');
 
     if (event.type !== 'online' && event.venueId) {
       const venue = await VenueModel.findById(event.venueId);
@@ -922,9 +1028,10 @@ export const downloadEventCalendarIcs = async (req: Request, res: Response, next
 
     const startDate = combineDateAndTime(event.date, event.startTime);
     const endDate = combineDateAndTime(event.date, event.endTime);
+    const normalizedLocation = normalizeLocation(event.location);
     let location = event.type === 'online'
       ? (event.meetingLink || 'Online')
-      : (event.location?.name || event.city || 'Venue');
+      : (normalizedLocation?.name || event.city || 'Venue');
 
     if (event.type !== 'online' && event.venueId) {
       const venue = await VenueModel.findById(event.venueId);
@@ -978,7 +1085,7 @@ export const createEvent = async (req: Request, res: Response, next: NextFunctio
       registrationFields: {
         customQuestions: eventInput.customQuestions,
       },
-      status: 'draft',
+      status: eventInput.visibility === 'public' ? 'published' : 'draft',
       moderationStatus: 'approved',
       isFlagged: false,
       isFeatured: false,
@@ -1075,13 +1182,14 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
 
     const freeRegistrationOptions = ticketOptions.filter((ticket) => ticket.isFree);
     const registrationQuestions = getEventRegistrationQuestions(event);
-    const locationName = String(event.location?.name || '').trim();
-    const locationAddress = String(event.location?.address || '').trim();
-    const locationLat = typeof event.location?.lat === 'number' && Number.isFinite(event.location.lat)
-      ? event.location.lat
+    const normalizedLocation = normalizeLocation(event.location);
+    const locationName = String(normalizedLocation?.name || '').trim();
+    const locationAddress = String(normalizedLocation?.address || '').trim();
+    const locationLat = typeof normalizedLocation?.lat === 'number' && Number.isFinite(normalizedLocation.lat)
+      ? normalizedLocation.lat
       : null;
-    const locationLng = typeof event.location?.lng === 'number' && Number.isFinite(event.location.lng)
-      ? event.location.lng
+    const locationLng = typeof normalizedLocation?.lng === 'number' && Number.isFinite(normalizedLocation.lng)
+      ? normalizedLocation.lng
       : null;
     const venueFallbackLabel = venue ? `${venue.name}, ${venue.city}` : '';
     const locationLabel = event.type === 'online'
@@ -1247,7 +1355,7 @@ export const deleteEvent = async (req: Request, res: Response, next: NextFunctio
     const event = await EventModel.findById(req.params.id as string);
     if (!event) return next(new AppError('Event not found', 404));
 
-    if (!isEventOwner(req.user!.id, event)) {
+    if (!canManageEvent(req.user!.id, event)) {
       return next(new AppError('Not authorized to delete this event', 403));
     }
 

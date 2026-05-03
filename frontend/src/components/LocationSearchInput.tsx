@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { theme } from '../constants/theme';
 import { MapPin, Search, X } from 'lucide-react-native';
@@ -27,12 +27,22 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({ label 
   const [showDropdown, setShowDropdown] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedQuery, setSelectedQuery] = useState(initialValue);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (!initialValue) return;
     setQuery((previous) => (previous.trim().length === 0 ? initialValue : previous));
     setSelectedQuery((previous) => (previous.trim().length === 0 ? initialValue : previous));
   }, [initialValue]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const searchLocation = async (text: string) => {
     setQuery(text);
@@ -45,24 +55,43 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({ label 
     }
 
     if (trimmed.length < 3) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      requestIdRef.current += 1;
+      setIsLoading(false);
       setResults([]);
       setShowDropdown(false);
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const response = await apiClient.get(`/locations/search?q=${encodeURIComponent(text)}`);
-      const data = response.data?.data || [];
-      setResults(data);
-      setShowDropdown(true);
-    } catch (error: any) {
-      console.warn('Error fetching location:', error);
-      setErrorMsg('Could not load location suggestions.');
-      setResults([]);
-    } finally {
-      setIsLoading(false);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      setIsLoading(true);
+      try {
+        const response = await apiClient.get('/locations/search', { params: { q: trimmed } });
+        const rawResults = response?.data?.data;
+        const data = Array.isArray(rawResults) ? rawResults : [];
+        if (requestId !== requestIdRef.current) return;
+        setResults(data);
+        setShowDropdown(data.length > 0);
+      } catch (error: any) {
+        if (requestId !== requestIdRef.current) return;
+        console.warn('Error fetching location:', error);
+        setErrorMsg('Could not load location suggestions.');
+        setResults([]);
+        setShowDropdown(false);
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+      }
+    }, 280);
   };
 
   const handleSelect = (item: LocationResult) => {
@@ -81,11 +110,16 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({ label 
   };
 
   const clearInput = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    requestIdRef.current += 1;
     setQuery('');
     setResults([]);
     setShowDropdown(false);
     setSelectedQuery('');
     setErrorMsg(null);
+    setIsLoading(false);
     onSelect(null);
   };
 

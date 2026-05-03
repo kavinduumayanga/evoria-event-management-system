@@ -7,8 +7,7 @@ const NOMINATIM_TIMEOUT_MS = 7000;
 
 const headers = {
   Accept: 'application/json',
-  'Accept-Language': 'en',
-  'User-Agent': 'EvoriaEventApp/1.0 (contact: support@evoria.app)',
+  'User-Agent': 'EvoriaEventApp/1.0',
 };
 
 const toFiniteNumber = (value: unknown): number | null => {
@@ -41,7 +40,19 @@ const searchNominatim = async (query: string, countryCode?: string) => {
       throw new Error(`Nominatim request failed with status ${response.status}`);
     }
 
-    const json = await response.json();
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+      throw new Error('Nominatim returned non-JSON response');
+    }
+
+    const rawBody = await response.text();
+    let json: unknown;
+    try {
+      json = JSON.parse(rawBody);
+    } catch {
+      throw new Error('Failed to parse Nominatim JSON response');
+    }
+
     return Array.isArray(json) ? json : [];
   } finally {
     clearTimeout(timeout);
