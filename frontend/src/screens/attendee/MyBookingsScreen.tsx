@@ -11,16 +11,17 @@ import {
   Pressable,
   Linking,
 } from 'react-native';
-import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, Button, Card, Input } from '../../components';
+import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, Button, Card, Input, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { EventService, RegistrationService } from '../../api/services';
 import { Booking } from '../../types';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { AttendeeTabParamList } from '../../types/navigation';
-import { QrCode, Eye, CalendarPlus, Star } from 'lucide-react-native';
+import { QrCode, Eye, CalendarPlus, Star, ArrowLeft } from 'lucide-react-native';
 import { safeArray } from '../../utils/safeData';
-import { safeString } from '../../utils/safeText';
+import { safeStatus, safeString, safeUpper } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyRegistrations'>;
 
@@ -135,6 +136,10 @@ export const MyBookingsScreen = () => {
     await Linking.openURL(url);
   };
 
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'HomeStack', params: { screen: 'EventList' } });
+  };
+
   if (isLoading && !isRefreshing) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchBookings} /></ScreenContainer>;
 
@@ -150,7 +155,15 @@ export const MyBookingsScreen = () => {
         }
         ListHeaderComponent={
           <View style={styles.pageHeader}>
-            <Text style={styles.pageTitle}>My Registrations</Text>
+            <View style={styles.pageHeaderLeft}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={handleBack}
+                variant="surface"
+                size={36}
+              />
+              <Text style={styles.pageTitle}>My Registrations</Text>
+            </View>
             <Button
               title="Waitlist"
               onPress={() => navigation.navigate('HomeStack', { screen: 'MyWaitlist' })}
@@ -161,87 +174,121 @@ export const MyBookingsScreen = () => {
           </View>
         }
         renderItem={({ item }) => (
-          <BookingCard
-            booking={item}
-            actions={
-              <View style={styles.actionsWrapper}>
-                {item.isWaitlisted ? (
-                  <Card variant="outline" style={styles.waitingBanner} noPadding>
-                    <Text style={styles.waitingBannerText}>
-                      Waiting in queue{item.waitlistPosition ? ` (#${item.waitlistPosition})` : ''}
-                    </Text>
-                  </Card>
-                ) : null}
+          (() => {
+            const approvalStatus = safeStatus(item.approvalStatus, 'approved');
+            const isApprovalPending = approvalStatus === 'pending';
+            const isApprovalRejected = approvalStatus === 'rejected';
+            const isQrAvailable = item.bookingStatus === 'confirmed' && !item.isWaitlisted && approvalStatus === 'approved';
 
-                <View style={styles.rsvpActions}>
-                  <Button
-                    title="Going"
-                    onPress={() => handleRsvpUpdate(item.id, 'going')}
-                    variant={item.rsvpStatus === 'going' ? 'primary' : 'secondary'}
-                    size="sm"
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    title="Not Going"
-                    onPress={() => handleRsvpUpdate(item.id, 'not_going')}
-                    variant={item.rsvpStatus === 'not_going' ? 'danger' : 'secondary'}
-                    size="sm"
-                    style={{ flex: 1 }}
-                  />
-                </View>
+            return (
+              <BookingCard
+                booking={item}
+                actions={
+                  <View style={styles.actionsWrapper}>
+                    {item.isWaitlisted ? (
+                      <Card variant="outline" style={styles.waitingBanner} noPadding>
+                        <Text style={styles.waitingBannerText}>
+                          Waiting in queue{item.waitlistPosition ? ` (#${item.waitlistPosition})` : ''}
+                        </Text>
+                      </Card>
+                    ) : null}
 
-                {item.event?.id ? (
-                  <Button
-                    title="View Event"
-                    icon={<Eye size={16} color={theme.colors.text} />}
-                    onPress={() =>
-                      navigation.navigate('HomeStack', {
-                        screen: 'EventDetails',
-                        params: { eventId: item.event!.id },
-                      })
-                    }
-                    variant="secondary"
-                    size="sm"
-                  />
-                ) : null}
+                    {!item.isWaitlisted ? (
+                      <Card variant="outline" style={[
+                        styles.approvalBanner,
+                        isApprovalPending ? styles.approvalBannerPending : isApprovalRejected ? styles.approvalBannerRejected : styles.approvalBannerApproved,
+                      ]} noPadding>
+                        <Text style={styles.approvalBannerText}>
+                          Approval: {safeUpper(approvalStatus.replace('_', ' '), 'APPROVED')}
+                        </Text>
+                      </Card>
+                    ) : null}
 
-                {item.event?.id ? (
-                  <Button
-                    title="Add to Calendar"
-                    icon={<CalendarPlus size={16} color={theme.colors.text} />}
-                    onPress={() => addToCalendar(item)}
-                    variant="secondary"
-                    size="sm"
-                  />
-                ) : null}
+                    {isApprovalPending ? (
+                      <Text style={styles.approvalHint}>
+                        Your registration is pending host approval. QR code will be available after approval.
+                      </Text>
+                    ) : null}
 
-                {item.bookingStatus === 'confirmed' && !item.isWaitlisted && (
-                  <Button
-                    title="View QR Ticket"
-                    icon={<QrCode size={16} color={theme.colors.textOnPrimary} />}
-                    onPress={() =>
-                      navigation.navigate('HomeStack', {
-                        screen: 'MyTicketQR',
-                        params: { bookingId: item.id },
-                      })
-                    }
-                    variant="primary"
-                    size="sm"
-                  />
-                )}
+                    {isApprovalRejected ? (
+                      <Text style={[styles.approvalHint, styles.rejectedHint]}>
+                        Your registration was not approved.
+                      </Text>
+                    ) : null}
 
-                {item.bookingStatus === 'confirmed' && !item.isWaitlisted && isEventCompleted(item) && (
-                  <Button
-                    title="Leave Feedback"
-                    icon={<Star size={16} color={theme.colors.textOnPrimary} />}
-                    onPress={() => openReviewModal(item)}
-                    variant="primary"
-                    size="sm"
-                  />
-                )}
-              </View>
-            }
-          />
+                    <View style={styles.rsvpActions}>
+                      <Button
+                        title="Going"
+                        onPress={() => handleRsvpUpdate(item.id, 'going')}
+                        variant={item.rsvpStatus === 'going' ? 'primary' : 'secondary'}
+                        size="sm"
+                        style={{ flex: 1 }}
+                        disabled={isApprovalRejected}
+                      />
+                      <Button
+                        title="Not Going"
+                        onPress={() => handleRsvpUpdate(item.id, 'not_going')}
+                        variant={item.rsvpStatus === 'not_going' ? 'danger' : 'secondary'}
+                        size="sm"
+                        style={{ flex: 1 }}
+                        disabled={isApprovalRejected}
+                      />
+                    </View>
+
+                    {item.event?.id ? (
+                      <Button
+                        title="View Event"
+                        icon={<Eye size={16} color={theme.colors.text} />}
+                        onPress={() =>
+                          navigation.navigate('HomeStack', {
+                            screen: 'EventDetails',
+                            params: { eventId: item.event!.id },
+                          })
+                        }
+                        variant="secondary"
+                        size="sm"
+                      />
+                    ) : null}
+
+                    {item.event?.id ? (
+                      <Button
+                        title="Add to Calendar"
+                        icon={<CalendarPlus size={16} color={theme.colors.text} />}
+                        onPress={() => addToCalendar(item)}
+                        variant="secondary"
+                        size="sm"
+                      />
+                    ) : null}
+
+                    {isQrAvailable ? (
+                      <Button
+                        title="View QR Ticket"
+                        icon={<QrCode size={16} color={theme.colors.textOnPrimary} />}
+                        onPress={() =>
+                          navigation.navigate('HomeStack', {
+                            screen: 'MyTicketQR',
+                            params: { bookingId: item.id },
+                          })
+                        }
+                        variant="primary"
+                        size="sm"
+                      />
+                    ) : null}
+
+                    {isQrAvailable && isEventCompleted(item) ? (
+                      <Button
+                        title="Leave Feedback"
+                        icon={<Star size={16} color={theme.colors.textOnPrimary} />}
+                        onPress={() => openReviewModal(item)}
+                        variant="primary"
+                        size="sm"
+                      />
+                    ) : null}
+                  </View>
+                }
+              />
+            );
+          })()
         )}
         ListEmptyComponent={<EmptyState title="No Registrations" message="You have not registered for any events yet." />}
       />
@@ -316,6 +363,11 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xl,
     marginBottom: theme.spacing.l,
   },
+  pageHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
+  },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   actionsWrapper: { width: '100%', gap: theme.spacing.s },
   rsvpActions: { flexDirection: 'row', gap: theme.spacing.s, width: '100%' },
@@ -327,6 +379,37 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.s,
   },
   waitingBannerText: { ...theme.typography.caption, color: theme.colors.warning, fontWeight: '700' },
+  approvalBanner: {
+    width: '100%',
+    paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.s,
+  },
+  approvalBannerPending: {
+    borderColor: theme.colors.warning,
+    backgroundColor: theme.colors.warningSubtle,
+  },
+  approvalBannerApproved: {
+    borderColor: theme.colors.success,
+    backgroundColor: theme.colors.successSubtle,
+  },
+  approvalBannerRejected: {
+    borderColor: theme.colors.error,
+    backgroundColor: theme.colors.errorSubtle,
+  },
+  approvalBannerText: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+    fontWeight: '700',
+  },
+  approvalHint: {
+    ...theme.typography.caption,
+    color: theme.colors.warning,
+  },
+  rejectedHint: {
+    color: theme.colors.error,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

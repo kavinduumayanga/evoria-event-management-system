@@ -8,17 +8,18 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   CalendarDays, Users, DollarSign, UserCheck,
-  Settings,
+  Settings, ArrowLeft,
 } from 'lucide-react-native';
 import {
   ScreenContainer, StatCard, EventCard,
-  LoadingState, ErrorState, EmptyState, SectionHeader,
+  LoadingState, ErrorState, EmptyState, SectionHeader, IconButton,
 } from '../../components';
 import { theme } from '../../constants/theme';
 import { AnalyticsService, EventService, UserService } from '../../api/services';
 import { Event, DashboardAnalytics } from '../../types';
 import { safeArray } from '../../utils/safeData';
 import { safeString } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 const normalizeDashboardAnalytics = (payload: any): DashboardAnalytics => ({
   totalEvents: Number(payload?.totalEvents || 0),
@@ -66,6 +67,10 @@ export const DashboardScreen = () => {
 
   useFocusEffect(useCallback(() => { fetchData(); }, []));
 
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'HomeStack', params: { screen: 'EventList' } });
+  };
+
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
     fetchData();
@@ -81,9 +86,17 @@ export const DashboardScreen = () => {
     <ScreenContainer scrollable refreshing={isRefreshing} onRefresh={onRefresh}>
       {/* === PAGE HEADER === */}
       <View style={styles.pageHeader}>
-        <View>
-          <Text style={styles.greeting}>Hello, {firstName}</Text>
-          <Text style={styles.role}>Host Dashboard</Text>
+        <View style={styles.pageHeaderLeft}>
+          <IconButton
+            icon={<ArrowLeft size={20} color={theme.colors.text} />}
+            onPress={handleBack}
+            variant="surface"
+            size={36}
+          />
+          <View>
+            <Text style={styles.greeting}>Hello, {firstName}</Text>
+            <Text style={styles.role}>Host Dashboard</Text>
+          </View>
         </View>
         <TouchableOpacity
           style={styles.settingsBtn}
@@ -174,6 +187,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.base,
     paddingTop: theme.spacing.xl,
     marginBottom: theme.spacing.xl,
+  },
+  pageHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
   },
   greeting: {
     ...theme.typography.h1,

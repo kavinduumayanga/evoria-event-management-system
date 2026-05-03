@@ -7,13 +7,14 @@ import {
   IconButton, StatusBadge, Button,
 } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { Plus, Edit2, Trash2, MapPin, Building2 } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, MapPin, Building2, ArrowLeft } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
 import { Venue } from '../../../types';
 import { useFocusEffect } from '@react-navigation/native';
 import { safeArray } from '../../../utils/safeData';
 import { safeString } from '../../../utils/safeText';
 import { useAuthStore } from '../../../store/auth.store';
+import { goBackOrFallback } from '../../../utils/navigationBack';
 
 type ManageVenuesNavigationProp = NativeStackNavigationProp<HostAdminVenueStackParamList, 'ManageVenues'>;
 interface Props { navigation: ManageVenuesNavigationProp; }
@@ -45,6 +46,10 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
   useFocusEffect(useCallback(() => { fetchVenues(); }, [authUser?.id]));
   const onRefresh = useCallback(() => { setIsRefreshing(true); fetchVenues(); }, [authUser?.id]);
 
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'Dashboard' });
+  };
+
   const handleDelete = (id: string) => {
     Alert.alert('Delete Venue', 'Are you sure you want to delete this venue?', [
       { text: 'Cancel', style: 'cancel' },
@@ -75,7 +80,15 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
         }
         ListHeaderComponent={
           <View style={styles.pageHeader}>
-            <Text style={styles.pageTitle}>Venues</Text>
+            <View style={styles.pageHeaderLeft}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={handleBack}
+                variant="surface"
+                size={36}
+              />
+              <Text style={styles.pageTitle}>Venues</Text>
+            </View>
             <Button
               title="New"
               onPress={() => navigation.navigate('VenueForm', {})}
@@ -136,6 +149,7 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   listContent: { paddingHorizontal: theme.spacing.base, paddingBottom: 100, flexGrow: 1 },
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.spacing.xl, marginBottom: theme.spacing.l },
+  pageHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   venueCard: { flexDirection: 'row', alignItems: 'center', borderRadius: theme.borderRadius.l, marginBottom: theme.spacing.sm, overflow: 'hidden' },
   iconWrap: { width: 56, justifyContent: 'center', alignItems: 'center', paddingVertical: theme.spacing.m, backgroundColor: theme.colors.primarySubtle },

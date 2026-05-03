@@ -12,6 +12,7 @@ import { CheckCircle2, Clock, Ticket as TicketIcon, ArrowLeft } from 'lucide-rea
 import apiClient from '../../api/client';
 import { Booking } from '../../types';
 import { logDevMissing, safeStatus, safeString, safeUpper } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 type BookingConfirmationNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AttendeeHomeStackParamList, 'BookingConfirmation'>,
@@ -75,6 +76,18 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
 
   const isWaitlisted = Boolean(booking.isWaitlisted);
   const approvalStatus = safeStatus(booking.approvalStatus, 'approved');
+  const isPendingApproval = !isWaitlisted && approvalStatus === 'pending';
+  const isRejectedApproval = !isWaitlisted && approvalStatus === 'rejected';
+  const heroAccentColor = isRejectedApproval
+    ? theme.colors.error
+    : (isWaitlisted || isPendingApproval)
+      ? theme.colors.warning
+      : theme.colors.success;
+  const heroAccentBg = isRejectedApproval
+    ? theme.colors.errorSubtle
+    : (isWaitlisted || isPendingApproval)
+      ? theme.colors.warningSubtle
+      : theme.colors.successSubtle;
   const rsvpStatus = safeStatus(booking.rsvpStatus, 'going');
   const bookingIdLabel = safeString(booking.id, '').slice(-8);
   const totalAmount = Number.isFinite(Number(booking.totalAmount)) ? Number(booking.totalAmount) : 0;
@@ -85,7 +98,7 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
         <View style={styles.header}>
           <IconButton
             icon={<ArrowLeft size={20} color={theme.colors.text} />}
-            onPress={() => navigation.goBack()}
+            onPress={() => goBackOrFallback(navigation as any, { name: 'HomeStack', params: { screen: 'EventList' } })}
             variant="surface"
             size={36}
           />
@@ -93,19 +106,29 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
 
         {/* Hero */}
         <View style={styles.heroSection}>
-          <View style={[styles.iconCircle, { backgroundColor: isWaitlisted ? theme.colors.warningSubtle : theme.colors.successSubtle }]}>
-            {isWaitlisted
-              ? <Clock size={40} color={theme.colors.warning} />
-              : <CheckCircle2 size={40} color={theme.colors.success} />
+          <View style={[styles.iconCircle, { backgroundColor: heroAccentBg }]}>
+            {(isWaitlisted || isPendingApproval || isRejectedApproval)
+              ? <Clock size={40} color={heroAccentColor} />
+              : <CheckCircle2 size={40} color={heroAccentColor} />
             }
           </View>
           <Text style={styles.heroTitle}>
-            {isWaitlisted ? 'Joined Waitlist!' : 'Booking Confirmed!'}
+            {isWaitlisted
+              ? 'Joined Waitlist!'
+              : isPendingApproval
+                ? 'Pending Host Approval'
+                : isRejectedApproval
+                  ? 'Registration Not Approved'
+                  : 'Booking Confirmed!'}
           </Text>
           <Text style={styles.heroSubtitle}>
             {isWaitlisted
               ? 'Event is full. You\'ll be promoted automatically when a seat opens.'
-              : 'Your registration is complete. See you there!'}
+              : isPendingApproval
+                ? 'Your registration was received and is waiting for host approval.'
+                : isRejectedApproval
+                  ? 'The host did not approve your registration for this event.'
+                  : 'Your registration is complete. See you there!'}
           </Text>
         </View>
 

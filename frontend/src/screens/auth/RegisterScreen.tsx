@@ -9,6 +9,7 @@ import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { safeLower } from '../../utils/safeText';
 import { useAuthStore } from '../../store/auth.store';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 interface Props { navigation: RegisterScreenNavigationProp; }
@@ -48,7 +49,12 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <IconButton icon={<ArrowLeft color={theme.colors.text} size={24} />} onPress={() => navigation.goBack()} variant="surface" size={48} />
+        <IconButton
+          icon={<ArrowLeft color={theme.colors.text} size={24} />}
+          onPress={() => goBackOrFallback(navigation as any, { name: 'Welcome' })}
+          variant="surface"
+          size={48}
+        />
       </View>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

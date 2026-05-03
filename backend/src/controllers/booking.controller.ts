@@ -152,7 +152,9 @@ const createConfirmedBooking = async (
   rsvpStatus: 'going' | 'not_going',
 ) => {
   const bookingDate = new Date().toISOString();
-  const qrCodeValue = await generateUniqueQrCodeValue();
+  const qrCodeValue = approvalStatus === 'approved'
+    ? await generateUniqueQrCodeValue()
+    : null;
 
   const newBookingDoc = await BookingModel.create({
     userId,
@@ -171,7 +173,7 @@ const createConfirmedBooking = async (
     checkedInAt: null,
     checkedInBy: null,
     checkInMethod: null,
-    qrCodeValue,
+    qrCodeValue: qrCodeValue || null,
     attendanceNote: undefined,
     customAnswers,
     registrationType: ticket.isFree ? 'free' : 'paid',

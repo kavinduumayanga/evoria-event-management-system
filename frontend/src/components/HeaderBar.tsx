@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ViewStyle, TextInput }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Share, Map, Search } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { goBackOrFallback } from '../utils/navigationBack';
 
 interface HeaderBarProps {
   variant?: 'discover' | 'event' | 'back';
@@ -14,6 +15,7 @@ interface HeaderBarProps {
   transparent?: boolean;
   onSearchChange?: (text: string) => void;
   onShare?: () => void;
+  showBackButton?: boolean;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -26,14 +28,18 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   transparent = false,
   onSearchChange,
   onShare,
+  showBackButton = true,
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [isSearchActive, setIsSearchActive] = useState(false);
 
   const handleBack = () => {
-    if (onBack) onBack();
-    else navigation.goBack();
+    if (onBack) {
+      onBack();
+      return;
+    }
+    goBackOrFallback(navigation as any);
   };
 
   return (
@@ -46,6 +52,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       {variant === 'discover' ? (
         <>
           <View style={styles.leftSection}>
+            {showBackButton ? (
+              <TouchableOpacity style={[styles.circleButton, styles.discoverBackButton]} onPress={handleBack}>
+                <ChevronLeft color="#FFFFFF" size={22} />
+              </TouchableOpacity>
+            ) : null}
             <Image source={require('../../assets/icon.png')} style={styles.avatar} />
             {!isSearchActive && <Text style={styles.titleDiscover}>Discovery</Text>}
             {isSearchActive && onSearchChange && (
@@ -119,7 +130,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
+    marginRight: 10,
+  },
+  discoverBackButton: {
+    marginRight: 8,
   },
   placeholderAvatar: {
     backgroundColor: '#333',

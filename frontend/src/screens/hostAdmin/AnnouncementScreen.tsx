@@ -3,19 +3,21 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   FlatList, Alert, RefreshControl, ScrollView,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { Megaphone, MailPlus, Send, History, Radio } from 'lucide-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Megaphone, MailPlus, Send, History, Radio, ArrowLeft } from 'lucide-react-native';
 import { Event } from '../../types';
 import { theme } from '../../constants/theme';
 import {
   ScreenContainer, LoadingState, ErrorState, EmptyState,
-  Card, Input, Button,
+  Card, Input, Button, IconButton,
 } from '../../components';
 import { EventCommunicationEntry, EventService, UserService } from '../../api/services';
 import { safeArray } from '../../utils/safeData';
 import { safeString, safeUpper } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 export const AnnouncementScreen = () => {
+  const navigation = useNavigation<any>();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [blastSubject, setBlastSubject] = useState('');
@@ -70,6 +72,10 @@ export const AnnouncementScreen = () => {
   useFocusEffect(useCallback(() => { fetchEvents(); }, [fetchEvents]));
   const onRefresh = useCallback(() => { setIsRefreshing(true); fetchEvents(); }, [fetchEvents]);
 
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'Dashboard' });
+  };
+
   const handleSendBlast = async () => {
     if (!selectedEventId) { Alert.alert('Select Event', 'Please select an event first.'); return; }
     if (!blastMessage.trim()) { Alert.alert('Missing Message', 'Blast message is required.'); return; }
@@ -112,6 +118,12 @@ export const AnnouncementScreen = () => {
       {/* === PAGE HEADER === */}
       <View style={styles.pageHeader}>
         <View style={styles.headerLeft}>
+          <IconButton
+            icon={<ArrowLeft size={20} color={theme.colors.text} />}
+            onPress={handleBack}
+            variant="surface"
+            size={36}
+          />
           <Radio size={20} color={theme.colors.primary} />
           <Text style={styles.pageTitle}>Communications</Text>
         </View>

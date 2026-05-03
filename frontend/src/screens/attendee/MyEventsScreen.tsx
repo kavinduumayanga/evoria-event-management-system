@@ -2,15 +2,16 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { Plus, CalendarDays, Edit2, Ban, Trash2 } from 'lucide-react-native';
+import { Plus, CalendarDays, Edit2, Ban, Trash2, ArrowLeft } from 'lucide-react-native';
 import { Event } from '../../types';
 import { AttendeeTabParamList } from '../../types/navigation';
 import { EventService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
-import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button } from '../../components';
+import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { logDevMissing, safeString } from '../../utils/safeText';
 import { safeArray } from '../../utils/safeData';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyEvents'>;
 
@@ -75,6 +76,10 @@ export const MyEventsScreen = () => {
     setIsRefreshing(true);
     fetchEvents();
   }, [currentUser?.id]);
+
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'HomeStack', params: { screen: 'EventList' } });
+  };
 
   const handleCancelEvent = (eventId: string) => {
     Alert.alert(
@@ -220,9 +225,17 @@ export const MyEventsScreen = () => {
         }
         ListHeaderComponent={
           <View style={styles.pageHeader}>
-            <View>
-              <Text style={styles.title}>My Events</Text>
-              <Text style={styles.subtitle}>Events you manage</Text>
+            <View style={styles.pageHeaderLeft}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={handleBack}
+                variant="surface"
+                size={36}
+              />
+              <View>
+                <Text style={styles.title}>My Events</Text>
+                <Text style={styles.subtitle}>Events you manage</Text>
+              </View>
             </View>
             <TouchableOpacity
               style={styles.createBtn}
@@ -257,6 +270,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  pageHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
   },
   title: {
     ...theme.typography.h1,
