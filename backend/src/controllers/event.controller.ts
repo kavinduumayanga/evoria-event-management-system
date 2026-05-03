@@ -471,7 +471,7 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
     branding: normalizeBranding(validatedData.branding),
     capacity: validatedData.capacity,
     priorityAccessEnabled: validatedData.priorityAccessEnabled,
-    requiresApproval: validatedData.requiresApproval,
+    requiresApproval: validatedData.pricingMode === 'ticketed' ? false : validatedData.requiresApproval,
     customQuestions: validatedData.customQuestions.map((question) => ({
       id: question.id.trim(),
       question: question.question.trim(),
@@ -483,6 +483,7 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
 };
 
 const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateEventSchema>): EventInput => {
+  const mergedPricingMode = updates.pricingMode !== undefined ? updates.pricingMode : normalizePricingMode(event.pricingMode);
   return {
     title: updates.title !== undefined ? updates.title.trim() : event.title,
     description: updates.description !== undefined ? updates.description.trim() : event.description,
@@ -499,7 +500,7 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
       ? normalizeLocation(updates.location)
       : normalizeLocation(event.location),
     type: updates.type !== undefined ? updates.type : event.type,
-    pricingMode: updates.pricingMode !== undefined ? updates.pricingMode : normalizePricingMode(event.pricingMode),
+    pricingMode: mergedPricingMode,
     visibility: updates.visibility !== undefined ? updates.visibility : event.visibility,
     meetingLink: Object.prototype.hasOwnProperty.call(updates, 'meetingLink')
       ? normalizeMeetingLink(updates.meetingLink)
@@ -517,7 +518,9 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
     priorityAccessEnabled: updates.priorityAccessEnabled !== undefined
       ? updates.priorityAccessEnabled
       : Boolean(event.priorityAccessEnabled),
-    requiresApproval: updates.requiresApproval !== undefined ? updates.requiresApproval : Boolean(event.requiresApproval),
+    requiresApproval: mergedPricingMode === 'ticketed'
+      ? false
+      : (updates.requiresApproval !== undefined ? updates.requiresApproval : Boolean(event.requiresApproval)),
     customQuestions: updates.customQuestions !== undefined
       ? updates.customQuestions.map((question) => ({
           id: question.id.trim(),
@@ -1378,9 +1381,14 @@ export const updateEvent = async (req: Request, res: Response, next: NextFunctio
     await validatePricingModeTransition(event, mergedEventInput.pricingMode);
     await validateEventData(mergedEventInput, resolveEventOwnerId(event));
 
+    const updatePayload = toEventUpdatePayload(updates);
+    if (nextPricingMode === 'ticketed') {
+      updatePayload.requiresApproval = false;
+    }
+
     const updatedEvent = await EventModel.findByIdAndUpdate(
       req.params.id as string,
-      toEventUpdatePayload(updates),
+      updatePayload,
       { new: true },
     );
 

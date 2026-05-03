@@ -27,6 +27,9 @@ interface AttendanceRecord {
   mobile?: string;
   nic?: string;
   guestStatus?: string;
+  bookingStatus?: string;
+  approvalStatus?: string;
+  rsvpStatus?: string;
   checkInStatus: 'not_checked_in' | 'checked_in';
   checkedInAt?: string | null;
   checkInMethod?: 'qr' | 'manual' | null;
@@ -40,20 +43,50 @@ interface RecentScanRecord {
   message: string;
 }
 
+const resolveGuestStatus = (item: any): string => {
+  const checkInStatus = safeString(item?.checkInStatus, '').toLowerCase();
+  if (checkInStatus === 'checked_in') return 'checked_in';
+
+  const rawStatus = safeString(item?.guestStatus || item?.status, '').toLowerCase();
+  if (rawStatus) return rawStatus;
+
+  const approvalStatus = safeString(item?.approvalStatus, '').toLowerCase();
+  const bookingStatus = safeString(item?.bookingStatus, '').toLowerCase();
+  const rsvpStatus = safeString(item?.rsvpStatus, '').toLowerCase();
+  const isWaitlisted = Boolean(item?.isWaitlisted);
+
+  if (bookingStatus === 'cancelled') return 'cancelled';
+  if (isWaitlisted || bookingStatus === 'pending') return 'waitlisted';
+  if (approvalStatus === 'pending') return 'pending';
+  if (approvalStatus === 'rejected') return 'declined';
+  if (rsvpStatus === 'not_going') return 'not_going';
+  if (approvalStatus === 'approved') return 'approved';
+  if (bookingStatus === 'confirmed') return 'approved';
+
+  return 'unknown';
+};
+
 const normalizeAttendance = (rawItems: unknown): AttendanceRecord[] => {
-  return safeArray<any>(rawItems).map((item) => ({
-    id: String(item.registrationId || item.bookingId || item.id),
-    attendeeName: item.attendeeName || item.name || 'Unknown attendee',
-    attendeeEmail: item.attendeeEmail || item.email || 'Unknown email',
-    mobile: item.mobile || '',
-    nic: item.nic || '',
-    guestStatus: item.guestStatus || item.status || '',
-    checkInStatus: item.checkInStatus === 'checked_in' ? 'checked_in' : 'not_checked_in',
-    checkedInAt: item.checkedInAt || null,
-    checkInMethod: item.checkInMethod || null,
-    attendanceNote: item.attendanceNote || null,
-    qrCodeValue: item.qrCodeValue || null,
-  }));
+  return safeArray<any>(rawItems).map((item) => {
+    const resolvedGuestStatus = resolveGuestStatus(item);
+    return {
+      ...item,
+      id: String(item.registrationId || item.bookingId || item.id),
+      attendeeName: item.attendeeName || item.name || 'Unknown attendee',
+      attendeeEmail: item.attendeeEmail || item.email || 'Unknown email',
+      mobile: item.mobile || '',
+      nic: item.nic || '',
+      guestStatus: resolvedGuestStatus,
+      bookingStatus: item.bookingStatus || '',
+      approvalStatus: item.approvalStatus || '',
+      rsvpStatus: item.rsvpStatus || '',
+      checkInStatus: resolvedGuestStatus === 'checked_in' ? 'checked_in' : 'not_checked_in',
+      checkedInAt: item.checkedInAt || null,
+      checkInMethod: item.checkInMethod || null,
+      attendanceNote: item.attendanceNote || null,
+      qrCodeValue: item.qrCodeValue || null,
+    };
+  });
 };
 
 export const CheckInScannerScreen = () => {
@@ -320,7 +353,31 @@ export const CheckInScannerScreen = () => {
         ListEmptyComponent={<EmptyState title="No Guests Yet" message="Guest records appear here after registrations." />}
         renderItem={({ item }) => {
           const checkedIn = item.checkInStatus === 'checked_in';
-          const statusColor = checkedIn ? theme.colors.success : theme.colors.warning;
+          const guestStatus = safeString(item.guestStatus, 'unknown').toLowerCase();
+          const isApproved = guestStatus === 'approved' || guestStatus === 'going' || guestStatus === 'confirmed';
+          const isPendingApproval = guestStatus === 'pending';
+          const isWaitlisted = guestStatus === 'waitlisted';
+          const isDeclined = guestStatus === 'declined' || guestStatus === 'rejected' || guestStatus === 'cancelled' || guestStatus === 'not_going';
+          const statusColor = checkedIn
+            ? theme.colors.success
+            : isApproved
+              ? theme.colors.success
+              : isDeclined
+                ? theme.colors.error
+                : isWaitlisted
+                  ? theme.colors.secondary
+                  : theme.colors.warning;
+          const badgeLabel = checkedIn
+            ? 'Checked In'
+            : isApproved
+              ? 'Approved'
+              : isDeclined
+                ? 'Declined'
+                : isWaitlisted
+                  ? 'Waitlisted'
+                  : isPendingApproval
+                    ? 'Pending Approval'
+                    : 'Pending';
           return (
             <Card variant={checkedIn ? 'primary' : 'raised'} style={styles.recordCard} noPadding>
               <View style={styles.recordInner}>
@@ -328,14 +385,14 @@ export const CheckInScannerScreen = () => {
                   <Text style={styles.recordName}>{item.attendeeName}</Text>
                   <View style={[styles.statusBadge, { borderColor: statusColor, backgroundColor: `${statusColor}20` }]}>
                     <Text style={[styles.statusText, { color: statusColor }]}>
-                      {checkedIn ? 'Checked In' : 'Pending'}
+                      {badgeLabel}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.recordMeta}>{item.attendeeEmail}</Text>
                 {item.mobile ? <Text style={styles.recordMeta}>Mobile: {item.mobile}</Text> : null}
                 {item.nic ? <Text style={styles.recordMeta}>NIC: {item.nic}</Text> : null}
-                {item.guestStatus ? <Text style={styles.recordMeta}>Status: {safeUpper(item.guestStatus, 'UNKNOWN')}</Text> : null}
+                {item.guestStatus ? <Text style={styles.recordMeta}>Status: {safeUpper(item.guestStatus.replace(/_/g, ' '), 'UNKNOWN')}</Text> : null}
                 {item.checkedInAt ? (
                   <Text style={styles.recordMeta}>
                     At: {formatSafeDate(item.checkedInAt, 'Time unavailable', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ({item.checkInMethod || 'manual'})
