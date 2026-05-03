@@ -3,15 +3,16 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Sha
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { Event, Venue, Session, TicketType } from '../../types';
+import { Event, Venue, TicketType } from '../../types';
 import { LoadingState, ErrorState, ScreenContainer, HeaderBar, PrimaryButton, SecondaryButton, SectionBlock } from '../../components';
 import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
-import { EventService, PublicEventDetails } from '../../api/services';
+import { EventService, PublicEventDetails, ReportService } from '../../api/services';
 import { MapPin, Calendar as CalendarIcon, Clock, MoreHorizontal, Mail, Ticket } from 'lucide-react-native';
-import { formatSafeDate, formatSafeTime, safeLower, safeStatus, safeString, safeTitle } from '../../utils/safeText';
+import { formatSafeDate, formatSafeTime, safeStatus, safeString, safeTitle } from '../../utils/safeText';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { LinearGradient } from 'expo-linear-gradient';
+import { safeArray } from '../../utils/safeData';
 
 type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventDetails'>;
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
@@ -32,16 +33,50 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchEventDetails = useCallback(async () => {
     if (!eventId) return;
     try {
-      setIsLoading(true); setError(null);
+      setIsLoading(true);
+      setError(null);
+      setEvent(null);
+      setVenue(null);
+      setTickets([]);
+      setPublicData(null);
+
       const [eventRes, ticketsRes] = await Promise.all([
-        apiClient.get(`/events/${eventId}`), apiClient.get(`/tickets/event/${eventId}`)
+        apiClient.get(`/events/${eventId}`),
+        apiClient.get(`/tickets/event/${eventId}`),
       ]);
-      const eventData = eventRes.data.data.event as Event;
-      setEvent(eventData); setTickets(ticketsRes.data.data.tickets || []);
-      if (eventData.venueId) { const venueRes = await apiClient.get(`/venues/${eventData.venueId}`); setVenue(venueRes.data.data.venue); }
+
+      const eventData = eventRes?.data?.data?.event as Event | undefined;
+      if (!eventData?.id) {
+        throw new Error('Invalid event payload');
+      }
+
+      setEvent(eventData);
+      setTickets(safeArray<TicketType>(ticketsRes?.data?.data?.tickets));
+
+      if (eventData.venueId) {
+        try {
+          const venueRes = await apiClient.get(`/venues/${eventData.venueId}`);
+          setVenue((venueRes?.data?.data?.venue as Venue) || null);
+        } catch {
+          setVenue(null);
+        }
+      }
+
       const resolvedSlug = publicSlug || eventData.publicSlug;
-      if (resolvedSlug) { try { setPublicData((await EventService.getPublicEventBySlug(resolvedSlug)).data); } catch {} }
-    } catch (e: any) { setError(e?.response?.data?.message || 'Failed to load event details'); } finally { setIsLoading(false); }
+      if (resolvedSlug) {
+        try {
+          setPublicData((await EventService.getPublicEventBySlug(resolvedSlug)).data);
+        } catch (publicError: any) {
+          if (__DEV__) {
+            console.warn('Unable to load public event details', publicError?.response?.data || publicError?.message || publicError);
+          }
+        }
+      }
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to load event details');
+    } finally {
+      setIsLoading(false);
+    }
   }, [eventId, publicSlug]);
 
   useFocusEffect(useCallback(() => { fetchEventDetails(); }, [fetchEventDetails]));
@@ -51,10 +86,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (error || !event) return <ScreenContainer><ErrorState message={error || "Event not found"} onRetry={() => navigation.goBack()} actionLabel="Go Back" /></ScreenContainer>;
 
   const host = typeof publicData?.event.host === 'object' && publicData?.event.host ? publicData.event.host : null;
-  const hostName = safeTitle(host?.name, 'Dallas Matcha Club');
+  const hostName = safeTitle(host?.name, 'Host unavailable');
   const coverImage = resolveImageUrl(publicData?.event.image || event.coverImage);
-  const formattedDate = formatSafeDate(event.date, 'Today', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  const agendaSessions = publicData?.agenda?.sessions || [];
+  const formattedDate = formatSafeDate(event.date, 'Date unavailable', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const isSoldOut = Number(event.capacity) > 0 && Number(event.bookingCount) >= Number(event.capacity);
   const hasRegistrationInventory = safeString(event.pricingMode, 'ticketed') === 'free' || tickets.some(t => t.isActive && t.quantity > t.soldCount);
   const canRegister = safeStatus(event.status, 'draft') === 'published' && safeString(event.visibility, 'private') === 'public' && !isSoldOut && hasRegistrationInventory;
@@ -89,6 +123,35 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const locationCoordinates = hasLocationCoordinates
     ? { lat: resolvedLat as number, lng: resolvedLng as number }
     : null;
+  const goingCount = Number.isFinite(Number(event.bookingCount)) ? Number(event.bookingCount) : 0;
+  const categoryLabel = safeString(publicData?.event?.topic || event.category, '').trim();
+
+  const legacyAgendaSource = Array.isArray((event as any)?.agenda)
+    ? (event as any).agenda
+    : Array.isArray((event as any)?.agendas)
+      ? (event as any).agendas
+      : [];
+  const legacyAgendaSessions = safeArray<any>(legacyAgendaSource).map((item, index) => ({
+    id: safeString(item?.id, `legacy-${index}`),
+    title: safeString(item?.title || item?.name, 'Session'),
+    startTime: safeString(item?.startTime || item?.time, ''),
+    endTime: safeString(item?.endTime, ''),
+    speakerName: safeString(item?.speakerName || item?.speaker, ''),
+    description: safeString(item?.description || item?.details, ''),
+  }));
+  const agendaSessions = safeArray<any>(publicData?.agenda?.sessions).length > 0
+    ? safeArray<any>(publicData?.agenda?.sessions)
+    : legacyAgendaSessions;
+
+  const buildMapTilePreviewUrl = (lat: number, lng: number) => {
+    const zoom = 14;
+    const clampedLat = Math.max(Math.min(lat, 85.0511), -85.0511);
+    const xTile = Math.floor(((lng + 180) / 360) * Math.pow(2, zoom));
+    const yTile = Math.floor(
+      ((1 - Math.log(Math.tan((clampedLat * Math.PI) / 180) + (1 / Math.cos((clampedLat * Math.PI) / 180))) / Math.PI) / 2) * Math.pow(2, zoom)
+    );
+    return `https://tile.openstreetmap.org/${zoom}/${xTile}/${yTile}.png`;
+  };
 
   const handleShare = async () => {
     const slug = publicSlug || event.publicSlug;
@@ -103,6 +166,39 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleContact = () => {
     const email = publicData?.event.contactDetails?.email || host?.email;
     if (email) Linking.openURL(`mailto:${email}`);
+  };
+
+  const handleAddToCalendar = async () => {
+    if (!eventId) return;
+    const url = EventService.getCalendarIcsUrl(eventId);
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'Unable to open calendar link.');
+      return;
+    }
+    await Linking.openURL(url);
+  };
+
+  const reportEvent = async (reason: string) => {
+    if (!eventId) return;
+    try {
+      await ReportService.createReport({
+        targetType: 'event',
+        targetId: eventId,
+        reason,
+      });
+      Alert.alert('Reported', 'Thanks for reporting. Our moderation team will review this event.');
+    } catch (reportError: any) {
+      Alert.alert('Report Failed', reportError?.response?.data?.message || 'Unable to submit report right now.');
+    }
+  };
+
+  const handleReportEvent = () => {
+    Alert.alert('Report Event', 'Why are you reporting this event?', [
+      { text: 'Spam', onPress: () => reportEvent('Spam or misleading event content') },
+      { text: 'Inappropriate', onPress: () => reportEvent('Inappropriate or abusive event content') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleEditEvent = () => {
@@ -165,7 +261,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.imageCard}>
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" /> : <View style={styles.coverPlaceholder} />}
           <View style={styles.featuredPill}>
-            <Text style={styles.featuredText}>Featured in Dallas</Text>
+            <Text style={styles.featuredText}>Featured Event</Text>
           </View>
         </View>
 
@@ -174,10 +270,10 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           {isCancelled ? <Text style={styles.cancelledChip}>Cancelled</Text> : null}
           <View style={styles.calendarRow}>
             <View style={styles.calendarIcon} />
-            <Text style={styles.calendarText}>{hostName} Events Calendar &gt;</Text>
+            <Text style={styles.calendarText}>{hostName} Events</Text>
           </View>
           <Text style={styles.timeText}>
-            Today, {formatSafeTime(event.startTime, '11:00')} - {formatSafeTime(event.endTime, '20:00')} GMT-5
+            {formattedDate} • {formatSafeTime(event.startTime, 'Time unavailable')} - {formatSafeTime(event.endTime, 'Time unavailable')}
           </Text>
         </View>
 
@@ -252,11 +348,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   }}
                 >
                   <Image
-                    source={{ uri: `https://tile.openstreetmap.org/14/${
-                      Math.floor((locationCoordinates.lng + 180) / 360 * Math.pow(2, 14))
-                    }/${
-                      Math.floor((1 - Math.log(Math.tan(locationCoordinates.lat * Math.PI / 180) + 1 / Math.cos(locationCoordinates.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, 14))
-                    }.png` }}
+                    source={{ uri: buildMapTilePreviewUrl(locationCoordinates.lat, locationCoordinates.lng) }}
                     style={StyleSheet.absoluteFillObject}
                     defaultSource={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=600&auto=format&fit=crop' }}
                   />
@@ -264,7 +356,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                     <MapPin size={16} color="#0B0B0C" />
                   </View>
                   <View style={styles.mapOpenBadge}>
-                    <Text style={styles.mapOpenText}>📍 Open in Maps</Text>
+                    <Text style={styles.mapOpenText}>Open in Maps</Text>
                   </View>
                 </TouchableOpacity>
               ) : (venue?.address || locationName) ? (
@@ -276,7 +368,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                     if (query) Linking.openURL(`https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`);
                   }}
                 >
-                  <Text style={styles.mapFallbackText}>📍 Open location in Maps</Text>
+                  <Text style={styles.mapFallbackText}>Open location in Maps</Text>
                 </TouchableOpacity>
               ) : null}
             </>
@@ -290,16 +382,16 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </SectionBlock>
 
-        <SectionBlock title="954 Going" style={styles.sectionBlock}>
+        <SectionBlock title={`${goingCount} Going`} style={styles.sectionBlock}>
           <View style={styles.avatarsRow}>
             {[1, 2, 3, 4].map(i => <View key={i} style={[styles.goingAvatar, { zIndex: 5 - i, marginLeft: i === 1 ? 0 : -10 }]} />)}
             <View style={[styles.goingAvatarMore, { zIndex: 0, marginLeft: -10 }]}><Text style={styles.goingMoreText}>+950</Text></View>
           </View>
-          <Text style={styles.goingNames}>Tommy Croft, Ciria, Khristan Maney, Taylor Vogel, and 950 more</Text>
+          <Text style={styles.goingNames}>Attendees who registered for this event will appear here over time.</Text>
         </SectionBlock>
 
         <SectionBlock title="About Event" style={styles.sectionBlock}>
-          <Text style={styles.description}>{safeString(event.description, "We're celebrating National Matcha Day with our biggest event yet! Join us for a full-day matcha experience featuring your favorite local vendors, a live DJ, giveaways, and interactive experiences!")}</Text>
+          <Text style={styles.description}>{safeString(event.description, 'No description available.')}</Text>
           <View style={styles.aboutMetaRow}>
             <MapPin size={16} color="#A3A3A3" />
             <Text style={styles.aboutMetaText}>{locationName || venue?.name || 'Online / TBA'}</Text>
@@ -313,9 +405,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.aboutMetaText}>{formatSafeTime(event.startTime, '11:00 AM')} – {formatSafeTime(event.endTime, '8:00 PM')}</Text>
           </View>
           
-          <View style={styles.tagPill}>
-            <Text style={styles.tagText}># Food & Drink</Text>
-          </View>
+          {categoryLabel ? (
+            <View style={styles.tagPill}>
+              <Text style={styles.tagText}># {categoryLabel}</Text>
+            </View>
+          ) : null}
         </SectionBlock>
 
         <SectionBlock title="Agenda" style={styles.sectionBlock}>
@@ -323,7 +417,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.agendaEmptyText}>No agenda has been added for this event yet.</Text>
           ) : (
             <View style={styles.agendaList}>
-              {agendaSessions.map((session) => {
+              {agendaSessions.map((session, index) => {
                 const sessionTitle = safeString(session.title, 'Session');
                 const hasStart = safeString(session.startTime, '').trim().length > 0;
                 const hasEnd = safeString(session.endTime, '').trim().length > 0;
@@ -331,7 +425,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 const description = safeString(session.description, '').trim();
 
                 return (
-                  <View key={session.id} style={styles.agendaCard}>
+                  <View key={`${safeString(session.id, 'agenda')}-${index}`} style={styles.agendaCard}>
                     <Text style={styles.agendaTitle}>{sessionTitle}</Text>
                     {(hasStart || hasEnd) ? (
                       <View style={styles.agendaMetaRow}>
@@ -360,13 +454,13 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsMoreModalVisible(false)}>
           <View style={styles.bottomSheet}>
             <Text style={styles.sheetTitle}>More Options</Text>
-            <TouchableOpacity style={styles.sheetOption} onPress={() => { setIsMoreModalVisible(false); /* Add logic */ }}>
+            <TouchableOpacity style={styles.sheetOption} onPress={async () => { setIsMoreModalVisible(false); await handleAddToCalendar(); }}>
               <Text style={styles.sheetOptionText}>Add to Calendar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.sheetOption} onPress={() => { setIsMoreModalVisible(false); const slug = publicSlug || event.publicSlug; if (slug) Linking.openURL(EventService.buildPublicEventUrl(slug)); }}>
               <Text style={styles.sheetOptionText}>Open in Browser</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sheetOption} onPress={() => { setIsMoreModalVisible(false); /* Add logic */ }}>
+            <TouchableOpacity style={styles.sheetOption} onPress={() => { setIsMoreModalVisible(false); handleReportEvent(); }}>
               <Text style={[styles.sheetOptionText, { color: '#FF453A' }]}>Report Event</Text>
             </TouchableOpacity>
           </View>

@@ -11,6 +11,8 @@ import { theme } from '../../../constants/theme';
 import { Plus, Edit2, Trash2, ArrowLeft, Ticket as TicketIcon } from 'lucide-react-native';
 import { TicketService } from '../../../api/services';
 import { TicketType } from '../../../types';
+import { safeArray } from '../../../utils/safeData';
+import { safeString } from '../../../utils/safeText';
 
 type ManageTicketsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageTickets'>;
 type ManageTicketsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageTickets'>;
@@ -31,7 +33,7 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setError(null);
       const res = await TicketService.getEventTickets(eventId);
-      setTickets(res.data.tickets);
+      setTickets(safeArray<TicketType>(res?.data?.tickets));
     } catch { setError('Failed to load tickets'); }
     finally { setIsLoading(false); setIsRefreshing(false); }
   };
@@ -61,7 +63,7 @@ export const ManageTicketsScreen: React.FC<Props> = ({ navigation, route }) => {
     <ScreenContainer>
       <FlatList
         data={tickets}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `ticket-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

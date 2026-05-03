@@ -51,7 +51,8 @@ export const BookingConfirmationScreen: React.FC<Props> = ({ navigation, route }
       setIsLoading(true);
       setError(null);
       const res = await apiClient.get(`/bookings/${bookingId}`);
-      setBooking(res.data.data.booking);
+      const bookingPayload = res?.data?.data?.booking as Booking | undefined;
+      setBooking(bookingPayload || null);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load booking details');
     } finally {

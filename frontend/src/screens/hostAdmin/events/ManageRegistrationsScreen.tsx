@@ -11,6 +11,8 @@ import { theme } from '../../../constants/theme';
 import { EventRegistrationStatus } from '../../../types';
 import { GuestRecord, GuestService } from '../../../api/services';
 import { ArrowLeft, UserCheck, Search, Users, Download } from 'lucide-react-native';
+import { safeArray } from '../../../utils/safeData';
+import { safeString } from '../../../utils/safeText';
 
 type ManageRegistrationsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
 type ManageRegistrationsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageRegistrations'>;
@@ -53,7 +55,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
     try {
       setError(null);
       const response = await GuestService.getEventGuests(eventId, queryParams);
-      setGuests(response.data.guests || []);
+      setGuests(safeArray<GuestRecord>(response?.data?.guests));
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load guests');
     } finally {
@@ -109,7 +111,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
     <ScreenContainer>
       <FlatList
         data={guests}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `guest-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

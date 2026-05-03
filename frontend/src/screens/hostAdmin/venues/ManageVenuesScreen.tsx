@@ -11,6 +11,8 @@ import { Plus, Edit2, Trash2, MapPin, Building2 } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
 import { Venue } from '../../../types';
 import { useFocusEffect } from '@react-navigation/native';
+import { safeArray } from '../../../utils/safeData';
+import { safeString } from '../../../utils/safeText';
 
 type ManageVenuesNavigationProp = NativeStackNavigationProp<HostAdminVenueStackParamList, 'ManageVenues'>;
 interface Props { navigation: ManageVenuesNavigationProp; }
@@ -31,7 +33,7 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setError(null);
       const res = await VenueService.getVenues();
-      setVenues(res.data.venues);
+      setVenues(safeArray<Venue>(res?.data?.venues));
     } catch { setError('Failed to load venues'); }
     finally { setIsLoading(false); setIsRefreshing(false); }
   };
@@ -61,7 +63,7 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
     <ScreenContainer>
       <FlatList
         data={venues}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `venue-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

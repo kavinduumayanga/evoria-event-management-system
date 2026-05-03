@@ -9,6 +9,8 @@ import { ArrowLeft, Upload } from 'lucide-react-native';
 import { SessionService, UploadService } from '../../../api/services';
 import { Session, SessionStatus } from '../../../types';
 import * as ImagePicker from 'expo-image-picker';
+import { resolveImageUrl } from '../../../utils/imageUrl';
+import { safeArray } from '../../../utils/safeData';
 
 type SessionFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'SessionForm'>;
 type SessionFormRouteProp = RouteProp<HostAdminEventStackParamList, 'SessionForm'>;
@@ -44,7 +46,7 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchSession = async () => {
     try {
       const res = await SessionService.getEventSessions(eventId);
-      const session = res.data.sessions.find((s: Session) => s.id === sessionId);
+      const session = safeArray<Session>(res?.data?.sessions).find((s) => s.id === sessionId);
       if (session) {
         setTitle(session.title);
         setDescription(session.description || '');
@@ -121,7 +123,8 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
       setIsUploadingImage(true);
       const response = await UploadService.uploadSessionImage(selectedImage.uri);
-      setBannerImage(response.data.url);
+      const uploadedPath = response?.data?.url || '';
+      setBannerImage(resolveImageUrl(uploadedPath) || uploadedPath);
     } catch (error: any) {
       Alert.alert('Upload Failed', error?.response?.data?.message || 'Unable to upload session image');
     } finally {
@@ -173,7 +176,7 @@ export const SessionFormScreen: React.FC<Props> = ({ navigation, route }) => {
           onChangeText={setBannerImage}
           placeholder="https://.../session-image.jpg"
         />
-        {bannerImage ? <Image source={{ uri: bannerImage }} style={styles.bannerPreview} /> : null}
+        {bannerImage ? <Image source={{ uri: resolveImageUrl(bannerImage) || bannerImage }} style={styles.bannerPreview} /> : null}
         <Button
           title={isUploadingImage ? 'Uploading Image...' : 'Upload Session Image'}
           onPress={handleUploadSessionImage}

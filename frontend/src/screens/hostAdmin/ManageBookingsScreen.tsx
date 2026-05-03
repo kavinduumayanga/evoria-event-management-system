@@ -6,6 +6,8 @@ import { BookingService, CheckInService } from '../../api/services';
 import { Booking } from '../../types';
 import { useFocusEffect } from '@react-navigation/native';
 import { X, UserCheck } from 'lucide-react-native';
+import { safeArray } from '../../utils/safeData';
+import { safeString } from '../../utils/safeText';
 
 export const ManageBookingsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -17,7 +19,7 @@ export const ManageBookingsScreen = () => {
     try {
       setError(null);
       const res = await BookingService.getBookings();
-      setBookings(res.data.bookings);
+      setBookings(safeArray<Booking>(res?.data?.bookings));
     } catch (err) {
       console.error(err);
       setError('Failed to load bookings');
@@ -80,7 +82,7 @@ export const ManageBookingsScreen = () => {
     <ScreenContainer>
       <FlatList
         data={bookings}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `booking-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

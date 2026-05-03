@@ -22,7 +22,8 @@ import {
 } from '../../../components';
 import { CheckInService } from '../../../api/services';
 import { CheckInHistoryRecord } from '../../../types';
-import { safeUpper } from '../../../utils/safeText';
+import { safeArray } from '../../../utils/safeData';
+import { safeString, safeUpper } from '../../../utils/safeText';
 
 interface Props {
   navigation: NativeStackNavigationProp<HostAdminEventStackParamList, 'CheckInHistory'>;
@@ -47,7 +48,7 @@ export const CheckInHistoryScreen: React.FC<Props> = ({ navigation, route }) => 
         result: resultFilter === 'all' ? undefined : resultFilter,
         limit: 150,
       });
-      setHistory(response.data.history || []);
+      setHistory(safeArray<CheckInHistoryRecord>(response?.data?.history));
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load check-in history');
     } finally {
@@ -70,7 +71,7 @@ export const CheckInHistoryScreen: React.FC<Props> = ({ navigation, route }) => 
     <ScreenContainer>
       <FlatList
         data={history}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `history-${index}`)}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}

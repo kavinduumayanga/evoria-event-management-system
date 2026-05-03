@@ -20,6 +20,15 @@ interface Props {
   route: EventAnalyticsRouteProp;
 }
 
+const normalizeEventAnalytics = (payload: any): EventAnalytics => ({
+  totalRegistrations: Number(payload?.totalRegistrations || 0),
+  totalApproved: Number(payload?.totalApproved || 0),
+  totalAttended: Number(payload?.totalAttended || 0),
+  totalRevenue: Number(payload?.totalRevenue || 0),
+  ticketsSold: Number(payload?.ticketsSold || 0),
+  conversionRate: Number(payload?.conversionRate || 0),
+});
+
 export const EventAnalyticsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { eventId } = route.params;
   const [analytics, setAnalytics] = useState<EventAnalytics | null>(null);
@@ -31,7 +40,7 @@ export const EventAnalyticsScreen: React.FC<Props> = ({ navigation, route }) => 
     try {
       setError(null);
       const response = await AnalyticsService.getEventAnalytics(eventId);
-      setAnalytics(response.data);
+      setAnalytics(normalizeEventAnalytics(response?.data));
     } catch (fetchError: any) {
       setError(fetchError.response?.data?.message || 'Failed to load event analytics');
     } finally {

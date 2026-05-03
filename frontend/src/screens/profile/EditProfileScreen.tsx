@@ -18,6 +18,7 @@ import { UploadService, UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
 import * as ImagePicker from 'expo-image-picker';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 const phoneRegex = /^\+?[0-9\s\-()]{7,20}$/;
 
@@ -106,7 +107,8 @@ export const EditProfileScreen = () => {
 
       setIsUploadingImage(true);
       const response = await UploadService.uploadProfileImage(selectedImage.uri);
-      setProfileImage(response.data.url);
+      const uploadedPath = response?.data?.url || '';
+      setProfileImage(resolveImageUrl(uploadedPath) || uploadedPath);
     } catch (error: any) {
       Alert.alert('Upload Failed', getApiErrorMessage(error, 'Unable to upload profile image.'));
     } finally {
@@ -162,7 +164,7 @@ export const EditProfileScreen = () => {
               leftIcon={<ImageIcon size={18} color={theme.colors.textMuted} />}
               hint="Upload an image or paste a direct URL."
             />
-            {profileImage ? <Image source={{ uri: profileImage }} style={styles.profilePreview} /> : null}
+            {profileImage ? <Image source={{ uri: resolveImageUrl(profileImage) || profileImage }} style={styles.profilePreview} /> : null}
             <Button
               title={isUploadingImage ? 'Uploading Image...' : 'Upload Profile Image'}
               onPress={handleUploadProfileImage}

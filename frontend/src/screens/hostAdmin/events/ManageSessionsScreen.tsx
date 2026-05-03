@@ -11,6 +11,8 @@ import { theme } from '../../../constants/theme';
 import { Plus, Edit2, Trash2, ArrowLeft, Layers, Clock, User as UserIcon } from 'lucide-react-native';
 import { SessionService } from '../../../api/services';
 import { Session } from '../../../types';
+import { safeArray } from '../../../utils/safeData';
+import { safeString } from '../../../utils/safeText';
 
 type ManageSessionsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageSessions'>;
 type ManageSessionsRouteProp = RouteProp<HostAdminEventStackParamList, 'ManageSessions'>;
@@ -37,7 +39,7 @@ export const ManageSessionsScreen: React.FC<Props> = ({ navigation, route }) => 
     try {
       setError(null);
       const res = await SessionService.getEventSessions(eventId);
-      setSessions(res.data.sessions);
+      setSessions(safeArray<Session>(res?.data?.sessions));
     } catch { setError('Failed to load sessions'); }
     finally { setIsLoading(false); setIsRefreshing(false); }
   };
@@ -67,7 +69,7 @@ export const ManageSessionsScreen: React.FC<Props> = ({ navigation, route }) => 
     <ScreenContainer>
       <FlatList
         data={sessions}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `session-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

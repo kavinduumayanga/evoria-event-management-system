@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button } from '../../components';
 import { theme } from '../../constants/theme';
 import { logDevMissing, safeString } from '../../utils/safeText';
+import { safeArray } from '../../utils/safeData';
 
 type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyEvents'>;
 
@@ -21,17 +22,40 @@ export const MyEventsScreen = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizeEvents = (payload: any): Event[] => {
+    if (Array.isArray(payload?.data?.events)) return payload.data.events;
+    if (Array.isArray(payload?.events)) return payload.events;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload)) return payload;
+    return [];
+  };
+
   const fetchEvents = async () => {
     try {
       setError(null);
+      if (!currentUser?.id) {
+        setEvents([]);
+        return;
+      }
+
       const response = await EventService.getEvents();
-      const allEvents: Event[] = response.data.events || [];
-      const manageableEvents = currentUser
-        ? allEvents.filter((event) => event.ownerId === currentUser.id || (event.adminIds || []).includes(currentUser.id))
-        : [];
+      const allEvents = normalizeEvents(response);
+      const manageableEvents = allEvents.filter((event) => {
+        const adminIds = safeArray<string>(event.adminIds);
+        return (
+          event.ownerId === currentUser.id
+          || event.hostAdminId === currentUser.id
+          || adminIds.includes(currentUser.id)
+        );
+      });
+
       setEvents(manageableEvents);
-    } catch (fetchError) {
-      console.error(fetchError);
+    } catch (fetchError: any) {
+      console.error('Failed to load managed events', {
+        status: fetchError?.response?.status,
+        message: fetchError?.message,
+        response: fetchError?.response?.data,
+      });
       setError('Failed to load your events');
     } finally {
       setIsLoading(false);
