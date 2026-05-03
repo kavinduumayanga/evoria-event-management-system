@@ -11,6 +11,8 @@ import { theme } from '../../../constants/theme';
 import { EventService, WaitlistService } from '../../../api/services';
 import { Event, Booking } from '../../../types';
 import { ArrowLeft, UserCheck, ListOrdered } from 'lucide-react-native';
+import { safeArray } from '../../../utils/safeData';
+import { safeString } from '../../../utils/safeText';
 
 interface WaitlistItem extends Booking {
   attendee?: { id: string; name: string; email: string } | null;
@@ -35,8 +37,8 @@ export const ManageWaitlistScreen: React.FC<Props> = ({ navigation, route }) => 
         EventService.getEvent(eventId),
         WaitlistService.getEventWaitlist(eventId),
       ]);
-      setEvent(eventRes.data.event || null);
-      setWaitlist(waitlistRes.data.waitlist || []);
+      setEvent((eventRes?.data?.event as Event) || null);
+      setWaitlist(safeArray<WaitlistItem>(waitlistRes?.data?.waitlist));
     } catch { setError('Failed to load waitlist'); }
     finally { setIsLoading(false); setIsRefreshing(false); }
   };
@@ -68,7 +70,7 @@ export const ManageWaitlistScreen: React.FC<Props> = ({ navigation, route }) => 
     <ScreenContainer>
       <FlatList
         data={waitlist}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `waitlist-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

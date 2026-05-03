@@ -9,7 +9,9 @@ import { Button, Card, ErrorState, IconButton, Input, LoadingState, ScreenContai
 import { EventService, PublicEventDetails, RegistrationService } from '../../api/services';
 import { theme } from '../../constants/theme';
 import { useAuthStore } from '../../store/auth.store';
+import { safeArray } from '../../utils/safeData';
 import { formatSafeDate, formatSafeTime, logDevMissing, safeLower, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 type PublicEventNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
 type PublicEventRouteProp = RouteProp<AttendeeHomeStackParamList, 'PublicEventDetails'>;
@@ -61,9 +63,9 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   }, [currentUser]);
 
   const event = publicData?.event;
-  const sessions = publicData?.agenda.sessions || [];
-  const tickets = publicData?.tickets || [];
-  const registrationQuestions = publicData?.registrationFields?.customQuestions || [];
+  const sessions = safeArray(publicData?.agenda?.sessions);
+  const tickets = safeArray(publicData?.tickets);
+  const registrationQuestions = safeArray(publicData?.registrationFields?.customQuestions);
   const isLoggedIn = Boolean(currentUser?.id);
 
   const requiredQuestionIds = useMemo(
@@ -217,7 +219,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
       >
         {/* Cover image */}
         {event.image ? (
-          <Image source={{ uri: event.image }} style={styles.coverImage} resizeMode="cover" />
+          <Image source={{ uri: resolveImageUrl(event.image) || event.image }} style={styles.coverImage} resizeMode="cover" />
         ) : (
           <View style={styles.coverPlaceholder}>
             <TicketIcon size={40} color={theme.colors.textMuted} />
@@ -344,7 +346,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
             {sessions.length === 0 ? (
               <Text style={styles.sectionText}>No agenda has been added for this event yet.</Text>
             ) : (
-              sessions.map((session) => {
+              sessions.map((session, index) => {
                 const sessionTitle = safeString(session.title, 'Session');
                 const hasStart = safeString(session.startTime, '').trim().length > 0;
                 const hasEnd = safeString(session.endTime, '').trim().length > 0;
@@ -352,7 +354,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                 const description = safeString(session.description, '').trim();
 
                 return (
-                  <Card key={session.id} variant="raised" style={styles.sessionCard} noPadding>
+                  <Card key={`${safeString(session.id, 'session')}-${index}`} variant="raised" style={styles.sessionCard} noPadding>
                     <View style={styles.sessionInner}>
                       <Text style={styles.sessionTitle}>{sessionTitle}</Text>
                       {(hasStart || hasEnd) ? (
@@ -372,8 +374,8 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
           {/* Tickets */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tickets</Text>
-            {tickets.length > 0 ? tickets.map((ticket) => (
-              <Card key={ticket.id} variant="raised" style={styles.ticketCard} noPadding>
+            {tickets.length > 0 ? tickets.map((ticket, index) => (
+              <Card key={safeString(ticket.id, `ticket-${index}`)} variant="raised" style={styles.ticketCard} noPadding>
                 <View style={styles.ticketInner}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
@@ -411,9 +413,9 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
                   <Input label="Mobile *" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" error={formErrors.mobile} />
                   <Input label="NIC *" value={nic} onChangeText={setNic} placeholder="200012345678" error={formErrors.nic} />
 
-                  {registrationQuestions.map((q) => (
+                  {registrationQuestions.map((q, index) => (
                     <Input
-                      key={q.id}
+                      key={safeString(q.id, `question-${index}`)}
                       label={`${q.question}${q.required ? ' *' : ''}`}
                       value={customAnswerMap[q.id] || ''}
                       onChangeText={(v) => {

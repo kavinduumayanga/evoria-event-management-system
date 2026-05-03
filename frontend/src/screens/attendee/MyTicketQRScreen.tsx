@@ -29,12 +29,15 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
       setError(null);
       if (!bookingId) return;
       const [bookingRes, qrRes] = await Promise.all([ BookingService.getBooking(bookingId), CheckInService.getBookingQr(bookingId) ]);
-      const bookingData = bookingRes.data.booking as Booking;
+      const bookingData = bookingRes?.data?.booking as Booking | undefined;
+      if (!bookingData?.id || !bookingData.eventId || !bookingData.ticketTypeId) {
+        throw new Error('Invalid booking payload');
+      }
       setBooking(bookingData);
-      setQrCodeValue(qrRes.data.qrCodeValue || qrRes.data.qrData || '');
+      setQrCodeValue(safeString(qrRes?.data?.qrCodeValue || qrRes?.data?.qrData, ''));
       const [eventRes, ticketRes] = await Promise.all([ EventService.getEvent(bookingData.eventId), TicketService.getTicket(bookingData.ticketTypeId) ]);
-      setEventTitle(safeTitle(eventRes.data.event?.title, 'Untitled Event'));
-      setTicketName(safeTitle(ticketRes.data.ticket?.name, 'Ticket'));
+      setEventTitle(safeTitle(eventRes?.data?.event?.title, 'Untitled Event'));
+      setTicketName(safeTitle(ticketRes?.data?.ticket?.name, 'Ticket'));
     } catch (err: any) { setError(err?.response?.data?.message || 'Failed to load ticket QR'); } finally { setIsLoading(false); }
   };
 

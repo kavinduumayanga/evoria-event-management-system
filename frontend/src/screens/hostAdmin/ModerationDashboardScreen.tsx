@@ -6,7 +6,8 @@ import { theme } from '../../constants/theme';
 import { AdminService, ModerationService, ReportService } from '../../api/services';
 import { PlatformAnalytics, ReportRecord } from '../../types';
 import { Flag, ShieldBan, ShieldCheck } from 'lucide-react-native';
-import { safeUpper } from '../../utils/safeText';
+import { safeArray } from '../../utils/safeData';
+import { safeString, safeUpper } from '../../utils/safeText';
 
 export const ModerationDashboardScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -29,7 +30,7 @@ export const ModerationDashboardScreen = () => {
         AdminService.getPlatformAnalytics(),
       ]);
 
-      setReports(reportsResponse.data.reports || []);
+      setReports(safeArray<ReportRecord>(reportsResponse?.data?.reports));
       setAnalytics(analyticsResponse.data || {
         totalUsers: 0,
         totalEvents: 0,
@@ -130,7 +131,7 @@ export const ModerationDashboardScreen = () => {
     <ScreenContainer style={styles.container}>
       <FlatList
         data={reports}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `report-${index}`)}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={

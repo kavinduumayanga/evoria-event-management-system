@@ -9,6 +9,7 @@ import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { TicketService } from '../../../api/services';
 import { PromoCode, TicketType } from '../../../types';
 import { safeUpper } from '../../../utils/safeText';
+import { safeArray } from '../../../utils/safeData';
 
 type TicketFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'TicketForm'>;
 type TicketFormRouteProp = RouteProp<HostAdminEventStackParamList, 'TicketForm'>;
@@ -50,7 +51,7 @@ export const TicketFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchTicket = async () => {
     try {
       const res = await TicketService.getEventTickets(eventId);
-      const ticket = res.data.tickets.find((item: TicketType) => item.id === ticketId);
+      const ticket = safeArray<TicketType>(res?.data?.tickets).find((item) => item.id === ticketId);
       if (!ticket) {
         Alert.alert('Error', 'Ticket not found');
         navigation.goBack();

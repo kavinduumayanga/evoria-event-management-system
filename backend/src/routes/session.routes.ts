@@ -12,8 +12,8 @@ import { protect } from '../middleware/auth.middleware';
 const router = Router();
 
 router.get('/', getSessions);
-router.get('/:id', getSession);
 router.get('/event/:eventId', getEventSessions);
+router.get('/:id', getSession);
 
 router.use(protect);
 

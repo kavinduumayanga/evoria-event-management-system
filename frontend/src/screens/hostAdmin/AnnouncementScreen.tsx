@@ -12,7 +12,8 @@ import {
   Card, Input, Button,
 } from '../../components';
 import { EventCommunicationEntry, EventService, UserService } from '../../api/services';
-import { safeUpper } from '../../utils/safeText';
+import { safeArray } from '../../utils/safeData';
+import { safeString, safeUpper } from '../../utils/safeText';
 
 export const AnnouncementScreen = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -34,7 +35,7 @@ export const AnnouncementScreen = () => {
     try {
       setIsLoadingHistory(true);
       const response = await EventService.getEventCommunications(eventId, 80);
-      setCommunications(response?.data?.communications || []);
+      setCommunications(safeArray<EventCommunicationEntry>(response?.data?.communications));
     } catch (err: any) {
       setCommunications([]);
       Alert.alert('History Error', err?.response?.data?.message || 'Failed to load communication history.');
@@ -47,8 +48,11 @@ export const AnnouncementScreen = () => {
     try {
       setError(null);
       const userRes = await UserService.getMe();
-      const eventsRes = await EventService.getHostEvents(userRes.data.user.id);
-      const managed = eventsRes?.data?.events || [];
+      const userId = safeString(userRes?.data?.user?.id, '');
+      const eventsRes = userId
+        ? await EventService.getHostEvents(userId)
+        : { data: { events: [] } };
+      const managed = safeArray<Event>(eventsRes?.data?.events);
       setEvents(managed);
       const hasSelection = managed.some((e: Event) => e.id === selectedEventId);
       const resolved = hasSelection ? selectedEventId : (managed[0]?.id || '');
@@ -117,7 +121,7 @@ export const AnnouncementScreen = () => {
       <FlatList
         data={events}
         horizontal
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `event-${index}`)}
         contentContainerStyle={styles.eventList}
         showsHorizontalScrollIndicator={false}
         refreshControl={
@@ -222,7 +226,7 @@ export const AnnouncementScreen = () => {
               <EmptyState title="No History" message="Invites and blasts will appear here." />
             ) : (
               communications.slice(0, 40).map((item) => (
-                <View key={item.id} style={styles.historyItem}>
+                <View key={safeString(item.id, `${item.source}-${item.createdAt}`)} style={styles.historyItem}>
                   <View style={styles.historyMetaRow}>
                     <View style={styles.typePill}>
                       <Text style={styles.historyType}>

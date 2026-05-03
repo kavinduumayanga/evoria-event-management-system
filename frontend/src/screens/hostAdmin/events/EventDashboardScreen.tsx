@@ -37,6 +37,8 @@ import {
   ScreenContainer,
 } from '../../../components';
 import { EventService, GuestService, EventDashboardData } from '../../../api/services';
+import { safeArray } from '../../../utils/safeData';
+import { safeString } from '../../../utils/safeText';
 
 interface Props {
   navigation: NativeStackNavigationProp<HostAdminEventStackParamList, 'EventDashboard'>;
@@ -54,6 +56,28 @@ const StatTile = ({ label, value, icon }: { label: string; value: string | numbe
     </View>
   </Card>
 );
+
+const normalizeDashboardData = (payload: any): EventDashboardData => ({
+  totalRegistrations: Number(payload?.totalRegistrations || 0),
+  pendingCount: Number(payload?.pendingCount || 0),
+  goingCount: Number(payload?.goingCount || 0),
+  declinedCount: Number(payload?.declinedCount || 0),
+  checkedInCount: Number(payload?.checkedInCount || 0),
+  capacity: {
+    used: Number(payload?.capacity?.used || 0),
+    total: Number(payload?.capacity?.total || 0),
+    percentage: Number(payload?.capacity?.percentage || 0),
+  },
+  ticketsSold: Number(payload?.ticketsSold || 0),
+  revenue: Number(payload?.revenue || 0),
+  remindersCount: Number(payload?.remindersCount || 0),
+  feedback: {
+    averageRating: Number(payload?.feedback?.averageRating || 0),
+    totalReviews: Number(payload?.feedback?.totalReviews || 0),
+  },
+  recentRegistrations: safeArray(payload?.recentRegistrations) as EventDashboardData['recentRegistrations'],
+  recentCheckIns: safeArray(payload?.recentCheckIns) as EventDashboardData['recentCheckIns'],
+});
 
 export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => {
   const { eventId } = route.params;
@@ -74,7 +98,7 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
     try {
       setError(null);
       const response = await EventService.getEventDashboard(eventId);
-      setDashboard(response.data);
+      setDashboard(normalizeDashboardData(response?.data));
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load event dashboard');
     } finally {
@@ -328,7 +352,7 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
                   <Text style={styles.listRowMeta}>{entry.email}</Text>
                 </View>
                 <View style={styles.statusPill}>
-                  <Text style={styles.statusPillText}>{entry.status.replace('_', ' ')}</Text>
+                  <Text style={styles.statusPillText}>{safeString(entry.status, 'unknown').replace('_', ' ')}</Text>
                 </View>
               </View>
             ))}

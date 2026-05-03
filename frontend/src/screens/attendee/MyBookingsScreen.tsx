@@ -19,6 +19,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { AttendeeTabParamList } from '../../types/navigation';
 import { QrCode, Eye, CalendarPlus, Star } from 'lucide-react-native';
+import { safeArray } from '../../utils/safeData';
+import { safeString } from '../../utils/safeText';
 
 type AttendeeTabNavigationProp = BottomTabNavigationProp<AttendeeTabParamList, 'MyRegistrations'>;
 
@@ -38,7 +40,7 @@ export const MyBookingsScreen = () => {
     try {
       setError(null);
       const res = await RegistrationService.getMyRegistrations();
-      setBookings(res.data.registrations);
+      setBookings(safeArray<Booking>(res?.data?.registrations));
     } catch (err) {
       console.error(err);
       setError('Failed to load your registrations');
@@ -138,7 +140,7 @@ export const MyBookingsScreen = () => {
     <ScreenContainer>
       <FlatList
         data={bookings}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `booking-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
