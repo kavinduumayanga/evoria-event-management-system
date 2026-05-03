@@ -14,6 +14,10 @@ import {
   isEventAtCapacityForQuantity,
 } from '../utils/waitlist.helper';
 import { canManageEvent } from '../utils/eventPermissions';
+import {
+  getEventRegistrationQuestions,
+  validateRegistrationAnswerAgainstQuestion,
+} from '../utils/eventRegistrationFields';
 
 const registrationSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
@@ -45,17 +49,26 @@ const ensureCanManageEvent = async (eventId: string, userId: string) => {
 };
 
 const validateCustomAnswers = (
-  eventCustomQuestions: Array<{ id: string; question: string; type: string; required?: boolean }>,
+  eventCustomQuestions: Array<{ id: string; question: string; type: string; required?: boolean; options?: string[] }>,
   customAnswers: Array<{ questionId: string; answer: string }>,
 ) => {
-  const questionsById = new Map<string, { required?: boolean }>();
+  const questionsById = new Map<string, { required?: boolean; type: string; options: string[] }>();
   for (const question of eventCustomQuestions) {
-    questionsById.set(question.id, { required: question.required });
+    questionsById.set(question.id, {
+      required: question.required,
+      type: question.type,
+      options: Array.isArray(question.options) ? question.options : [],
+    });
   }
 
   for (const answer of customAnswers) {
-    if (!questionsById.has(answer.questionId)) {
+    const matchingQuestion = questionsById.get(answer.questionId);
+    if (!matchingQuestion) {
       throw new AppError(`Invalid custom question answer: ${answer.questionId}`, 400);
+    }
+
+    if (!validateRegistrationAnswerAgainstQuestion(matchingQuestion, answer.answer)) {
+      throw new AppError(`Invalid answer for question: ${answer.questionId}`, 400);
     }
   }
 
@@ -111,12 +124,13 @@ export const createRegistration = async (req: Request, res: Response, next: Next
       return next(new AppError('Ticket is not active', 400));
     }
 
-    const eventQuestions = (event.customQuestions || []) as Array<{
-      id: string;
-      question: string;
-      type: string;
-      required?: boolean;
-    }>;
+    const eventQuestions = getEventRegistrationQuestions(event).map((question) => ({
+      id: question.id,
+      question: question.question,
+      type: question.type,
+      required: question.required,
+      options: question.options || [],
+    }));
 
     validateCustomAnswers(eventQuestions, validatedData.customAnswers);
 

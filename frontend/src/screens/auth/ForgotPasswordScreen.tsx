@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Keyboard,
+  TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, Mail } from 'lucide-react-native';
+import { ArrowLeft, Key, Lock, Mail } from 'lucide-react-native';
 import { AuthStackParamList } from '../../types/navigation';
 import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
@@ -26,13 +28,26 @@ interface Props {
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+type ResetFlowStep = 'email' | 'otp' | 'reset';
 
-  const handleForgotPassword = async () => {
-    const normalizedEmail = safeLower(email.trim());
+export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
+  const otpRef = useRef<TextInput>(null);
+  const newPasswordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
+
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [step, setStep] = useState<ResetFlowStep>('email');
+  const [isLoading, setIsLoading] = useState(false);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  const normalizedEmail = safeLower(email.trim());
+
+  const handleSendOtp = async () => {
+    Keyboard.dismiss();
 
     if (!normalizedEmail) {
       Alert.alert('Validation', 'Please enter your email address.');
@@ -46,9 +61,10 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       setIsLoading(true);
-
       const response = await AuthService.forgotPassword({ email: normalizedEmail });
-      setMessage(response?.message || 'If your account exists, an OTP was sent.');
+      setInfoMessage(response?.message || 'If your account exists, an OTP was sent.');
+      setStep('otp');
+      setTimeout(() => otpRef.current?.focus(), 120);
     } catch (error: any) {
       Alert.alert('Request Failed', getApiErrorMessage(error, 'Unable to process forgot password request.'));
     } finally {
@@ -56,11 +72,61 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const handleVerifyOtp = async () => {
+    Keyboard.dismiss();
+
+    if (!otp.trim()) {
+      Alert.alert('Validation', 'Please enter the OTP code.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await AuthService.verifyResetOtp({ token: otp.trim() });
+      setStep('reset');
+      setInfoMessage('OTP verified. Set your new password.');
+      setTimeout(() => newPasswordRef.current?.focus(), 120);
+    } catch (error: any) {
+      const message = getApiErrorMessage(error, 'Unable to verify OTP.');
+      Alert.alert('Verification Failed', message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    Keyboard.dismiss();
+
+    if (!otp.trim()) {
+      Alert.alert('Validation', 'OTP is required.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert('Validation', 'New password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Validation', 'Password confirmation does not match.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await AuthService.resetPassword({ token: otp.trim(), newPassword });
+      Alert.alert('Success', 'Password reset complete. Please sign in with your new password.', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+      ]);
+    } catch (error: any) {
+      const message = getApiErrorMessage(error, 'Unable to reset password.');
+      Alert.alert('Reset Failed', message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <View style={styles.root}>
-      
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Header */}
         <View style={styles.header}>
           <IconButton
             icon={<ArrowLeft color={theme.colors.text} size={22} />}
@@ -79,7 +145,11 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.titleSection}>
               <Text style={styles.title}>Forgot password?</Text>
               <Text style={styles.subtitle}>
-                Enter your email address and we'll send you an OTP code.
+                {step === 'email'
+                  ? 'Enter your email address and we\'ll send you an OTP code.'
+                  : step === 'otp'
+                    ? 'Enter the OTP from your email to continue.'
+                    : 'Set your new password to complete reset.'}
               </Text>
             </View>
 
@@ -91,30 +161,99 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
               value={email}
               onChangeText={setEmail}
               leftIcon={<Mail size={18} color={theme.colors.textMuted} />}
+              editable={step === 'email'}
+              returnKeyType={step === 'email' ? 'done' : 'next'}
+              onSubmitEditing={step === 'email' ? handleSendOtp : () => otpRef.current?.focus()}
             />
 
-            {message && (
-              <Text style={styles.infoText}>{message}</Text>
-            )}
+            {step !== 'email' ? (
+              <Input
+                ref={otpRef}
+                label="OTP code"
+                placeholder="Enter the 6-digit OTP"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={otp}
+                onChangeText={setOtp}
+                leftIcon={<Key size={18} color={theme.colors.textMuted} />}
+                returnKeyType={step === 'otp' ? 'done' : 'next'}
+                onSubmitEditing={step === 'otp' ? handleVerifyOtp : () => newPasswordRef.current?.focus()}
+              />
+            ) : null}
 
+            {step === 'reset' ? (
+              <>
+                <Input
+                  ref={newPasswordRef}
+                  label="New password"
+                  placeholder="At least 6 characters"
+                  isPassword
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+                  returnKeyType="next"
+                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                />
+                <Input
+                  ref={confirmPasswordRef}
+                  label="Confirm new password"
+                  placeholder="Re-enter your new password"
+                  isPassword
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+                  returnKeyType="done"
+                  onSubmitEditing={handleResetPassword}
+                />
+              </>
+            ) : null}
+
+            {infoMessage ? <Text style={styles.infoText}>{infoMessage}</Text> : null}
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Bottom CTAs */}
         <View style={styles.bottomZone}>
-          <Button
-            title="Send OTP Code"
-            onPress={handleForgotPassword}
-            isLoading={isLoading}
-            variant="primary"
-            size="lg"
-          />
-          <Button
-            title="Go to Reset Password"
-            onPress={() => navigation.navigate('ResetPassword', { email: safeLower(email.trim()) || undefined })}
-            variant="ghost"
-            size="md"
-          />
+          {step === 'email' ? (
+            <Button
+              title="Send OTP Code"
+              onPress={handleSendOtp}
+              isLoading={isLoading}
+              variant="primary"
+              size="lg"
+              style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
+            />
+          ) : step === 'otp' ? (
+            <View style={styles.stepActions}>
+              <Button
+                title="Verify OTP"
+                onPress={handleVerifyOtp}
+                isLoading={isLoading}
+                variant="primary"
+                size="lg"
+                style={styles.stepActionButton}
+              />
+              <Button
+                title="Resend OTP"
+                onPress={handleSendOtp}
+                variant="ghost"
+                size="md"
+                style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
+              />
+            </View>
+          ) : (
+            <Button
+              title="Reset Password"
+              onPress={handleResetPassword}
+              isLoading={isLoading}
+              variant="primary"
+              size="lg"
+              style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
+            />
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -161,5 +300,11 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.l,
     paddingTop: theme.spacing.m,
     gap: theme.spacing.sm,
+  },
+  stepActions: {
+    gap: theme.spacing.s,
+  },
+  stepActionButton: {
+    marginBottom: theme.spacing.xs,
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Alert, Keyboard } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
 import { HeaderBar, PrimaryButton, InputField, GlassCard } from '../../components';
@@ -20,6 +20,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const login = useAuthStore((state) => state.login);
 
   const handleLogin = async () => {
+    Keyboard.dismiss();
     const normalizedEmail = safeLower(email.trim());
     if (!normalizedEmail || !password) {
       Alert.alert('Validation', 'Please fill in all fields.');
@@ -58,6 +59,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               value={email}
               onChangeText={setEmail}
               icon={<Mail size={20} color="#FFFFFF" />}
+              returnKeyType="next"
             />
             <InputField
               label="Password"
@@ -67,6 +69,8 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               value={password}
               onChangeText={setPassword}
               icon={<Lock size={20} color="#FFFFFF" />}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
             />
             <TouchableOpacity style={styles.forgotBtn} onPress={() => navigation.navigate('ForgotPassword')}>
               <Text style={styles.forgotText}>Forgot password?</Text>

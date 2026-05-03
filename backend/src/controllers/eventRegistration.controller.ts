@@ -7,7 +7,10 @@ import { EventModel } from '../models/Event';
 import { UserModel } from '../models/User';
 import { AppError } from '../utils/appError';
 import { canManageEvent } from '../utils/eventPermissions';
-import { getEventRegistrationQuestions } from '../utils/eventRegistrationFields';
+import {
+  getEventRegistrationQuestions,
+  validateRegistrationAnswerAgainstQuestion,
+} from '../utils/eventRegistrationFields';
 import {
   sendPendingRegistrationCommunications,
   sendRegistrationStatusCommunications,
@@ -97,14 +100,22 @@ const ensurePublicEventCanRegister = (event: any) => {
 };
 
 const validateCustomAnswers = (
-  eventQuestions: Array<{ id: string; question: string; required: boolean }>,
+  eventQuestions: Array<{ id: string; question: string; required: boolean; type: string; options?: string[] }>,
   customAnswers: Array<{ questionId: string; answer: string }>,
 ) => {
   const questionMap = new Map(eventQuestions.map((question) => [question.id, question]));
 
   for (const answer of customAnswers) {
-    if (!questionMap.has(answer.questionId)) {
+    const question = questionMap.get(answer.questionId);
+    if (!question) {
       throw new AppError(`Invalid custom question answer: ${answer.questionId}`, 400);
+    }
+
+    if (!validateRegistrationAnswerAgainstQuestion({
+      type: question.type,
+      options: question.options || [],
+    }, answer.answer)) {
+      throw new AppError(`Invalid answer for question: ${answer.questionId}`, 400);
     }
   }
 
@@ -131,6 +142,8 @@ export const createPublicEventRegistration = async (req: Request, res: Response,
     const eventQuestions = getEventRegistrationQuestions(event).map((question) => ({
       id: question.id,
       question: question.question,
+      type: question.type,
+      options: question.options || [],
       required: question.required,
     }));
 

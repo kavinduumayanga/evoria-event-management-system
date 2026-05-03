@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Keyboard,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,6 +28,8 @@ interface Props {
 }
 
 export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
+  const newPasswordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
   const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,6 +38,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   const prefetchedEmail = route.params?.email;
 
   const handleResetPassword = async () => {
+    Keyboard.dismiss();
     if (!token.trim()) {
       Alert.alert('Validation', 'Please enter the OTP code.');
       return;
@@ -97,8 +102,11 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
               value={token}
               onChangeText={setToken}
               leftIcon={<Key size={18} color={theme.colors.textMuted} />}
+              returnKeyType="next"
+              onSubmitEditing={() => newPasswordRef.current?.focus()}
             />
             <Input
+              ref={newPasswordRef}
               label="New password"
               placeholder="At least 6 characters"
               isPassword
@@ -107,8 +115,11 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
               value={newPassword}
               onChangeText={setNewPassword}
               leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+              returnKeyType="next"
+              onSubmitEditing={() => confirmPasswordRef.current?.focus()}
             />
             <Input
+              ref={confirmPasswordRef}
               label="Confirm new password"
               placeholder="Re-enter your new password"
               isPassword
@@ -118,6 +129,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+              onSubmitEditing={handleResetPassword}
             />
           </ScrollView>
         </KeyboardAvoidingView>

@@ -18,6 +18,7 @@ const AUTH_OPTIONAL_PATHS = [
   '/auth/login',
   '/auth/register',
   '/auth/forgot-password',
+  '/auth/verify-reset-otp',
   '/auth/reset-password',
   '/public/',
 ];

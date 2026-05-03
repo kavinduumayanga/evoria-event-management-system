@@ -3,7 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 const venueSchema = new Schema({
   _id: { type: String, default: uuidv4 },
+  ownerId: { type: String, required: true, index: true },
   name: { type: String, required: true },
+  description: { type: String, trim: true, default: '' },
   address: { type: String, required: true },
   city: { type: String, required: true },
   capacity: { type: Number, required: true },

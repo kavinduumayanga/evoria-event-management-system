@@ -13,6 +13,7 @@ import { Venue } from '../../../types';
 import { useFocusEffect } from '@react-navigation/native';
 import { safeArray } from '../../../utils/safeData';
 import { safeString } from '../../../utils/safeText';
+import { useAuthStore } from '../../../store/auth.store';
 
 type ManageVenuesNavigationProp = NativeStackNavigationProp<HostAdminVenueStackParamList, 'ManageVenues'>;
 interface Props { navigation: ManageVenuesNavigationProp; }
@@ -24,6 +25,7 @@ const VENUE_STATUS: Record<string, any> = {
 };
 
 export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
+  const authUser = useAuthStore((state) => state.user);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,14 +34,16 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
   const fetchVenues = async () => {
     try {
       setError(null);
-      const res = await VenueService.getVenues();
+      const res = authUser?.id
+        ? await VenueService.getHostVenues(authUser.id)
+        : await VenueService.getVenues();
       setVenues(safeArray<Venue>(res?.data?.venues));
     } catch { setError('Failed to load venues'); }
     finally { setIsLoading(false); setIsRefreshing(false); }
   };
 
-  useFocusEffect(useCallback(() => { fetchVenues(); }, []));
-  const onRefresh = useCallback(() => { setIsRefreshing(true); fetchVenues(); }, []);
+  useFocusEffect(useCallback(() => { fetchVenues(); }, [authUser?.id]));
+  const onRefresh = useCallback(() => { setIsRefreshing(true); fetchVenues(); }, [authUser?.id]);
 
   const handleDelete = (id: string) => {
     Alert.alert('Delete Venue', 'Are you sure you want to delete this venue?', [
@@ -101,6 +105,9 @@ export const ManageVenuesScreen: React.FC<Props> = ({ navigation }) => {
                 <StatusBadge status={VENUE_STATUS[item.type] ?? 'neutral'} label={item.type} />
               </View>
               <Text style={styles.venueDetail} numberOfLines={1}>{item.address}, {item.city}</Text>
+              {safeString((item as any).description, '').trim() ? (
+                <Text style={styles.venueDetail} numberOfLines={2}>{safeString((item as any).description, '')}</Text>
+              ) : null}
               <Text style={styles.venueCapacity}>Capacity: {item.capacity.toLocaleString()}</Text>
             </View>
             <View style={styles.venueActions}>

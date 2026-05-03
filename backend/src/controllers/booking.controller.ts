@@ -19,6 +19,10 @@ import {
   normalizeWaitlistPositions,
   promoteNextWaitlistedBooking,
 } from '../utils/waitlist.helper';
+import {
+  getEventRegistrationQuestions,
+  validateRegistrationAnswerAgainstQuestion,
+} from '../utils/eventRegistrationFields';
 
 const bookingSchema = z.object({
   eventId: z.string().trim().min(1, 'eventId is required'),
@@ -235,10 +239,46 @@ const handleZodError = (error: unknown, next: NextFunction) => {
   return next(error);
 };
 
+const validateCustomAnswers = (
+  eventQuestions: Array<{ id: string; question: string; required: boolean; type: string; options: string[] }>,
+  customAnswers: Array<{ questionId: string; answer: string }>,
+) => {
+  const questionsById = new Map(eventQuestions.map((question) => [question.id, question]));
+
+  for (const answer of customAnswers) {
+    const matchingQuestion = questionsById.get(answer.questionId);
+    if (!matchingQuestion) {
+      throw new AppError(`Invalid custom question answer: ${answer.questionId}`, 400);
+    }
+
+    if (!validateRegistrationAnswerAgainstQuestion(matchingQuestion, answer.answer)) {
+      throw new AppError(`Invalid answer for question: ${answer.questionId}`, 400);
+    }
+  }
+
+  for (const question of eventQuestions) {
+    if (!question.required) continue;
+    const match = customAnswers.find((answer) => answer.questionId === question.id);
+    if (!match || !match.answer.trim()) {
+      throw new AppError(`Required question is missing an answer: ${question.question}`, 400);
+    }
+  }
+};
+
 export const createBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = bookingSchema.parse(req.body);
     const event = await ensureBookableEvent(validatedData.eventId);
+    const eventQuestions = getEventRegistrationQuestions(event).map((question) => ({
+      id: question.id,
+      question: question.question,
+      required: question.required,
+      type: question.type,
+      options: question.options || [],
+    }));
+
+    validateCustomAnswers(eventQuestions, validatedData.customAnswers || []);
+
     const existingBooking = await BookingModel.findOne({
       userId: req.user!.id,
       eventId: validatedData.eventId,
