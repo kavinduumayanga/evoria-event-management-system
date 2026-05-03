@@ -450,6 +450,18 @@ export const UploadService = {
 };
 
 export const EventService = {
+  addCoHost: async (eventId: string, data: { email: string }) => {
+    const response = await apiClient.post(`/events/${eventId}/co-hosts`, data);
+    return response.data;
+  },
+  getCoHosts: async (eventId: string) => {
+    const response = await apiClient.get(`/events/${eventId}/co-hosts`);
+    return response.data;
+  },
+  removeCoHost: async (eventId: string, userId: string) => {
+    const response = await apiClient.delete(`/events/${eventId}/co-hosts/${userId}`);
+    return response.data;
+  },
   getEvents: async () => {
     const response = await apiClient.get('/events');
     return response.data;
