@@ -40,7 +40,9 @@ export const MyBookingsScreen = () => {
     try {
       setError(null);
       const res = await RegistrationService.getMyRegistrations();
-      setBookings(safeArray<Booking>(res?.data?.registrations));
+      const registrations = safeArray<Booking>(res?.data?.registrations);
+      const fallbackBookings = safeArray<Booking>(res?.data?.bookings);
+      setBookings(registrations.length > 0 ? registrations : fallbackBookings);
     } catch (err) {
       console.error(err);
       setError('Failed to load your registrations');

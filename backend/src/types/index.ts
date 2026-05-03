@@ -216,7 +216,9 @@ export interface Venue {
   description?: string;
   address: string;
   city: string;
-  capacity: number;
+  capacity?: number;
+  lat?: number | null;
+  lng?: number | null;
   type: VenueType;
   contactInfo?: string;
   createdAt: string;

@@ -41,6 +41,21 @@ const normalizeQuestionOptions = (raw: unknown): string[] => {
   return options;
 };
 
+const resolveRegistrationStatusLabel = (registration: any): string => {
+  if (!registration) return 'Already Registered';
+  if (registration.bookingStatus === 'cancelled') return 'Cancelled';
+  if (registration.isWaitlisted) {
+    const position = Number.isFinite(Number(registration.waitlistPosition)) ? Number(registration.waitlistPosition) : null;
+    return position ? `Waitlisted (#${position})` : 'Waitlisted';
+  }
+  if (registration.approvalStatus === 'pending') return 'Pending Approval';
+  if (registration.approvalStatus === 'rejected') return 'Rejected';
+  if (registration.checkInStatus === 'checked_in') return 'Checked In';
+  if (registration.rsvpStatus === 'not_going') return 'Not Going';
+  if (registration.bookingStatus === 'confirmed') return 'Confirmed';
+  return safeTitle(registration.bookingStatus, 'Registered');
+};
+
 export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const slug = route.params?.slug;
@@ -59,6 +74,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const [isSubmittingRegistration, setIsSubmittingRegistration] = useState(false);
   const [reviewSummary, setReviewSummary] = useState<{ averageRating: number; totalReviews: number } | null>(null);
   const [hasHostImageError, setHasHostImageError] = useState(false);
+  const [existingBookingStatus, setExistingBookingStatus] = useState<string | null>(null);
 
   const fetchPublicEvent = async () => {
     if (!slug) return;
@@ -88,6 +104,36 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
     setEmail((p) => p || currentUser.email || '');
     setMobile((p) => p || currentUser.phone || '');
   }, [currentUser]);
+
+  useEffect(() => {
+    const eventId = publicData?.event?.id;
+    if (!currentUser?.id || !eventId) {
+      setExistingBookingStatus(null);
+      return;
+    }
+
+    let mounted = true;
+    const resolveStatus = async () => {
+      try {
+        const response = await RegistrationService.getMyRegistrations();
+        const registrations = safeArray<any>(response?.data?.registrations);
+        const activeRegistration = registrations.find((registration) => {
+          if (safeString(registration.eventId, '') !== eventId) return false;
+          return safeString(registration.bookingStatus, '') !== 'cancelled';
+        });
+        if (!mounted) return;
+        setExistingBookingStatus(activeRegistration ? resolveRegistrationStatusLabel(activeRegistration) : null);
+      } catch {
+        if (!mounted) return;
+        setExistingBookingStatus(null);
+      }
+    };
+
+    void resolveStatus();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser?.id, publicData?.event?.id]);
 
   const event = publicData?.event;
   const sessions = safeArray(publicData?.agenda?.sessions);
@@ -240,6 +286,8 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const aboutLabel = safeString(event.about, '');
   const isSoldOut = tickets.every((t) => (Number.isFinite(Number(t.remaining)) ? Number(t.remaining) : 0) <= 0);
   const isTicketedEvent = safeString(event.pricingMode, 'ticketed') === 'ticketed';
+  const isAlreadyRegistered = Boolean(existingBookingStatus);
+  const showGuestRegistrationForm = !isTicketedEvent && !isLoggedIn;
   const buildMapTilePreviewUrl = (lat: number, lng: number) => {
     const zoom = 14;
     const clampedLat = Math.max(Math.min(lat, 85.0511), -85.0511);
@@ -461,7 +509,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
           </View>
 
           {/* Registration form (non-ticketed only) */}
-          {!isTicketedEvent && (
+          {showGuestRegistrationForm && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Register</Text>
               <Card variant="raised" style={styles.registrationCard} noPadding>
@@ -562,18 +610,33 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
 
       {/* Sticky footer CTA */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 72 }]}>
+        {isAlreadyRegistered ? (
+          <Text style={styles.registeredStatusText}>Status: {existingBookingStatus}</Text>
+        ) : null}
         <Button
           title={
-            isTicketedEvent
-              ? (isLoggedIn ? (isSoldOut ? 'Sold Out' : 'Book Tickets') : 'Login to Book')
-              : 'Submit Registration'
+            isAlreadyRegistered
+              ? 'Already Registered'
+              : isLoggedIn
+                ? (isTicketedEvent ? (isSoldOut ? 'Sold Out' : 'Book Tickets') : 'Continue to Registration')
+                : (isTicketedEvent ? (isSoldOut ? 'Sold Out' : 'Login to Book') : 'Submit Registration')
           }
-          disabled={isTicketedEvent ? (isSoldOut || !isLoggedIn) : isSubmittingRegistration}
+          disabled={
+            isAlreadyRegistered
+            || (isLoggedIn
+              ? (isTicketedEvent ? isSoldOut : false)
+              : (isTicketedEvent ? (isSoldOut || !isLoggedIn) : isSubmittingRegistration))
+          }
           onPress={() => {
-            if (isTicketedEvent) { navigation.navigate('TicketSelection', { eventId: event.id }); return; }
+            if (isAlreadyRegistered) return;
+            if (isLoggedIn) {
+              navigation.navigate('TicketSelection', { eventId: event.id });
+              return;
+            }
+            if (isTicketedEvent) return;
             handleSubmitRegistration();
           }}
-          isLoading={isSubmittingRegistration}
+          isLoading={!isLoggedIn && !isTicketedEvent && isSubmittingRegistration}
           variant="primary"
           size="lg"
           style={{ backgroundColor: brandAccent, borderColor: brandAccent }}
@@ -591,10 +654,10 @@ const styles = StyleSheet.create({
   coverWrap: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#171A20',
+    backgroundColor: '#0B0B0C',
     overflow: 'hidden',
   },
-  coverImage: { width: '100%', height: '100%' },
+  coverImage: { width: '100%', height: '100%', backgroundColor: '#0B0B0C' },
   coverPlaceholder: {
     width: '100%',
     height: '100%',
@@ -704,5 +767,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.base, paddingVertical: theme.spacing.l,
     borderTopWidth: 1, borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+  },
+  registeredStatusText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.s,
+    textAlign: 'center',
   },
 });
