@@ -9,8 +9,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
-import { Button } from '../../components';
+import { Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
+import { ArrowLeft } from 'lucide-react-native';
 
 type WelcomeScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Welcome'>;
 
@@ -54,6 +55,14 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.glowBottom} />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.topRow}>
+          <IconButton
+            icon={<ArrowLeft size={20} color={theme.colors.text} />}
+            onPress={() => navigation.navigate('Login')}
+            variant="surface"
+            size={36}
+          />
+        </View>
         <Animated.View
           style={[
             styles.centerContent,
@@ -103,6 +112,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  topRow: {
+    paddingTop: theme.spacing.s,
   },
   logoShell: {
     width: 210,

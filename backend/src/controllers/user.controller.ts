@@ -32,6 +32,8 @@ const signToken = (id: string, role?: Role) => {
 const toSafeUser = (userDoc: any) => {
   const user = userDoc?.toJSON ? userDoc.toJSON() : { ...userDoc };
   delete user.password;
+  delete user.emailVerificationToken;
+  delete user.emailVerificationExpires;
   delete user.resetPasswordToken;
   delete user.resetPasswordExpires;
   return user;
@@ -263,8 +265,12 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
     }
 
     const updates = { ...req.body };
+    delete updates.email;
     delete updates.password;
     delete updates.role;
+    delete updates.emailVerified;
+    delete updates.emailVerificationToken;
+    delete updates.emailVerificationExpires;
     delete updates.resetPasswordToken;
     delete updates.resetPasswordExpires;
 
@@ -281,16 +287,41 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
 
 export const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.user!.id !== (req.params.id as string)) {
+    const requestedUserId = req.params.id as string;
+    if (req.user!.id !== requestedUserId) {
       return next(new AppError('Not authorized to delete this user', 403));
     }
 
-    const deletedUserDoc = await UserModel.findByIdAndDelete(req.params.id as string);
-    if (!deletedUserDoc) {
+    const userDoc = await UserModel.findById(requestedUserId).select('_id');
+    if (!userDoc) {
       return next(new AppError('User not found', 404));
     }
 
-    res.status(204).json({ status: 'success', data: null });
+    let summary: DeleteSummary;
+    const session = await mongoose.startSession();
+
+    try {
+      try {
+        session.startTransaction();
+        summary = await purgeUserAccountData(requestedUserId, session);
+        await session.commitTransaction();
+      } catch (transactionError) {
+        await session.abortTransaction().catch(() => undefined);
+        if (!isTransactionUnsupportedError(transactionError)) {
+          throw transactionError;
+        }
+
+        summary = await purgeUserAccountData(requestedUserId);
+      }
+    } finally {
+      await session.endSession();
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Account and related data deleted permanently.',
+      data: { summary },
+    });
   } catch (error) {
     next(error);
   }

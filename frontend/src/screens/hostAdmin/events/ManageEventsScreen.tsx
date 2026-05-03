@@ -7,17 +7,18 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Plus, Edit2, Trash2, Ticket as TicketIcon, Calendar as CalendarIcon,
-  Megaphone, Ban, Users, Star, ListOrdered, LayoutDashboard, BellRing, History,
+  Megaphone, Ban, Users, Star, ListOrdered, LayoutDashboard, BellRing, History, ArrowLeft,
 } from 'lucide-react-native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import {
-  ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button, Card,
+  ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button, Card, IconButton,
 } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { EventService, UserService } from '../../../api/services';
 import { Event } from '../../../types';
 import { safeArray } from '../../../utils/safeData';
 import { safeString } from '../../../utils/safeText';
+import { goBackOrFallback } from '../../../utils/navigationBack';
 
 type ManageEventsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageEvents'>;
 
@@ -56,6 +57,10 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
 
   useFocusEffect(useCallback(() => { fetchEvents(); }, []));
   const onRefresh = useCallback(() => { setIsRefreshing(true); fetchEvents(); }, []);
+
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'Dashboard' });
+  };
 
   const handleDelete = (id: string) => {
     Alert.alert('Delete Event', 'Are you sure you want to delete this event?', [
@@ -130,7 +135,15 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
         }
         ListHeaderComponent={
           <View style={styles.pageHeader}>
-            <Text style={styles.pageTitle}>Events</Text>
+            <View style={styles.pageHeaderLeft}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={handleBack}
+                variant="surface"
+                size={36}
+              />
+              <Text style={styles.pageTitle}>Events</Text>
+            </View>
             <Button
               title="New"
               onPress={() => navigation.navigate('EventForm', {})}
@@ -223,6 +236,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: theme.spacing.xl,
     marginBottom: theme.spacing.l,
+  },
+  pageHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
   },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   eventBlock: { marginBottom: theme.spacing.m },

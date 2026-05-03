@@ -7,7 +7,7 @@ import { AttendeeHomeStackParamList } from '../../types/navigation';
 import { Booking } from '../../types';
 import { HeaderBar, QRCard, LoadingState, ErrorState, GlassCard } from '../../components';
 import { BookingService, CheckInService, EventService, TicketService } from '../../api/services';
-import { formatSafeDate, logDevMissing, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
+import { formatSafeDate, safeStatus, safeString, safeTitle, safeUpper } from '../../utils/safeText';
 
 type MyTicketQRRouteProp = RouteProp<AttendeeHomeStackParamList, 'MyTicketQR'>;
 type MyTicketQRNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'MyTicketQR'>;
@@ -22,19 +22,36 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
   const [eventTitle, setEventTitle] = useState('Event');
   const [ticketName, setTicketName] = useState('Ticket');
   const [qrCodeValue, setQrCodeValue] = useState('');
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
 
   const fetchTicketQr = async () => {
     try {
       setIsLoading(true);
       setError(null);
+      setBlockedMessage(null);
       if (!bookingId) return;
-      const [bookingRes, qrRes] = await Promise.all([ BookingService.getBooking(bookingId), CheckInService.getBookingQr(bookingId) ]);
+      const bookingRes = await BookingService.getBooking(bookingId);
       const bookingData = bookingRes?.data?.booking as Booking | undefined;
       if (!bookingData?.id || !bookingData.eventId || !bookingData.ticketTypeId) {
         throw new Error('Invalid booking payload');
       }
       setBooking(bookingData);
-      setQrCodeValue(safeString(qrRes?.data?.qrCodeValue || qrRes?.data?.qrData, ''));
+
+      const approvalStatus = safeStatus(bookingData.approvalStatus, 'approved');
+      if (approvalStatus === 'pending') {
+        setQrCodeValue('');
+        setBlockedMessage('Your registration is pending host approval. QR code will be available after approval.');
+      } else if (approvalStatus === 'rejected') {
+        setQrCodeValue('');
+        setBlockedMessage('Your registration was not approved.');
+      } else if (safeStatus(bookingData.bookingStatus, '') !== 'confirmed') {
+        setQrCodeValue('');
+        setBlockedMessage('QR code is available only for confirmed registrations.');
+      } else {
+        const qrRes = await CheckInService.getBookingQr(bookingId);
+        setQrCodeValue(safeString(qrRes?.data?.qrCodeValue || qrRes?.data?.qrData, ''));
+      }
+
       const [eventRes, ticketRes] = await Promise.all([ EventService.getEvent(bookingData.eventId), TicketService.getTicket(bookingData.ticketTypeId) ]);
       setEventTitle(safeTitle(eventRes?.data?.event?.title, 'Untitled Event'));
       setTicketName(safeTitle(ticketRes?.data?.ticket?.name, 'Ticket'));
@@ -46,7 +63,7 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
   if (!bookingId) return <View style={styles.screen}><HeaderBar variant="back" /><ErrorState message="Missing ticket details." onRetry={() => navigation.goBack()} /></View>;
   if (isLoading) return <LoadingState />;
   if (error) return <View style={styles.screen}><HeaderBar variant="back" /><ErrorState message={error} onRetry={fetchTicketQr} /></View>;
-  if (!booking || !qrCodeValue) return <View style={styles.screen}><HeaderBar variant="back" /><ErrorState message="No QR data available" onRetry={fetchTicketQr} /></View>;
+  if (!booking) return <View style={styles.screen}><HeaderBar variant="back" /><ErrorState message="No ticket data available" onRetry={fetchTicketQr} /></View>;
 
   const checkedIn = booking.checkInStatus === 'checked_in';
   const bookingIdLabel = safeString(booking.id, '').slice(-8);
@@ -67,7 +84,17 @@ export const MyTicketQRScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
 
           <View style={styles.qrSection}>
-            <QRCard value={qrCodeValue} size={220} label="Present this QR code at the entrance" />
+            {blockedMessage ? (
+              <View style={styles.pendingStateCard}>
+                <Text style={styles.pendingStateText}>{blockedMessage}</Text>
+              </View>
+            ) : qrCodeValue ? (
+              <QRCard value={qrCodeValue} size={220} label="Present this QR code at the entrance" />
+            ) : (
+              <View style={styles.pendingStateCard}>
+                <Text style={styles.pendingStateText}>No QR data available yet.</Text>
+              </View>
+            )}
           </View>
 
           {checkedIn && booking.checkedInAt && (
@@ -94,6 +121,21 @@ const styles = StyleSheet.create({
   eventTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '700', textAlign: 'center', letterSpacing: -0.5 },
   bookingId: { color: '#A3A3A3', fontSize: 14, fontFamily: 'monospace' },
   qrSection: { paddingHorizontal: 24, paddingBottom: 24, alignItems: 'center' },
+  pendingStateCard: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  pendingStateText: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
   checkedInBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, backgroundColor: 'rgba(32, 201, 151, 0.1)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
   checkedInText: { color: '#20C997', fontSize: 14, fontWeight: '600' },
 });

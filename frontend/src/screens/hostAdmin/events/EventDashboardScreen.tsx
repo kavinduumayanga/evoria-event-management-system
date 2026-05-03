@@ -36,10 +36,11 @@ import {
   LoadingState,
   ScreenContainer,
 } from '../../../components';
-import { EventService, GuestService, EventDashboardData } from '../../../api/services';
+import { EventService, GuestService, EventDashboardData, RegistrationService } from '../../../api/services';
 import { useAuthStore } from '../../../store/auth.store';
 import { safeArray } from '../../../utils/safeData';
 import { safeString } from '../../../utils/safeText';
+import { goBackOrFallback } from '../../../utils/navigationBack';
 
 interface Props {
   navigation: NativeStackNavigationProp<HostAdminEventStackParamList, 'EventDashboard'>;
@@ -96,6 +97,7 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
 
   const [isInviting, setIsInviting] = useState(false);
   const [isBlasting, setIsBlasting] = useState(false);
+  const [isUpdatingApprovalId, setIsUpdatingApprovalId] = useState<string | null>(null);
 
   const [hostEmail, setHostEmail] = useState('');
   const [isAddingHost, setIsAddingHost] = useState(false);
@@ -155,7 +157,10 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
     ];
   }, [dashboard]);
 
-  const isOwner = dashboard && dashboard.recentRegistrations && true; // Assuming owner logic or just let the button fail
+  const pendingApprovals = useMemo(
+    () => safeArray(dashboard?.recentRegistrations).filter((entry: any) => safeString(entry?.status, '').toLowerCase() === 'pending'),
+    [dashboard?.recentRegistrations],
+  );
 
   const handleAddHost = async () => {
     if (!hostEmail.trim()) {
@@ -246,6 +251,26 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
     }
   };
 
+  const handlePendingApprovalAction = async (entry: EventDashboardData['recentRegistrations'][number], action: 'approve' | 'reject') => {
+    try {
+      setIsUpdatingApprovalId(entry.id);
+      if (entry.source === 'registration') {
+        await GuestService.updateGuestStatus(entry.id, action === 'approve' ? 'going' : 'declined');
+      } else if (action === 'approve') {
+        await RegistrationService.approveRegistration(entry.id);
+      } else {
+        await RegistrationService.rejectRegistration(entry.id);
+      }
+
+      await fetchDashboard();
+      Alert.alert('Success', action === 'approve' ? 'Registration approved.' : 'Registration rejected.');
+    } catch (err: any) {
+      Alert.alert('Update Failed', err?.response?.data?.message || 'Unable to update registration status.');
+    } finally {
+      setIsUpdatingApprovalId(null);
+    }
+  };
+
   if (isLoading && !isRefreshing) return <LoadingState />;
   if (error || !dashboard) return <ScreenContainer><ErrorState message={error || 'Dashboard not available'} onRetry={fetchDashboard} /></ScreenContainer>;
 
@@ -260,7 +285,7 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
         <View style={styles.header}>
           <IconButton
             icon={<ArrowLeft size={20} color={theme.colors.text} />}
-            onPress={() => navigation.goBack()}
+            onPress={() => goBackOrFallback(navigation as any, { name: 'ManageEvents' })}
             variant="surface"
             size={36}
           />
@@ -307,6 +332,55 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
                 </View>
               </View>
             ))}
+          </View>
+        </Card>
+
+        <Card variant="raised" style={styles.card} noPadding>
+          <View style={styles.cardInner}>
+            <View style={styles.pendingHeaderRow}>
+              <Text style={styles.cardTitle}>Pending Approvals</Text>
+              <View style={styles.pendingCountBadge}>
+                <Text style={styles.pendingCountText}>{dashboard.pendingCount}</Text>
+              </View>
+            </View>
+
+            {pendingApprovals.length === 0 ? (
+              <Text style={styles.emptyText}>No pending approvals right now.</Text>
+            ) : (
+              pendingApprovals.slice(0, 4).map((entry) => (
+                <View key={entry.id} style={styles.pendingRow}>
+                  <View style={styles.pendingMeta}>
+                    <Text style={styles.pendingName}>{safeString(entry.name, 'Guest')}</Text>
+                    <Text style={styles.pendingEmail}>{safeString(entry.email, 'No email')}</Text>
+                  </View>
+                  <View style={styles.pendingActions}>
+                    <Button
+                      title="Approve"
+                      onPress={() => handlePendingApprovalAction(entry, 'approve')}
+                      variant="secondary"
+                      size="sm"
+                      isLoading={isUpdatingApprovalId === entry.id}
+                      style={styles.pendingActionButton}
+                    />
+                    <Button
+                      title="Reject"
+                      onPress={() => handlePendingApprovalAction(entry, 'reject')}
+                      variant="danger"
+                      size="sm"
+                      isLoading={isUpdatingApprovalId === entry.id}
+                      style={styles.pendingActionButton}
+                    />
+                  </View>
+                </View>
+              ))
+            )}
+
+            <Button
+              title="View All"
+              onPress={() => navigation.navigate('ManageRegistrations', { eventId })}
+              variant="ghost"
+              size="sm"
+            />
           </View>
         </Card>
 
@@ -581,6 +655,54 @@ const styles = StyleSheet.create({
   },
   statusFill: {
     height: '100%',
+  },
+  pendingHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.s,
+  },
+  pendingCountBadge: {
+    minWidth: 28,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: theme.colors.warningSubtle,
+    alignItems: 'center',
+  },
+  pendingCountText: {
+    ...theme.typography.caption,
+    color: theme.colors.warning,
+    fontWeight: '700',
+  },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.m,
+    padding: theme.spacing.s,
+    marginBottom: theme.spacing.s,
+    gap: theme.spacing.s,
+  },
+  pendingMeta: {
+    flex: 1,
+  },
+  pendingName: {
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
+  },
+  pendingEmail: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  pendingActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+  },
+  pendingActionButton: {
+    minWidth: 86,
   },
   quickActionsGrid: {
     flexDirection: 'row',

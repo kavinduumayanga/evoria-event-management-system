@@ -14,6 +14,7 @@ export interface User {
   profileImage?: string;
   isActive?: boolean;
   isSuspended?: boolean;
+  emailVerified?: boolean;
   reportCount?: number;
 }
 

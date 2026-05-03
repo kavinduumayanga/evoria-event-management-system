@@ -56,7 +56,7 @@ export const getEventDashboard = async (req: Request, res: Response, next: NextF
       BookingModel.find({ eventId })
         .sort({ createdAt: -1 })
         .limit(8)
-        .select('id userId bookingStatus approvalStatus rsvpStatus checkInStatus createdAt checkedInAt quantity totalAmount'),
+        .select('id userId bookingStatus approvalStatus rsvpStatus checkInStatus isWaitlisted waitlistPosition createdAt checkedInAt quantity totalAmount'),
       CheckInHistoryModel.find({ eventId })
         .sort({ scannedAt: -1 })
         .limit(10),
@@ -140,6 +140,8 @@ export const getEventDashboard = async (req: Request, res: Response, next: NextF
         const user = userMap.get(booking.userId);
         const derivedStatus = booking.checkInStatus === 'checked_in'
           ? 'checked_in'
+          : booking.isWaitlisted || booking.bookingStatus === 'pending'
+            ? 'waitlisted'
           : booking.rsvpStatus === 'not_going'
             ? 'not_going'
             : booking.approvalStatus === 'rejected'

@@ -27,6 +27,9 @@ const userSchema = new Schema({
   profileImage: { type: String, trim: true },
   isActive: { type: Boolean, default: true },
   isSuspended: { type: Boolean, default: false },
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationToken: { type: String, select: false },
+  emailVerificationExpires: { type: Date, select: false },
   reportCount: { type: Number, default: 0 },
   resetPasswordToken: { type: String, select: false },
   resetPasswordExpires: { type: Date, select: false },
@@ -39,6 +42,8 @@ const userSchema = new Schema({
       delete ret._id;
       delete ret.__v;
       delete ret.password;
+      delete ret.emailVerificationToken;
+      delete ret.emailVerificationExpires;
       delete ret.resetPasswordToken;
       delete ret.resetPasswordExpires;
     }
@@ -46,5 +51,6 @@ const userSchema = new Schema({
 });
 
 userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ emailVerified: 1 });
 
 export const UserModel = mongoose.model('User', userSchema);

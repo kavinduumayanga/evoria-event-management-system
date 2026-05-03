@@ -1,15 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity } from 'react-native';
-import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, Button } from '../../components';
+import { ScreenContainer, BookingCard, LoadingState, ErrorState, EmptyState, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { BookingService, CheckInService } from '../../api/services';
 import { Booking } from '../../types';
-import { useFocusEffect } from '@react-navigation/native';
-import { X, UserCheck } from 'lucide-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { X, UserCheck, ArrowLeft } from 'lucide-react-native';
 import { safeArray } from '../../utils/safeData';
 import { safeString } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 export const ManageBookingsScreen = () => {
+  const navigation = useNavigation<any>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +41,10 @@ export const ManageBookingsScreen = () => {
     setIsRefreshing(true);
     fetchBookings();
   }, []);
+
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'Dashboard' });
+  };
 
   const handleRefundBooking = (bookingId: string) => {
     Alert.alert('Refund Booking', 'Are you sure you want to refund and cancel this booking?', [
@@ -90,7 +96,15 @@ export const ManageBookingsScreen = () => {
         }
         ListHeaderComponent={
           <View style={styles.pageHeader}>
-            <Text style={styles.pageTitle}>Manage Bookings</Text>
+            <View style={styles.pageHeaderLeft}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={handleBack}
+                variant="surface"
+                size={36}
+              />
+              <Text style={styles.pageTitle}>Manage Bookings</Text>
+            </View>
           </View>
         }
         renderItem={({ item }) => (
@@ -135,6 +149,11 @@ const styles = StyleSheet.create({
   pageHeader: {
     paddingTop: theme.spacing.xl,
     marginBottom: theme.spacing.l,
+  },
+  pageHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
   },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   actionBtn: {

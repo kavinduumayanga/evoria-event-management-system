@@ -1584,9 +1584,14 @@ export const addEventAdmin = async (req: Request, res: Response, next: NextFunct
 
     const { email } = addEventAdminSchema.parse(req.body);
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await UserModel.findOne({ email: normalizedEmail }).select('_id email');
+    const user = await UserModel.findOne({
+      email: normalizedEmail,
+      emailVerified: true,
+      isActive: true,
+      isSuspended: false,
+    }).select('_id email');
     if (!user) {
-      return next(new AppError('User not found for the provided email', 404));
+      return next(new AppError('No active verified user found for the provided email', 404));
     }
 
     const ownerId = resolveEventOwnerId(event);
@@ -1682,9 +1687,14 @@ export const addEventCoHost = async (req: Request, res: Response, next: NextFunc
 
     const { email } = addEventCoHostSchema.parse(req.body);
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await UserModel.findOne({ email: normalizedEmail }).select('_id email name profileImage');
+    const user = await UserModel.findOne({
+      email: normalizedEmail,
+      emailVerified: true,
+      isActive: true,
+      isSuspended: false,
+    }).select('_id email name profileImage');
     if (!user) {
-      return next(new AppError('User not found for the provided email', 404));
+      return next(new AppError('No active verified user found for the provided email', 404));
     }
 
     const ownerId = resolveEventOwnerId(event);

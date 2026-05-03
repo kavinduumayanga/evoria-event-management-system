@@ -5,6 +5,7 @@ export type AuthStackParamList = {
   Welcome: undefined;
   Login: undefined;
   Register: undefined;
+  VerifyEmail: { email?: string } | undefined;
   ForgotPassword: undefined;
   ResetPassword: { email?: string } | undefined;
 };

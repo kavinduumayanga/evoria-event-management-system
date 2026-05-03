@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "ts-node scripts/seed.ts",
+    "reset:users": "ts-node scripts/reset-users-and-user-data.ts",
     "test": "tsx --test tests/**/*.test.ts"
   },
   "keywords": [],

@@ -32,6 +32,15 @@ export interface ForgotPasswordPayload {
   email: string;
 }
 
+export interface VerifyEmailPayload {
+  email: string;
+  otp: string;
+}
+
+export interface ResendVerificationPayload {
+  email: string;
+}
+
 export interface ResetPasswordPayload {
   email: string;
   token: string;
@@ -365,6 +374,14 @@ const inferImageMimeType = (uri: string): string => {
 export const AuthService = {
   register: async (payload: RegisterPayload) => {
     const response = await apiClient.post('/auth/register', payload);
+    return response.data;
+  },
+  verifyEmail: async (payload: VerifyEmailPayload) => {
+    const response = await apiClient.post('/auth/verify-email', payload);
+    return response.data;
+  },
+  resendVerification: async (payload: ResendVerificationPayload) => {
+    const response = await apiClient.post('/auth/resend-verification', payload);
     return response.data;
   },
   login: async (payload: LoginPayload) => {

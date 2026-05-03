@@ -1,14 +1,15 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Platform } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { User, Mail, Phone, Shield, LogOut, ChevronRight, KeyRound } from 'lucide-react-native';
-import { ScreenContainer, Card, LoadingState, ErrorState, Button } from '../../components';
+import { User, Mail, Phone, Shield, LogOut, ChevronRight, KeyRound, ArrowLeft } from 'lucide-react-native';
+import { ScreenContainer, Card, LoadingState, ErrorState, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { safeInitials } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 export const ProfileScreen = () => {
   const navigation = useNavigation<any>();
@@ -36,6 +37,10 @@ export const ProfileScreen = () => {
   }, [updateAuthUser]);
 
   useFocusEffect(useCallback(() => { setIsLoading(true); fetchProfile(); }, [fetchProfile]));
+
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'HomeStack', params: { screen: 'EventList' } });
+  };
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
@@ -126,7 +131,15 @@ export const ProfileScreen = () => {
     <ScreenContainer scrollable>
       {/* === HEADER === */}
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Profile</Text>
+        <View style={styles.pageHeaderLeft}>
+          <IconButton
+            icon={<ArrowLeft size={20} color={theme.colors.text} />}
+            onPress={handleBack}
+            variant="surface"
+            size={36}
+          />
+          <Text style={styles.pageTitle}>Profile</Text>
+        </View>
       </View>
 
       {/* === AVATAR + NAME === */}
@@ -217,6 +230,7 @@ const actionStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   pageHeader: { paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.xl, marginBottom: theme.spacing.xl },
+  pageHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.s },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   avatarSection: { alignItems: 'center', marginBottom: theme.spacing.xl, paddingHorizontal: theme.spacing.base },
   avatarImage: { width: 96, height: 96, borderRadius: 48, marginBottom: theme.spacing.m, borderWidth: 2, borderColor: theme.colors.primary },

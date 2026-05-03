@@ -17,6 +17,8 @@ const apiClient = axios.create({
 const AUTH_OPTIONAL_PATHS = [
   '/auth/login',
   '/auth/register',
+  '/auth/verify-email',
+  '/auth/resend-verification',
   '/auth/forgot-password',
   '/auth/verify-reset-otp',
   '/auth/reset-password',
