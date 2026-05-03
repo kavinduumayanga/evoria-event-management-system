@@ -4,9 +4,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation';
 import { HeaderBar, PrimaryButton, InputField, GlassCard } from '../../components';
 import { AuthService } from '../../api/services';
-import { safeLower } from '../../utils/safeText';
 import { useAuthStore } from '../../store/auth.store';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { normalizeEmail, validateAccountEmail } from '../../utils/emailValidation';
 import { Mail, Lock } from 'lucide-react-native';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
@@ -19,22 +19,69 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
 
+  const handleResendVerification = async (normalizedEmail: string) => {
+    try {
+      const response = await AuthService.resendVerification({ email: normalizedEmail });
+      Alert.alert('Verification OTP', response?.message || 'If your account needs verification, a new OTP has been sent.', [
+        {
+          text: 'Verify Now',
+          onPress: () => navigation.navigate('VerifyEmail', { email: normalizedEmail }),
+        },
+        {
+          text: 'Close',
+          style: 'cancel',
+        },
+      ]);
+    } catch (error: any) {
+      Alert.alert('Resend Failed', getApiErrorMessage(error, 'Unable to resend verification OTP right now.'));
+    }
+  };
+
   const handleLogin = async () => {
     Keyboard.dismiss();
-    const normalizedEmail = safeLower(email.trim());
-    if (!normalizedEmail || !password) {
+    const normalized = normalizeEmail(email);
+    if (!normalized || !password) {
       Alert.alert('Validation', 'Please fill in all fields.');
       return;
     }
+
+    const emailValidation = validateAccountEmail(normalized);
+    if (!emailValidation.isValid) {
+      Alert.alert('Validation', emailValidation.message || 'Please enter a valid email address.');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await AuthService.login({ email: normalizedEmail, password });
+      const response = await AuthService.login({ email: normalized, password });
       const { token, user, data } = response;
       const resolvedUser = user || data?.user;
       if (!token || !resolvedUser) throw new Error('Invalid login response');
       await login(resolvedUser, token);
     } catch (error: any) {
-      Alert.alert('Login Failed', getApiErrorMessage(error, 'Unable to sign in. Please try again.'));
+      const message = getApiErrorMessage(error, 'Unable to sign in. Please try again.');
+      const loweredMessage = message.toLowerCase();
+
+      if (loweredMessage.includes('verify your email')) {
+        Alert.alert('Email Verification Required', message, [
+          {
+            text: 'Resend OTP',
+            onPress: () => {
+              handleResendVerification(normalized).catch(() => undefined);
+            },
+          },
+          {
+            text: 'Verify Now',
+            onPress: () => navigation.navigate('VerifyEmail', { email: normalized }),
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]);
+      } else {
+        Alert.alert('Login Failed', message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +100,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           <GlassCard variant="dark" style={styles.formCard}>
             <InputField
               label="Email Address"
-              placeholder="hello@example.com"
+              placeholder="hello@yourdomain.com"
               keyboardType="email-address"
               autoCapitalize="none"
               value={email}

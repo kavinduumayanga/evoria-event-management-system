@@ -30,7 +30,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string; role?: Role; tokenVersion?: number };
 
-    const currentUser = await UserModel.findById(decoded.id).select('+isActive +isSuspended');
+    const currentUser = await UserModel.findById(decoded.id).select('+isActive +isSuspended +emailVerified');
     if (!currentUser) {
       return next(new AppError('Unauthorized access. User no longer exists.', 401));
     }
@@ -41,6 +41,10 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     if (currentUser.isSuspended) {
       return next(new AppError('This account is suspended. Please contact support.', 401));
+    }
+
+    if (!currentUser.emailVerified) {
+      return next(new AppError('Please verify your email before using your account.', 401));
     }
 
     req.user = {

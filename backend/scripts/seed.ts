@@ -39,6 +39,11 @@ const upsertDemoUser = async (payload: {
         phone: payload.phone,
         isActive: true,
         isSuspended: false,
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
       },
     },
     {
