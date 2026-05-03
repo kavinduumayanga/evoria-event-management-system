@@ -9,6 +9,8 @@
     "start": "node dist/server.js",
     "seed": "ts-node scripts/seed.ts",
     "reset:users": "ts-node scripts/reset-users-and-user-data.ts",
+    "db:clear": "tsx scripts/clear-database.ts",
+    "db:counts": "tsx scripts/db-counts.ts",
     "test": "tsx --test tests/**/*.test.ts"
   },
   "keywords": [],
