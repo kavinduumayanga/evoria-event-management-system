@@ -8,6 +8,7 @@ import { ScreenContainer, EventCard, LoadingState, EmptyState, ErrorState, Heade
 import { theme } from '../../constants/theme';
 import { EventService } from '../../api/services';
 import { safeString } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 type EventListScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'EventList'>;
 interface Props { navigation: EventListScreenNavigationProp; }
@@ -54,12 +55,16 @@ export const EventListScreen: React.FC<Props> = ({ navigation }) => {
 
   useFocusEffect(useCallback(() => { fetchEvents(searchQuery); }, [fetchEvents, searchQuery]));
 
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'EventList' });
+  };
+
   if (isLoading && !isRefreshing) return <LoadingState />;
   if (error) return <ScreenContainer><ErrorState message={error} onRetry={fetchEvents} /></ScreenContainer>;
 
   return (
     <View style={styles.container}>
-      <HeaderBar variant="discover" onSearchChange={setSearchQuery} />
+      <HeaderBar variant="discover" onSearchChange={setSearchQuery} onBack={handleBack} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

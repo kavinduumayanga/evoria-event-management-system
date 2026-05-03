@@ -19,6 +19,7 @@ import { Input, Button, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ResetPassword'>;
 type ResetPasswordScreenRouteProp = NativeStackScreenProps<AuthStackParamList, 'ResetPassword'>['route'];
@@ -77,7 +78,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.header}>
             <IconButton
               icon={<ArrowLeft color={theme.colors.text} size={22} />}
-              onPress={() => navigation.goBack()}
+              onPress={() => goBackOrFallback(navigation as any, { name: 'ForgotPassword' })}
               variant="surface"
               size={40}
             />

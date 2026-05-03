@@ -100,9 +100,21 @@ const generateBookingQrCodeValue = async (): Promise<string> => {
   throw new AppError('Failed to generate a unique QR code token', 500);
 };
 
-const ensureQrTokenForBooking = async (bookingId: string) => {
-  const booking = await BookingModel.findById(bookingId);
-  if (!booking) return null;
+const ensureQrTokenForBooking = async (booking: any) => {
+  if (booking.bookingStatus === 'cancelled') {
+    throw new AppError('Cancelled bookings do not have an active QR code', 400);
+  }
+
+  if (booking.bookingStatus !== 'confirmed') {
+    throw new AppError('Only confirmed bookings can access QR code', 400);
+  }
+
+  if (booking.approvalStatus && booking.approvalStatus !== 'approved') {
+    if (booking.approvalStatus === 'pending') {
+      throw new AppError('Your registration is pending host approval. QR code will be available after approval.', 403);
+    }
+    throw new AppError('Your registration was not approved. QR code is unavailable.', 403);
+  }
 
   if (booking.qrCodeValue) return booking;
   booking.qrCodeValue = await generateBookingQrCodeValue();
@@ -146,14 +158,16 @@ export const getBookingQr = async (req: Request, res: Response, next: NextFuncti
       });
     }
 
-    let booking = await ensureQrTokenForBooking(registrationOrBookingId);
-    if (!booking) return next(new AppError('Booking not found', 404));
-
-    if (booking.userId !== req.user!.id) {
-      await ensureCanManageEvent(booking.eventId, req.user!.id);
-      booking = await ensureQrTokenForBooking(registrationOrBookingId);
-      if (!booking) return next(new AppError('Booking not found', 404));
+    const bookingRecord = await BookingModel.findById(registrationOrBookingId);
+    if (!bookingRecord) {
+      next(new AppError('Booking not found', 404));
+      return;
     }
+
+    if (bookingRecord.userId !== req.user!.id) {
+      await ensureCanManageEvent(bookingRecord.eventId, req.user!.id);
+    }
+    const booking = await ensureQrTokenForBooking(bookingRecord);
 
     res.status(200).json({
       status: 'success',
@@ -162,6 +176,7 @@ export const getBookingQr = async (req: Request, res: Response, next: NextFuncti
         qrCodeValue: booking.qrCodeValue,
         qrData: booking.qrCodeValue,
         bookingStatus: booking.bookingStatus,
+        approvalStatus: booking.approvalStatus,
         checkInStatus: booking.checkInStatus,
       },
     });

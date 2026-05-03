@@ -1,8 +1,10 @@
+import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { BookingModel } from '../models/Booking';
 import { EventModel } from '../models/Event';
 import { TicketTypeModel } from '../models/TicketType';
+import { UserModel } from '../models/User';
 import { VenueModel } from '../models/Venue';
 import { AppError } from '../utils/appError';
 import { ApprovalStatus, RsvpStatus } from '../types';
@@ -46,6 +48,16 @@ const ensureCanManageEvent = async (eventId: string, userId: string) => {
   }
 
   return event;
+};
+
+const generateUniqueBookingQrCodeValue = async (): Promise<string> => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const token = `qr_${crypto.randomBytes(16).toString('hex')}`;
+    const exists = await BookingModel.exists({ qrCodeValue: token });
+    if (!exists) return token;
+  }
+
+  throw new AppError('Failed to generate a unique QR code token', 500);
 };
 
 const validateCustomAnswers = (
@@ -308,10 +320,53 @@ export const getEventRegistrations = async (req: Request, res: Response, next: N
     await ensureCanManageEvent(req.params.eventId as string, req.user!.id);
 
     const registrations = await BookingModel.find({ eventId: req.params.eventId }).sort({ createdAt: -1 });
+
+    const userIds = Array.from(new Set(registrations.map((registration) => registration.userId)));
+    const ticketTypeIds = Array.from(new Set(registrations.map((registration) => registration.ticketTypeId)));
+    const [users, tickets] = await Promise.all([
+      userIds.length ? UserModel.find({ _id: { $in: userIds } }).select('id name email') : [],
+      ticketTypeIds.length ? TicketTypeModel.find({ _id: { $in: ticketTypeIds } }).select('id name') : [],
+    ]);
+
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const ticketMap = new Map(tickets.map((ticket) => [ticket.id, ticket]));
+
+    const mappedRegistrations = registrations.map((registration) => {
+      const user = userMap.get(registration.userId);
+      const ticket = ticketMap.get(registration.ticketTypeId);
+      const effectiveStatus = registration.isWaitlisted
+        ? 'waitlisted'
+        : registration.bookingStatus === 'cancelled'
+          ? 'cancelled'
+          : registration.checkInStatus === 'checked_in'
+            ? 'checked_in'
+            : registration.approvalStatus === 'pending'
+              ? 'pending'
+              : registration.approvalStatus === 'rejected'
+                ? 'rejected'
+                : registration.rsvpStatus === 'not_going'
+                  ? 'not_going'
+                  : 'approved';
+
+      return {
+        ...registration.toJSON(),
+        attendee: {
+          id: user?.id || registration.userId,
+          name: user?.name || 'Guest',
+          email: user?.email || '',
+        },
+        ticket: {
+          id: registration.ticketTypeId,
+          name: ticket?.name || 'Ticket',
+        },
+        effectiveStatus,
+      };
+    });
+
     res.status(200).json({
       status: 'success',
-      results: registrations.length,
-      data: { registrations: registrations.map((registration) => registration.toJSON()) },
+      results: mappedRegistrations.length,
+      data: { registrations: mappedRegistrations },
     });
   } catch (error) {
     next(error);
@@ -330,13 +385,30 @@ const updateApprovalStatus = async (
 
     await ensureCanManageEvent(registration.eventId, req.user!.id);
 
+    if (registration.bookingStatus === 'cancelled') {
+      return next(new AppError('Cancelled registrations cannot be approved or rejected', 400));
+    }
+
+    if (registration.isWaitlisted) {
+      return next(new AppError('Waitlisted registrations cannot be approved until promoted', 400));
+    }
+
     if (registration.approvalStatus === approvalStatus) {
       return next(new AppError(`Registration already ${approvalStatus}`, 400));
     }
 
     const updatePayload: Record<string, unknown> = { approvalStatus };
+    if (approvalStatus === 'approved' && !registration.qrCodeValue) {
+      updatePayload.qrCodeValue = await generateUniqueBookingQrCodeValue();
+    }
     if (approvalStatus === 'rejected') {
       updatePayload.rsvpStatus = 'not_going';
+      updatePayload.checkInStatus = 'not_checked_in';
+      updatePayload.checkedInAt = null;
+      updatePayload.checkedInBy = null;
+      updatePayload.checkInMethod = null;
+      updatePayload.attendanceNote = null;
+      updatePayload.qrCodeValue = null;
     }
 
     const updatedRegistration = await BookingModel.findByIdAndUpdate(registration.id, updatePayload, { new: true });

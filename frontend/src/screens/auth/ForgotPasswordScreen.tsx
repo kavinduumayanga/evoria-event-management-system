@@ -20,6 +20,7 @@ import { theme } from '../../constants/theme';
 import { AuthService } from '../../api/services';
 import { safeLower } from '../../utils/safeText';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
 
@@ -141,7 +142,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.header}>
             <IconButton
               icon={<ArrowLeft color={theme.colors.text} size={22} />}
-              onPress={() => navigation.goBack()}
+              onPress={() => goBackOrFallback(navigation as any, { name: 'Login' })}
               variant="surface"
               size={40}
             />

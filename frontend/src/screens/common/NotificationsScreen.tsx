@@ -3,14 +3,15 @@ import {
   View, Text, StyleSheet, FlatList, RefreshControl,
   TouchableOpacity, Alert,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { Bell, Check, Trash2, BellOff } from 'lucide-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Bell, Check, Trash2, BellOff, ArrowLeft } from 'lucide-react-native';
 import { Notification } from '../../types';
 import { NotificationService } from '../../api/services';
 import { theme } from '../../constants/theme';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatusBadge } from '../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatusBadge, IconButton } from '../../components';
 import { safeArray } from '../../utils/safeData';
 import { formatSafeDate, logDevMissing, safeStatus, safeString } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 const TYPE_STATUS: Record<string, any> = {
   booking: 'success',
@@ -21,6 +22,7 @@ const TYPE_STATUS: Record<string, any> = {
 };
 
 export const NotificationsScreen = () => {
+  const navigation = useNavigation<any>();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -41,6 +43,10 @@ export const NotificationsScreen = () => {
 
   useFocusEffect(useCallback(() => { fetchNotifications(); }, []));
   const onRefresh = useCallback(() => { setIsRefreshing(true); fetchNotifications(); }, []);
+
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'HomeStack', params: { screen: 'EventList' } });
+  };
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -83,11 +89,19 @@ export const NotificationsScreen = () => {
         }
         ListHeaderComponent={
           <View style={styles.pageHeader}>
-            <View>
-              <Text style={styles.pageTitle}>Notifications</Text>
-              {unreadCount > 0 && (
-                <Text style={styles.unreadLabel}>{unreadCount} unread</Text>
-              )}
+            <View style={styles.pageHeaderLeft}>
+              <IconButton
+                icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                onPress={handleBack}
+                variant="surface"
+                size={36}
+              />
+              <View>
+                <Text style={styles.pageTitle}>Notifications</Text>
+                {unreadCount > 0 && (
+                  <Text style={styles.unreadLabel}>{unreadCount} unread</Text>
+                )}
+              </View>
             </View>
             <View style={styles.bellWrap}>
               <Bell size={20} color={unreadCount > 0 ? theme.colors.warning : theme.colors.textMuted} />
@@ -179,6 +193,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingTop: theme.spacing.xl,
     marginBottom: theme.spacing.l,
+  },
+  pageHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
   },
   pageTitle: { ...theme.typography.h1, color: theme.colors.text },
   unreadLabel: { ...theme.typography.label, color: theme.colors.warning, marginTop: 2 },

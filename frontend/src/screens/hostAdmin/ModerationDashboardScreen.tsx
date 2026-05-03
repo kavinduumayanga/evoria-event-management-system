@@ -1,15 +1,17 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Alert } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatCard } from '../../components';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatCard, IconButton } from '../../components';
 import { theme } from '../../constants/theme';
 import { AdminService, ModerationService, ReportService } from '../../api/services';
 import { PlatformAnalytics, ReportRecord } from '../../types';
-import { Flag, ShieldBan, ShieldCheck } from 'lucide-react-native';
+import { Flag, ShieldBan, ShieldCheck, ArrowLeft } from 'lucide-react-native';
 import { safeArray } from '../../utils/safeData';
 import { safeString, safeUpper } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 export const ModerationDashboardScreen = () => {
+  const navigation = useNavigation<any>();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,10 @@ export const ModerationDashboardScreen = () => {
     setIsRefreshing(true);
     fetchData();
   }, []);
+
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'Dashboard' });
+  };
 
   const runActionWithConfirmation = (
     title: string,
@@ -137,7 +143,15 @@ export const ModerationDashboardScreen = () => {
         ListHeaderComponent={
           <>
             <View style={styles.header}>
-              <Text style={styles.title}>Moderation Dashboard</Text>
+              <View style={styles.headerTopRow}>
+                <IconButton
+                  icon={<ArrowLeft size={20} color={theme.colors.text} />}
+                  onPress={handleBack}
+                  variant="surface"
+                  size={36}
+                />
+                <Text style={styles.title}>Moderation Dashboard</Text>
+              </View>
               <Text style={styles.subtitle}>Review reports and enforce platform rules</Text>
             </View>
 
@@ -253,6 +267,11 @@ const styles = StyleSheet.create({
   header: {
     marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.m,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
   },
   title: {
     ...theme.typography.h1,

@@ -8,16 +8,17 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
-import { Camera, RefreshCw, QrCode, UserCheck } from 'lucide-react-native';
+import { Camera, RefreshCw, QrCode, UserCheck, ArrowLeft } from 'lucide-react-native';
 import { theme } from '../../constants/theme';
-import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, Button, Input } from '../../components';
+import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, Button, Input, IconButton } from '../../components';
 import { CheckInService, EventService, UserService } from '../../api/services';
 import { Event } from '../../types';
 import { HostAdminEventStackParamList } from '../../types/navigation';
 import { safeArray } from '../../utils/safeData';
 import { formatSafeDate, safeString, safeUpper } from '../../utils/safeText';
+import { goBackOrFallback } from '../../utils/navigationBack';
 
 interface AttendanceRecord {
   id: string;
@@ -56,6 +57,7 @@ const normalizeAttendance = (rawItems: unknown): AttendanceRecord[] => {
 };
 
 export const CheckInScannerScreen = () => {
+  const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<HostAdminEventStackParamList, 'CheckInScanner'>>();
   const preselectedEventId = String(route.params?.eventId || '');
   const [events, setEvents] = useState<Event[]>([]);
@@ -123,6 +125,10 @@ export const CheckInScannerScreen = () => {
     setIsRefreshing(true);
     fetchScreenData();
   }, [fetchScreenData]);
+
+  const handleBack = () => {
+    goBackOrFallback(navigation as any, { name: 'ManageEvents' });
+  };
 
   const openScanner = async () => {
     if (!selectedEventId) {
@@ -221,7 +227,15 @@ export const CheckInScannerScreen = () => {
   return (
     <ScreenContainer style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>QR Check-in</Text>
+        <View style={styles.headerLeft}>
+          <IconButton
+            icon={<ArrowLeft size={20} color={theme.colors.text} />}
+            onPress={handleBack}
+            variant="surface"
+            size={36}
+          />
+          <Text style={styles.title}>QR Check-in</Text>
+        </View>
         <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
           <RefreshCw size={18} color={theme.colors.primary} />
         </TouchableOpacity>
@@ -392,6 +406,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
   },
   title: {
     ...theme.typography.h1,
