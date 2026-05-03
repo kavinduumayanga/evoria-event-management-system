@@ -42,10 +42,12 @@ export const MyEventsScreen = () => {
       const allEvents = normalizeEvents(response);
       const manageableEvents = allEvents.filter((event) => {
         const adminIds = safeArray<string>(event.adminIds);
+        const coHostIds = safeArray<string>((event as any).coHostIds);
         return (
           event.ownerId === currentUser.id
           || event.hostAdminId === currentUser.id
           || adminIds.includes(currentUser.id)
+          || coHostIds.includes(currentUser.id)
         );
       });
 
@@ -132,8 +134,17 @@ export const MyEventsScreen = () => {
           if (!eventId) {
             logDevMissing('my-events-id', 'Managed event missing id; actions disabled.');
           }
+          const isOwner = item.ownerId === currentUser?.id || item.hostAdminId === currentUser?.id;
+
           return (
             <View style={styles.eventBlock}>
+              <View style={styles.roleBadgeWrap}>
+                <View style={[styles.roleBadge, isOwner ? styles.roleBadgeOwner : styles.roleBadgeCoHost]}>
+                  <Text style={[styles.roleBadgeText, isOwner ? styles.roleBadgeTextOwner : styles.roleBadgeTextCoHost]}>
+                    {isOwner ? 'Owner' : 'Co-host'}
+                  </Text>
+                </View>
+              </View>
               <EventCard
                 event={item}
                 variant="list"
@@ -266,7 +277,38 @@ const styles = StyleSheet.create({
     ...theme.shadows.glow,
   },
   eventBlock: {
-    marginBottom: theme.spacing.m,
+    marginBottom: theme.spacing.xl,
+    position: 'relative',
+  },
+  roleBadgeWrap: {
+    position: 'absolute',
+    top: -12,
+    right: 12,
+    zIndex: 10,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  roleBadgeOwner: {
+    backgroundColor: theme.colors.primarySubtle,
+    borderColor: theme.colors.primary,
+  },
+  roleBadgeCoHost: {
+    backgroundColor: theme.colors.surfaceOverlay,
+    borderColor: theme.colors.border,
+  },
+  roleBadgeText: {
+    ...theme.typography.caption,
+    fontWeight: '700',
+  },
+  roleBadgeTextOwner: {
+    color: theme.colors.primaryLight,
+  },
+  roleBadgeTextCoHost: {
+    color: theme.colors.textSecondary,
   },
   eventActions: {
     marginTop: theme.spacing.s,

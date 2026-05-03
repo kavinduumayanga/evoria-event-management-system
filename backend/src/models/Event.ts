@@ -24,6 +24,7 @@ const eventSchema = new Schema({
   // Legacy field kept for backward compatibility with older records.
   hostAdminId: { type: String, index: true },
   adminIds: { type: [String], default: [] },
+  coHostIds: { type: [String], default: [] },
   publicSlug: { type: String, required: true, unique: true, trim: true, lowercase: true, index: true },
   venueId: { type: String, default: null },
   location: {

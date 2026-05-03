@@ -1,5 +1,6 @@
 import React, { forwardRef, useState } from 'react';
-import { View, TextInput, Text, StyleSheet, TextInputProps, Animated } from 'react-native';
+import { View, TextInput, Text, StyleSheet, TextInputProps, Animated, TouchableOpacity } from 'react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { theme } from '../constants/theme';
 
 export interface InputProps extends TextInputProps {
@@ -48,7 +49,21 @@ export const Input = forwardRef<TextInput, InputProps>(
             secureTextEntry={secureText}
             {...props}
           />
-          {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
+          {isPassword ? (
+            <TouchableOpacity
+              onPress={() => setSecureText(!secureText)}
+              style={styles.rightIcon}
+              activeOpacity={0.7}
+            >
+              {secureText ? (
+                <EyeOff size={20} color={theme.colors.textMuted} />
+              ) : (
+                <Eye size={20} color={theme.colors.textMuted} />
+              )}
+            </TouchableOpacity>
+          ) : (
+            rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>
+          )}
         </Animated.View>
         {hint && !error && <Text style={styles.hintText}>{hint}</Text>}
         {error && <Text style={styles.errorText}>{error}</Text>}
