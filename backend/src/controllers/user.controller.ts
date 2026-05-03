@@ -1,8 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import mongoose, { ClientSession } from 'mongoose';
 import { UserModel } from '../models/User';
 import { EventModel } from '../models/Event';
+import { VenueModel } from '../models/Venue';
+import { TicketTypeModel } from '../models/TicketType';
+import { SessionModel } from '../models/Session';
+import { RegistrationModel } from '../models/Registration';
+import { BookingModel } from '../models/Booking';
+import { NotificationModel } from '../models/Notification';
+import { ReminderModel } from '../models/Reminder';
+import { ReviewModel } from '../models/Review';
+import { ReportModel } from '../models/Report';
+import { CheckInHistoryModel } from '../models/CheckInHistory';
+import { PushTokenModel } from '../models/PushToken';
+import { EmailLogModel } from '../models/EmailLog';
 import { Role } from '../types';
 import { AppError } from '../utils/appError';
 import { z } from 'zod';
@@ -49,6 +62,166 @@ const handleValidationError = (error: unknown, next: NextFunction) => {
   }
 
   return next(error);
+};
+
+type DeleteSummary = {
+  deletedUser: number;
+  deletedOwnedEvents: number;
+  deletedOwnedVenues: number;
+  deletedOwnedTickets: number;
+  deletedOwnedSessions: number;
+  deletedOwnedRegistrations: number;
+  deletedOwnedBookings: number;
+  deletedUserRegistrations: number;
+  deletedUserBookings: number;
+  deletedUserReviews: number;
+  deletedUserReports: number;
+  deletedUserNotifications: number;
+  deletedUserReminders: number;
+  deletedUserCheckins: number;
+  deletedUserPushTokens: number;
+  deletedUserEmailLogs: number;
+  deletedEventReviews: number;
+  deletedEventReports: number;
+  deletedEventReminders: number;
+  deletedEventNotifications: number;
+  deletedEventCheckins: number;
+  deletedEventEmailLogs: number;
+  adminAccessRemovedFromEvents: number;
+};
+
+const createDeleteSummary = (): DeleteSummary => ({
+  deletedUser: 0,
+  deletedOwnedEvents: 0,
+  deletedOwnedVenues: 0,
+  deletedOwnedTickets: 0,
+  deletedOwnedSessions: 0,
+  deletedOwnedRegistrations: 0,
+  deletedOwnedBookings: 0,
+  deletedUserRegistrations: 0,
+  deletedUserBookings: 0,
+  deletedUserReviews: 0,
+  deletedUserReports: 0,
+  deletedUserNotifications: 0,
+  deletedUserReminders: 0,
+  deletedUserCheckins: 0,
+  deletedUserPushTokens: 0,
+  deletedUserEmailLogs: 0,
+  deletedEventReviews: 0,
+  deletedEventReports: 0,
+  deletedEventReminders: 0,
+  deletedEventNotifications: 0,
+  deletedEventCheckins: 0,
+  deletedEventEmailLogs: 0,
+  adminAccessRemovedFromEvents: 0,
+});
+
+const sessionOptions = (session?: ClientSession) => (session ? { session } : undefined);
+
+const isTransactionUnsupportedError = (error: unknown): boolean => {
+  const message = String((error as { message?: string })?.message || '').toLowerCase();
+  return message.includes('transaction numbers are only allowed')
+    || message.includes('replica set')
+    || message.includes('transaction is not supported');
+};
+
+const purgeUserAccountData = async (userId: string, session?: ClientSession): Promise<DeleteSummary> => {
+  const summary = createDeleteSummary();
+
+  const ownedEvents = session
+    ? await EventModel.find({ $or: [{ ownerId: userId }, { hostAdminId: userId }] }).session(session)
+    : await EventModel.find({ $or: [{ ownerId: userId }, { hostAdminId: userId }] });
+  const ownedEventIds = ownedEvents.map((event) => event.id);
+
+  if (ownedEventIds.length > 0) {
+    const eventCheckins = await CheckInHistoryModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedEventCheckins += eventCheckins.deletedCount || 0;
+
+    const eventEmailLogs = await EmailLogModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedEventEmailLogs += eventEmailLogs.deletedCount || 0;
+
+    const eventNotifications = await NotificationModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedEventNotifications += eventNotifications.deletedCount || 0;
+
+    const eventReminders = await ReminderModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedEventReminders += eventReminders.deletedCount || 0;
+
+    const eventReviews = await ReviewModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedEventReviews += eventReviews.deletedCount || 0;
+
+    const eventReports = await ReportModel.deleteMany({ targetType: 'event', targetId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedEventReports += eventReports.deletedCount || 0;
+
+    const eventBookings = await BookingModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedOwnedBookings += eventBookings.deletedCount || 0;
+
+    const eventRegistrations = await RegistrationModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedOwnedRegistrations += eventRegistrations.deletedCount || 0;
+
+    const eventSessions = await SessionModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedOwnedSessions += eventSessions.deletedCount || 0;
+
+    const eventTickets = await TicketTypeModel.deleteMany({ eventId: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedOwnedTickets += eventTickets.deletedCount || 0;
+
+    const deletedEvents = await EventModel.deleteMany({ _id: { $in: ownedEventIds } }, sessionOptions(session));
+    summary.deletedOwnedEvents += deletedEvents.deletedCount || 0;
+  }
+
+  const deletedVenues = await VenueModel.deleteMany({ ownerId: userId }, sessionOptions(session));
+  summary.deletedOwnedVenues += deletedVenues.deletedCount || 0;
+
+  const deletedUserBookings = await BookingModel.deleteMany({ userId }, sessionOptions(session));
+  summary.deletedUserBookings += deletedUserBookings.deletedCount || 0;
+
+  const deletedUserRegistrations = await RegistrationModel.deleteMany({ userId }, sessionOptions(session));
+  summary.deletedUserRegistrations += deletedUserRegistrations.deletedCount || 0;
+
+  const deletedUserReviews = await ReviewModel.deleteMany({ userId }, sessionOptions(session));
+  summary.deletedUserReviews += deletedUserReviews.deletedCount || 0;
+
+  const deletedUserReports = await ReportModel.deleteMany({
+    $or: [
+      { reporterId: userId },
+      { targetType: 'user', targetId: userId },
+    ],
+  }, sessionOptions(session));
+  summary.deletedUserReports += deletedUserReports.deletedCount || 0;
+
+  const deletedUserNotifications = await NotificationModel.deleteMany({
+    $or: [{ userId }, { createdBy: userId }],
+  }, sessionOptions(session));
+  summary.deletedUserNotifications += deletedUserNotifications.deletedCount || 0;
+
+  const deletedUserReminders = await ReminderModel.deleteMany({ createdBy: userId }, sessionOptions(session));
+  summary.deletedUserReminders += deletedUserReminders.deletedCount || 0;
+
+  const deletedUserCheckins = await CheckInHistoryModel.deleteMany({ scannedBy: userId }, sessionOptions(session));
+  summary.deletedUserCheckins += deletedUserCheckins.deletedCount || 0;
+
+  const deletedUserPushTokens = await PushTokenModel.deleteMany({ userId }, sessionOptions(session));
+  summary.deletedUserPushTokens += deletedUserPushTokens.deletedCount || 0;
+
+  const deletedUserEmailLogs = await EmailLogModel.deleteMany({
+    $or: [{ recipientUserId: userId }, { createdBy: userId }],
+  }, sessionOptions(session));
+  summary.deletedUserEmailLogs += deletedUserEmailLogs.deletedCount || 0;
+
+  const adminAccessUpdate = await EventModel.updateMany(
+    { adminIds: userId },
+    { $pull: { adminIds: userId } },
+    sessionOptions(session),
+  );
+  summary.adminAccessRemovedFromEvents += adminAccessUpdate.modifiedCount || 0;
+
+  const deletedUser = await UserModel.deleteOne({ _id: userId }, sessionOptions(session));
+  summary.deletedUser += deletedUser.deletedCount || 0;
+
+  if (summary.deletedUser !== 1) {
+    throw new AppError('Account delete failed. User record was not removed.', 500);
+  }
+
+  return summary;
 };
 
 export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
@@ -203,28 +376,42 @@ export const updatePassword = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const deactivateAccount = async (req: Request, res: Response, next: NextFunction) => {
+export const deleteAccount = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userDoc = await UserModel.findById(req.user!.id).select('+isActive +resetPasswordToken +resetPasswordExpires');
+    const userId = req.user!.id;
+    const userDoc = await UserModel.findById(userId).select('_id');
     if (!userDoc) {
       return next(new AppError('User not found', 404));
     }
 
-    if (!userDoc.isActive) {
-      return next(new AppError('Account is already deactivated', 400));
+    let summary: DeleteSummary;
+    const session = await mongoose.startSession();
+
+    try {
+      try {
+        session.startTransaction();
+        summary = await purgeUserAccountData(userId, session);
+        await session.commitTransaction();
+      } catch (transactionError) {
+        await session.abortTransaction().catch(() => undefined);
+        if (!isTransactionUnsupportedError(transactionError)) {
+          throw transactionError;
+        }
+
+        // Fallback for non-replica-set local environments where transactions are unavailable.
+        summary = await purgeUserAccountData(userId);
+      }
+    } finally {
+      await session.endSession();
     }
-
-    userDoc.isActive = false;
-    userDoc.resetPasswordToken = undefined;
-    userDoc.resetPasswordExpires = undefined;
-
-    await userDoc.save();
 
     res.status(200).json({
       status: 'success',
-      message: 'Account deactivated successfully.',
+      message: 'Account and related data deleted permanently.',
+      data: { summary },
     });
   } catch (error) {
+    console.error('[user.deleteAccount] Failed to delete account', error);
     next(error);
   }
 };

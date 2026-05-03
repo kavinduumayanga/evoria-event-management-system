@@ -9,6 +9,7 @@ import {
   ScrollView,
   Keyboard,
   TextInput,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,15 +31,19 @@ interface Props {
 export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   const newPasswordRef = useRef<TextInput>(null);
   const confirmPasswordRef = useRef<TextInput>(null);
+  const prefetchedEmail = route.params?.email;
+  const [email, setEmail] = useState(prefetchedEmail || '');
   const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const prefetchedEmail = route.params?.email;
-
   const handleResetPassword = async () => {
     Keyboard.dismiss();
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      Alert.alert('Validation', 'Please enter a valid email address.');
+      return;
+    }
     if (!token.trim()) {
       Alert.alert('Validation', 'Please enter the OTP code.');
       return;
@@ -54,7 +59,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       setIsLoading(true);
-      await AuthService.resetPassword({ token: token.trim(), newPassword });
+      await AuthService.resetPassword({ email: email.trim().toLowerCase(), token: token.trim(), newPassword });
       Alert.alert('Success', 'Password reset complete. Please sign in with your new password.', [
         { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
@@ -67,83 +72,94 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={styles.root}>
-      
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <IconButton
-            icon={<ArrowLeft color={theme.colors.text} size={22} />}
-            onPress={() => navigation.goBack()}
-            variant="surface"
-            size={40}
-          />
-        </View>
-
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.titleSection}>
-              <Text style={styles.title}>Reset password</Text>
-              <Text style={styles.subtitle}>
-                Enter your OTP code and choose a new password.
-              </Text>
-              {prefetchedEmail && (
-                <Text style={styles.prefillText}>For: {prefetchedEmail}</Text>
-              )}
-            </View>
-
-            <Input
-              label="OTP code"
-              placeholder="Enter the 6-digit OTP"
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={token}
-              onChangeText={setToken}
-              leftIcon={<Key size={18} color={theme.colors.textMuted} />}
-              returnKeyType="next"
-              onSubmitEditing={() => newPasswordRef.current?.focus()}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          <View style={styles.header}>
+            <IconButton
+              icon={<ArrowLeft color={theme.colors.text} size={22} />}
+              onPress={() => navigation.goBack()}
+              variant="surface"
+              size={40}
             />
-            <Input
-              ref={newPasswordRef}
-              label="New password"
-              placeholder="At least 6 characters"
-              isPassword
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={newPassword}
-              onChangeText={setNewPassword}
-              leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
-              returnKeyType="next"
-              onSubmitEditing={() => confirmPasswordRef.current?.focus()}
-            />
-            <Input
-              ref={confirmPasswordRef}
-              label="Confirm new password"
-              placeholder="Re-enter your new password"
-              isPassword
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="done"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
-              onSubmitEditing={handleResetPassword}
-            />
-          </ScrollView>
-        </KeyboardAvoidingView>
+          </View>
 
-        <View style={styles.bottomZone}>
-          <Button
-            title="Reset Password"
-            onPress={handleResetPassword}
-            isLoading={isLoading}
-            variant="primary"
-            size="lg"
-          />
-        </View>
-      </SafeAreaView>
+          <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.titleSection}>
+                <Text style={styles.title}>Reset password</Text>
+                <Text style={styles.subtitle}>
+                  Enter your email, OTP code, and choose a new password.
+                </Text>
+              </View>
+
+              <Input
+                label="Email address"
+                placeholder="name@example.com"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+                returnKeyType="done"
+                blurOnSubmit
+              />
+              <Input
+                label="OTP code"
+                placeholder="Enter the 6-digit OTP"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={token}
+                onChangeText={setToken}
+                leftIcon={<Key size={18} color={theme.colors.textMuted} />}
+                returnKeyType="next"
+                blurOnSubmit
+                onSubmitEditing={() => newPasswordRef.current?.focus()}
+              />
+              <Input
+                ref={newPasswordRef}
+                label="New password"
+                placeholder="At least 6 characters"
+                isPassword
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+                returnKeyType="next"
+                blurOnSubmit
+                onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+              />
+              <Input
+                ref={confirmPasswordRef}
+                label="Confirm new password"
+                placeholder="Re-enter your new password"
+                isPassword
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+                blurOnSubmit
+              />
+            </ScrollView>
+          </KeyboardAvoidingView>
+
+          <View style={styles.bottomZone}>
+            <Button
+              title="Reset Password"
+              onPress={handleResetPassword}
+              isLoading={isLoading}
+              variant="primary"
+              size="lg"
+            />
+          </View>
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     </View>
   );
 };

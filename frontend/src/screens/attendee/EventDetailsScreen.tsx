@@ -291,7 +291,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.imageCard}>
-          {coverImage ? <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" /> : <View style={styles.coverPlaceholder} />}
+          {coverImage ? (
+            <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.coverPlaceholder} />
+          )}
           <View style={[styles.featuredPill, { backgroundColor: brandAccent }]}>
             <Text style={[styles.featuredText, { color: registerButtonTextColor }]}>Featured Event</Text>
           </View>
@@ -529,21 +533,23 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000000' },
   scrollContent: { paddingBottom: 120 },
   imageCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#141518',
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    height: 400,
+    width: '100%',
+    aspectRatio: 1,
     alignItems: 'center',
-    paddingTop: 80,
+    justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
     ...theme.shadows.premium,
   },
-  coverImage: { width: '80%', height: '80%', borderRadius: 16 },
-  coverPlaceholder: { width: '80%', height: '80%', backgroundColor: '#F0F0F0', borderRadius: 16 },
+  coverImage: { width: '100%', height: '100%' },
+  coverPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1B1F24' },
   featuredPill: {
     position: 'absolute',
-    bottom: -16,
-    backgroundColor: '#FFFFFF',
+    bottom: 16,
+    backgroundColor: '#0F1115',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,

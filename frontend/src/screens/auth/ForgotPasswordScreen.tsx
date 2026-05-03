@@ -9,6 +9,7 @@ import {
   ScrollView,
   Keyboard,
   TextInput,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -75,6 +76,11 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const handleVerifyOtp = async () => {
     Keyboard.dismiss();
 
+    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
+      Alert.alert('Validation', 'Please enter a valid email address.');
+      return;
+    }
+
     if (!otp.trim()) {
       Alert.alert('Validation', 'Please enter the OTP code.');
       return;
@@ -82,7 +88,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       setIsLoading(true);
-      await AuthService.verifyResetOtp({ token: otp.trim() });
+      await AuthService.verifyResetOtp({ email: normalizedEmail, token: otp.trim() });
       setStep('reset');
       setInfoMessage('OTP verified. Set your new password.');
       setTimeout(() => newPasswordRef.current?.focus(), 120);
@@ -97,6 +103,10 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const handleResetPassword = async () => {
     Keyboard.dismiss();
 
+    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
+      Alert.alert('Validation', 'Please enter a valid email address.');
+      return;
+    }
     if (!otp.trim()) {
       Alert.alert('Validation', 'OTP is required.');
       return;
@@ -112,7 +122,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       setIsLoading(true);
-      await AuthService.resetPassword({ token: otp.trim(), newPassword });
+      await AuthService.resetPassword({ email: normalizedEmail, token: otp.trim(), newPassword });
       Alert.alert('Success', 'Password reset complete. Please sign in with your new password.', [
         { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
@@ -126,136 +136,140 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.root}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <IconButton
-            icon={<ArrowLeft color={theme.colors.text} size={22} />}
-            onPress={() => navigation.goBack()}
-            variant="surface"
-            size={40}
-          />
-        </View>
-
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.titleSection}>
-              <Text style={styles.title}>Forgot password?</Text>
-              <Text style={styles.subtitle}>
-                {step === 'email'
-                  ? 'Enter your email address and we\'ll send you an OTP code.'
-                  : step === 'otp'
-                    ? 'Enter the OTP from your email to continue.'
-                    : 'Set your new password to complete reset.'}
-              </Text>
-            </View>
-
-            <Input
-              label="Email address"
-              placeholder="name@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-              leftIcon={<Mail size={18} color={theme.colors.textMuted} />}
-              editable={step === 'email'}
-              returnKeyType={step === 'email' ? 'done' : 'next'}
-              onSubmitEditing={step === 'email' ? handleSendOtp : () => otpRef.current?.focus()}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          <View style={styles.header}>
+            <IconButton
+              icon={<ArrowLeft color={theme.colors.text} size={22} />}
+              onPress={() => navigation.goBack()}
+              variant="surface"
+              size={40}
             />
+          </View>
 
-            {step !== 'email' ? (
+          <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.titleSection}>
+                <Text style={styles.title}>Forgot password?</Text>
+                <Text style={styles.subtitle}>
+                  {step === 'email'
+                    ? 'Enter your email address and we\'ll send you an OTP code.'
+                    : step === 'otp'
+                      ? 'Enter the OTP from your email to continue.'
+                      : 'Set your new password to complete reset.'}
+                </Text>
+              </View>
+
               <Input
-                ref={otpRef}
-                label="OTP code"
-                placeholder="Enter the 6-digit OTP"
+                label="Email address"
+                placeholder="name@example.com"
+                keyboardType="email-address"
                 autoCapitalize="none"
-                autoCorrect={false}
-                value={otp}
-                onChangeText={setOtp}
-                leftIcon={<Key size={18} color={theme.colors.textMuted} />}
-                returnKeyType={step === 'otp' ? 'done' : 'next'}
-                onSubmitEditing={step === 'otp' ? handleVerifyOtp : () => newPasswordRef.current?.focus()}
+                value={email}
+                onChangeText={setEmail}
+                leftIcon={<Mail size={18} color={theme.colors.textMuted} />}
+                editable={step === 'email'}
+                returnKeyType="done"
+                blurOnSubmit
               />
-            ) : null}
 
-            {step === 'reset' ? (
-              <>
+              {step !== 'email' ? (
                 <Input
-                  ref={newPasswordRef}
-                  label="New password"
-                  placeholder="At least 6 characters"
-                  isPassword
+                  ref={otpRef}
+                  label="OTP code"
+                  placeholder="Enter the 6-digit OTP"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
-                  returnKeyType="next"
-                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                  value={otp}
+                  onChangeText={setOtp}
+                  leftIcon={<Key size={18} color={theme.colors.textMuted} />}
+                  returnKeyType={step === 'otp' ? 'done' : 'next'}
+                  blurOnSubmit
+                  onSubmitEditing={step === 'otp' ? undefined : () => newPasswordRef.current?.focus()}
                 />
-                <Input
-                  ref={confirmPasswordRef}
-                  label="Confirm new password"
-                  placeholder="Re-enter your new password"
-                  isPassword
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
-                  returnKeyType="done"
-                  onSubmitEditing={handleResetPassword}
-                />
-              </>
-            ) : null}
+              ) : null}
 
-            {infoMessage ? <Text style={styles.infoText}>{infoMessage}</Text> : null}
-          </ScrollView>
-        </KeyboardAvoidingView>
+              {step === 'reset' ? (
+                <>
+                  <Input
+                    ref={newPasswordRef}
+                    label="New password"
+                    placeholder="At least 6 characters"
+                    isPassword
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+                    returnKeyType="next"
+                    blurOnSubmit
+                    onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                  />
+                  <Input
+                    ref={confirmPasswordRef}
+                    label="Confirm new password"
+                    placeholder="Re-enter your new password"
+                    isPassword
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    leftIcon={<Lock size={18} color={theme.colors.textMuted} />}
+                    returnKeyType="done"
+                    blurOnSubmit
+                  />
+                </>
+              ) : null}
 
-        <View style={styles.bottomZone}>
-          {step === 'email' ? (
-            <Button
-              title="Send OTP Code"
-              onPress={handleSendOtp}
-              isLoading={isLoading}
-              variant="primary"
-              size="lg"
-              style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
-            />
-          ) : step === 'otp' ? (
-            <View style={styles.stepActions}>
+              {infoMessage ? <Text style={styles.infoText}>{infoMessage}</Text> : null}
+            </ScrollView>
+          </KeyboardAvoidingView>
+
+          <View style={styles.bottomZone}>
+            {step === 'email' ? (
               <Button
-                title="Verify OTP"
-                onPress={handleVerifyOtp}
+                title="Send OTP Code"
+                onPress={handleSendOtp}
                 isLoading={isLoading}
                 variant="primary"
                 size="lg"
-                style={styles.stepActionButton}
-              />
-              <Button
-                title="Resend OTP"
-                onPress={handleSendOtp}
-                variant="ghost"
-                size="md"
                 style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
               />
-            </View>
-          ) : (
-            <Button
-              title="Reset Password"
-              onPress={handleResetPassword}
-              isLoading={isLoading}
-              variant="primary"
-              size="lg"
-              style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
-            />
-          )}
-        </View>
-      </SafeAreaView>
+            ) : step === 'otp' ? (
+              <View style={styles.stepActions}>
+                <Button
+                  title="Verify OTP"
+                  onPress={handleVerifyOtp}
+                  isLoading={isLoading}
+                  variant="primary"
+                  size="lg"
+                  style={styles.stepActionButton}
+                />
+                <Button
+                  title="Resend OTP"
+                  onPress={handleSendOtp}
+                  variant="ghost"
+                  size="md"
+                  style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
+                />
+              </View>
+            ) : (
+              <Button
+                title="Reset Password"
+                onPress={handleResetPassword}
+                isLoading={isLoading}
+                variant="primary"
+                size="lg"
+                style={{ marginBottom: Math.max(insets.bottom, 16) + 12 }}
+              />
+            )}
+          </View>
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     </View>
   );
 };

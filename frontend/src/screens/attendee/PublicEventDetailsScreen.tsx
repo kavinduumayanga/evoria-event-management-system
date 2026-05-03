@@ -268,13 +268,15 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
         keyboardShouldPersistTaps="handled"
       >
         {/* Cover image */}
-        {event.image ? (
-          <Image source={{ uri: resolveImageUrl(event.image) || event.image }} style={styles.coverImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.coverPlaceholder}>
-            <TicketIcon size={40} color={theme.colors.textMuted} />
-          </View>
-        )}
+        <View style={styles.coverWrap}>
+          {event.image ? (
+            <Image source={{ uri: resolveImageUrl(event.image) || event.image }} style={styles.coverImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.coverPlaceholder}>
+              <TicketIcon size={40} color={theme.colors.textMuted} />
+            </View>
+          )}
+        </View>
 
         <View style={styles.content}>
           {/* Title + topic */}
@@ -586,10 +588,19 @@ const styles = StyleSheet.create({
   screen: { padding: 0 },
   headerOverlay: { position: 'absolute', top: 52, left: theme.spacing.base, zIndex: 20 },
   scrollContent: { paddingBottom: 110 },
-  coverImage: { width: '100%', height: 240 },
+  coverWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#171A20',
+    overflow: 'hidden',
+  },
+  coverImage: { width: '100%', height: '100%' },
   coverPlaceholder: {
-    width: '100%', height: 240, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1B1F25',
   },
   content: { padding: theme.spacing.base },
   eventTitle: { ...theme.typography.h1, color: theme.colors.text, marginTop: theme.spacing.m },

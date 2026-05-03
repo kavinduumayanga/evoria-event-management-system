@@ -6,7 +6,7 @@ import {
   deleteUser,
   updateProfile,
   updatePassword,
-  deactivateAccount,
+  deleteAccount,
 } from '../controllers/user.controller';
 import { protect } from '../middleware/auth.middleware';
 
@@ -16,7 +16,7 @@ router.use(protect);
 
 router.put('/profile', updateProfile);
 router.put('/password', updatePassword);
-router.patch('/deactivate', deactivateAccount);
+router.delete('/me', deleteAccount);
 
 router.get('/:id', getUser);
 router.put('/:id', updateUser);
