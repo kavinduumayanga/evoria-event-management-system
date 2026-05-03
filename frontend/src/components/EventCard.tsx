@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Calendar, MapPin, Clock } from 'lucide-react-native';
 import { Event } from '../types';
-import { safeString } from '../utils/safeText';
+import { safeInitials, safeString, safeTitle } from '../utils/safeText';
 import { resolveImageUrl } from '../utils/imageUrl';
 
 interface EventCardProps {
@@ -13,11 +13,16 @@ interface EventCardProps {
 
 export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
   const [hasImageError, setHasImageError] = useState(false);
+  const [hasHostImageError, setHasHostImageError] = useState(false);
   const imageUrl = useMemo(() => resolveImageUrl(safeString(event.coverImage)), [event.coverImage]);
   const title = safeString(event.title, 'Untitled Event');
   const description = safeString(event.description, 'No description available.');
   const eventDate = safeString(event.date, 'TBA');
   const eventTime = safeString(event.startTime, 'TBA');
+  const host = typeof (event as any)?.host === 'object' && (event as any)?.host ? (event as any).host : null;
+  const hostName = safeTitle(host?.name, 'Evoria Host');
+  const hostImage = resolveImageUrl(safeString(host?.profileImage, ''));
+  const hostInitials = safeInitials(hostName, 'EH');
   const rawLocation = (event as any).location;
   const eventLocation = typeof rawLocation === 'string'
     ? safeString(rawLocation, 'Online / TBA')
@@ -26,6 +31,10 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
   useEffect(() => {
     setHasImageError(false);
   }, [imageUrl]);
+
+  useEffect(() => {
+    setHasHostImageError(false);
+  }, [hostImage]);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
@@ -68,6 +77,17 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
         <View style={styles.detailItem}>
           <MapPin color="#A3A3A3" size={14} />
           <Text style={styles.detailText}>{eventLocation}</Text>
+        </View>
+
+        <View style={styles.hostRow}>
+          {hostImage && !hasHostImageError ? (
+            <Image source={{ uri: hostImage }} style={styles.hostAvatar} onError={() => setHasHostImageError(true)} />
+          ) : (
+            <View style={styles.hostAvatarFallback}>
+              <Text style={styles.hostInitials}>{hostInitials}</Text>
+            </View>
+          )}
+          <Text style={styles.hostName} numberOfLines={1}>{hostName}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -161,5 +181,36 @@ const styles = StyleSheet.create({
     color: '#A3A3A3',
     fontSize: 13,
     marginLeft: 6,
+  },
+  hostRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hostAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+  },
+  hostAvatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(93,139,132,0.9)',
+  },
+  hostInitials: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  hostName: {
+    color: '#CFCFCF',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
 });

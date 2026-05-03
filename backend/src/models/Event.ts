@@ -4,8 +4,13 @@ import { v4 as uuidv4 } from 'uuid';
 const customQuestionSchema = new Schema({
   id: { type: String, required: true, trim: true },
   question: { type: String, required: true, trim: true },
-  type: { type: String, enum: ['text', 'number', 'choice'], required: true },
+  type: {
+    type: String,
+    enum: ['text', 'number', 'choice', 'dropdown', 'radio', 'checkbox', 'multiple_choice'],
+    required: true,
+  },
   required: { type: Boolean, default: false },
+  options: { type: [String], default: [] },
 }, { _id: false });
 
 const eventSchema = new Schema({

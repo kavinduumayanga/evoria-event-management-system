@@ -9,7 +9,7 @@ import { theme } from '../../constants/theme';
 import apiClient from '../../api/client';
 import { EventService, PublicEventDetails, ReportService } from '../../api/services';
 import { MapPin, Calendar as CalendarIcon, Clock, MoreHorizontal, Mail, Ticket } from 'lucide-react-native';
-import { formatSafeDate, formatSafeTime, safeStatus, safeString, safeTitle } from '../../utils/safeText';
+import { formatSafeDate, formatSafeTime, safeInitials, safeStatus, safeString, safeTitle } from '../../utils/safeText';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { LinearGradient } from 'expo-linear-gradient';
 import { safeArray } from '../../utils/safeData';
@@ -18,6 +18,27 @@ type EventDetailsScreenNavigationProp = NativeStackNavigationProp<AttendeeHomeSt
 type EventDetailsScreenRouteProp = RouteProp<AttendeeHomeStackParamList, 'EventDetails'>;
 
 interface Props { navigation: EventDetailsScreenNavigationProp; route: EventDetailsScreenRouteProp; }
+
+const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const FALLBACK_PRIMARY = '#4A4232';
+const FALLBACK_ACCENT = '#5D8B84';
+
+const normalizeHexColor = (value: unknown, fallback: string): string => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  return HEX_COLOR_REGEX.test(normalized) ? normalized : fallback;
+};
+
+const isLightHexColor = (hexColor: string): boolean => {
+  const hex = hexColor.replace('#', '');
+  const normalized = hex.length === 3
+    ? hex.split('').map((char) => `${char}${char}`).join('')
+    : hex;
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  const luminance = (0.299 * red) + (0.587 * green) + (0.114 * blue);
+  return luminance >= 150;
+};
 
 export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const eventId = route.params?.eventId;
@@ -29,6 +50,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
+  const [hasHostImageError, setHasHostImageError] = useState(false);
 
   const fetchEventDetails = useCallback(async () => {
     if (!eventId) return;
@@ -39,6 +61,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       setVenue(null);
       setTickets([]);
       setPublicData(null);
+      setHasHostImageError(false);
 
       const [eventRes, ticketsRes] = await Promise.all([
         apiClient.get(`/events/${eventId}`),
@@ -85,8 +108,16 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) return <LoadingState />;
   if (error || !event) return <ScreenContainer><ErrorState message={error || "Event not found"} onRetry={() => navigation.goBack()} actionLabel="Go Back" /></ScreenContainer>;
 
-  const host = typeof publicData?.event.host === 'object' && publicData?.event.host ? publicData.event.host : null;
-  const hostName = safeTitle(host?.name, 'Host unavailable');
+  const eventHost = typeof (event as any)?.host === 'object' && (event as any)?.host ? (event as any).host : null;
+  const publicHost = typeof publicData?.event.host === 'object' && publicData?.event.host ? publicData.event.host : null;
+  const host = publicHost || eventHost;
+  const hostName = safeTitle(host?.name, 'Evoria Host');
+  const hostImage = resolveImageUrl(safeString(host?.profileImage || '', ''));
+  const hostInitials = safeInitials(hostName, 'EH');
+  const brandPrimary = normalizeHexColor(publicData?.event?.branding?.primaryColor || event.branding?.primaryColor, FALLBACK_PRIMARY);
+  const brandAccent = normalizeHexColor(publicData?.event?.branding?.accentColor || event.branding?.accentColor, FALLBACK_ACCENT);
+  const registerButtonTextColor = isLightHexColor(brandAccent) ? '#0B0B0C' : '#FFFFFF';
+
   const coverImage = resolveImageUrl(publicData?.event.image || event.coverImage);
   const formattedDate = formatSafeDate(event.date, 'Date unavailable', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const isSoldOut = Number(event.capacity) > 0 && Number(event.bookingCount) >= Number(event.capacity);
@@ -134,6 +165,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const legacyAgendaSessions = safeArray<any>(legacyAgendaSource).map((item, index) => ({
     id: safeString(item?.id, `legacy-${index}`),
     title: safeString(item?.title || item?.name, 'Session'),
+    sessionDate: safeString(item?.sessionDate || event.date, ''),
     startTime: safeString(item?.startTime || item?.time, ''),
     endTime: safeString(item?.endTime, ''),
     speakerName: safeString(item?.speakerName || item?.speaker, ''),
@@ -254,14 +286,14 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={styles.root}>
-      <LinearGradient colors={['#4A4232', '#000000']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={[brandPrimary, '#000000']} style={StyleSheet.absoluteFillObject} />
       <HeaderBar variant="event" transparent onShare={handleShare} />
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.imageCard}>
           {coverImage ? <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" /> : <View style={styles.coverPlaceholder} />}
-          <View style={styles.featuredPill}>
-            <Text style={styles.featuredText}>Featured Event</Text>
+          <View style={[styles.featuredPill, { backgroundColor: brandAccent }]}>
+            <Text style={[styles.featuredText, { color: registerButtonTextColor }]}>Featured Event</Text>
           </View>
         </View>
 
@@ -281,9 +313,18 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.actionFlex1}>
             <PrimaryButton
               title="Register"
-              icon={<Ticket color="#000" size={20} />}
-              onPress={() => navigation.navigate('TicketSelection', { eventId })}
+              icon={<Ticket color={registerButtonTextColor} size={20} />}
+              onPress={() => {
+                const slug = publicSlug || event.publicSlug;
+                if (safeString(event.pricingMode, 'ticketed') === 'free' && slug) {
+                  navigation.navigate('PublicEventDetails', { slug });
+                  return;
+                }
+                navigation.navigate('TicketSelection', { eventId });
+              }}
               disabled={!canRegister}
+              style={{ backgroundColor: brandAccent }}
+              textStyle={{ color: registerButtonTextColor }}
             />
           </View>
           <View style={styles.actionFlex1}>
@@ -377,7 +418,13 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <SectionBlock title="Host" style={styles.sectionBlock}>
           <View style={styles.hostRow}>
-            <View style={styles.hostAvatar} />
+            {hostImage && !hasHostImageError ? (
+              <Image source={{ uri: hostImage }} style={[styles.hostAvatar, { backgroundColor: 'transparent' }]} onError={() => setHasHostImageError(true)} />
+            ) : (
+              <View style={[styles.hostAvatar, { backgroundColor: brandAccent }]}>
+                <Text style={[styles.hostInitials, { color: registerButtonTextColor }]}>{hostInitials}</Text>
+              </View>
+            )}
             <Text style={styles.hostName}>{hostName}</Text>
           </View>
         </SectionBlock>
@@ -427,6 +474,14 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 return (
                   <View key={`${safeString(session.id, 'agenda')}-${index}`} style={styles.agendaCard}>
                     <Text style={styles.agendaTitle}>{sessionTitle}</Text>
+                    {safeString(session.sessionDate, '').trim() ? (
+                      <View style={styles.agendaMetaRow}>
+                        <CalendarIcon size={14} color="#A3A3A3" />
+                        <Text style={styles.agendaMetaText}>
+                          {formatSafeDate(session.sessionDate, 'Date unavailable', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </Text>
+                      </View>
+                    ) : null}
                     {(hasStart || hasEnd) ? (
                       <View style={styles.agendaMetaRow}>
                         <Clock size={14} color="#A3A3A3" />
@@ -494,7 +549,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     ...theme.shadows.md,
   },
-  featuredText: { color: '#000', fontWeight: '600', fontSize: 12 },
+  featuredText: { fontWeight: '600', fontSize: 12 },
   headerInfo: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 24 },
   title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginBottom: 12 },
   cancelledChip: {
@@ -586,7 +641,8 @@ const styles = StyleSheet.create({
   },
   mapFallbackText: { color: '#A3A3A3', fontSize: 15, fontWeight: '500' },
   hostRow: { flexDirection: 'row', alignItems: 'center' },
-  hostAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#5D8B84', marginRight: 16 },
+  hostAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#5D8B84', marginRight: 16, alignItems: 'center', justifyContent: 'center' },
+  hostInitials: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   hostName: { color: '#FFFFFF', fontSize: 18, fontWeight: '500' },
   avatarsRow: { flexDirection: 'row', marginBottom: 12 },
   goingAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFB8B8', borderWidth: 2, borderColor: '#000' },

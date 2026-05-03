@@ -2,14 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, Platform, Modal, Keyboard } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Plus, X, Upload, HelpCircle, Edit2 } from 'lucide-react-native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
 import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, LocationSearchInput } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { EventService, UploadService, SessionService } from '../../../api/services';
-import { Event, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode } from '../../../types';
+import { EventService, UploadService, SessionService, TicketService, VenueService } from '../../../api/services';
+import {
+  Event,
+  EventStatus,
+  EventVisibility,
+  EventType,
+  EventCustomQuestion,
+  CustomQuestionType,
+  EventPricingMode,
+  TicketType,
+  Venue,
+} from '../../../types';
 import { resolveImageUrl } from '../../../utils/imageUrl';
 import { useAuthStore } from '../../../store/auth.store';
 import { safeArray } from '../../../utils/safeData';
@@ -26,8 +37,9 @@ interface Props {
 const eventTypes: EventType[] = ['online', 'physical', 'hybrid'];
 const pricingModes: EventPricingMode[] = ['free', 'ticketed'];
 const visibilityOptions: EventVisibility[] = ['public', 'private', 'unlisted'];
-const customQuestionTypes: CustomQuestionType[] = ['text', 'number', 'choice'];
+const customQuestionTypes: CustomQuestionType[] = ['text', 'number', 'choice', 'dropdown', 'radio', 'checkbox', 'multiple_choice'];
 const themeColors = ['#8B5CF6', '#22C55E', '#F97316', '#0EA5E9', '#EC4899', '#14B8A6', '#EAB308', '#EF4444'];
+const choiceQuestionTypes = new Set<CustomQuestionType>(['choice', 'dropdown', 'radio', 'checkbox', 'multiple_choice']);
 
 const toDateString = (value: Date) => {
   const year = value.getFullYear();
@@ -60,8 +72,30 @@ const parseTimeToMinutes = (timeValue: string): number | null => {
   return (hours * 60) + minutes;
 };
 
+const normalizeQuestionOptions = (rawOptions: string[]): string[] => {
+  const seen = new Set<string>();
+  const options: string[] = [];
+
+  for (const item of rawOptions) {
+    const normalized = item.trim();
+    if (!normalized) continue;
+
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    options.push(normalized);
+  }
+
+  return options;
+};
+
+const prettifyQuestionType = (value: CustomQuestionType) => {
+  return value.replace(/_/g, ' ').toUpperCase();
+};
+
 interface AgendaItem {
   id?: string;
+  sessionDate: string;
   startTime: string;
   endTime: string;
   title: string;
@@ -69,9 +103,27 @@ interface AgendaItem {
   description: string;
 }
 
-type PickerType = 'date' | 'startTime' | 'endTime';
+interface TicketDraft {
+  id?: string;
+  name: string;
+  description: string;
+  price: string;
+  quantity: string;
+  maxPerUser: string;
+  isActive: boolean;
+  currency: string;
+}
+
+type PickerType =
+  | 'date'
+  | 'startTime'
+  | 'endTime'
+  | 'agendaDate'
+  | 'agendaStartTime'
+  | 'agendaEndTime';
 
 export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const eventId = route.params?.eventId;
   const isEditing = !!eventId;
   const authUser = useAuthStore((state) => state.user);
@@ -105,10 +157,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [questionDraft, setQuestionDraft] = useState('');
   const [questionType, setQuestionType] = useState<CustomQuestionType>('text');
   const [questionRequired, setQuestionRequired] = useState(false);
+  const [questionOptionsDraft, setQuestionOptionsDraft] = useState<string[]>(['', '']);
 
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
   const [isAgendaModalVisible, setIsAgendaModalVisible] = useState(false);
   const [agendaDraft, setAgendaDraft] = useState<AgendaItem>({
+    sessionDate: '',
     startTime: '',
     endTime: '',
     title: '',
@@ -116,6 +170,20 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     description: '',
   });
   const [editingAgendaIndex, setEditingAgendaIndex] = useState<number | null>(null);
+
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [ticketDrafts, setTicketDrafts] = useState<TicketDraft[]>([]);
+  const [isTicketModalVisible, setIsTicketModalVisible] = useState(false);
+  const [editingTicketIndex, setEditingTicketIndex] = useState<number | null>(null);
+  const [ticketDraft, setTicketDraft] = useState<TicketDraft>({
+    name: '',
+    description: '',
+    price: '0',
+    quantity: '100',
+    maxPerUser: '1',
+    isActive: true,
+    currency: 'LKR',
+  });
 
   const [activePicker, setActivePicker] = useState<PickerType | null>(null);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
@@ -128,10 +196,19 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const fetchData = async () => {
     try {
+      try {
+        const venuesResponse = await VenueService.getVenues();
+        const hostVenues = safeArray<Venue>(venuesResponse?.data?.venues);
+        setVenues(hostVenues);
+      } catch {
+        setVenues([]);
+      }
+
       if (isEditing) {
-        const [eventResponse, sessionsResponse] = await Promise.all([
+        const [eventResponse, sessionsResponse, ticketsResponse] = await Promise.all([
           EventService.getEvent(eventId!),
           SessionService.getEventSessions(eventId!),
+          TicketService.getEventTickets(eventId!),
         ]);
         const event: Event = eventResponse.data.event;
 
@@ -185,11 +262,17 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setRequiresApproval(Boolean(event.requiresApproval));
         const eventQuestions = safeArray<EventCustomQuestion>(event.customQuestions);
         const registrationQuestions = safeArray<EventCustomQuestion>(event.registrationFields?.customQuestions);
-        setCustomQuestions(eventQuestions.length > 0 ? eventQuestions : registrationQuestions);
+        const normalizedQuestions = (eventQuestions.length > 0 ? eventQuestions : registrationQuestions)
+          .map((question) => ({
+            ...question,
+            options: safeArray<string>(question.options),
+          }));
+        setCustomQuestions(normalizedQuestions);
         const sessions = safeArray<any>(sessionsResponse?.data?.sessions);
         setAgendaItems(
           sessions.map((session: any) => ({
             id: session.id,
+            sessionDate: (session.sessionDate || event.date || '').slice(0, 10),
             startTime: session.startTime || '',
             endTime: session.endTime || session.startTime || '',
             title: session.title || '',
@@ -197,13 +280,27 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             description: session.description || '',
           }))
         );
+        const existingTickets = safeArray<TicketType>(ticketsResponse?.data?.tickets);
+        setTicketDrafts(existingTickets.map((ticket) => ({
+          id: ticket.id,
+          name: ticket.name || '',
+          description: ticket.description || '',
+          price: String(Number(ticket.price || 0)),
+          quantity: String(Number(ticket.quantity || 0)),
+          maxPerUser: String(Number(ticket.maxPerUser || 1)),
+          isActive: Boolean(ticket.isActive),
+          currency: (ticket.currency || 'LKR').toUpperCase(),
+        })));
       } else {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        setDate(toDateString(tomorrow));
+        const nextDate = toDateString(tomorrow);
+        setDate(nextDate);
         setStartTime('09:00');
         setEndTime('11:00');
         setAgendaItems([]);
+        setAgendaDraft((previous) => ({ ...previous, sessionDate: nextDate }));
+        setTicketDrafts([]);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load event details');
@@ -219,8 +316,14 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       setPickerValue(date ? new Date(`${date}T00:00:00`) : new Date());
     } else if (type === 'startTime') {
       setPickerValue(toTimeDate(startTime || '09:00'));
-    } else {
+    } else if (type === 'endTime') {
       setPickerValue(toTimeDate(endTime || startTime || '10:00'));
+    } else if (type === 'agendaDate') {
+      setPickerValue(agendaDraft.sessionDate ? new Date(`${agendaDraft.sessionDate}T00:00:00`) : (date ? new Date(`${date}T00:00:00`) : new Date()));
+    } else if (type === 'agendaStartTime') {
+      setPickerValue(toTimeDate(agendaDraft.startTime || '09:00'));
+    } else {
+      setPickerValue(toTimeDate(agendaDraft.endTime || agendaDraft.startTime || '10:00'));
     }
     setActivePicker(type);
   };
@@ -237,6 +340,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       setStartTime(toTimeString(pickerValue));
     } else if (activePicker === 'endTime') {
       setEndTime(toTimeString(pickerValue));
+    } else if (activePicker === 'agendaDate') {
+      setAgendaDraft((previous) => ({ ...previous, sessionDate: toDateString(pickerValue) }));
+    } else if (activePicker === 'agendaStartTime') {
+      setAgendaDraft((previous) => ({ ...previous, startTime: toTimeString(pickerValue) }));
+    } else if (activePicker === 'agendaEndTime') {
+      setAgendaDraft((previous) => ({ ...previous, endTime: toTimeString(pickerValue) }));
     }
     closePicker();
   };
@@ -273,8 +382,15 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const addCustomQuestion = () => {
+    Keyboard.dismiss();
     if (!questionDraft.trim()) {
       Alert.alert('Validation Error', 'Custom question text cannot be empty.');
+      return;
+    }
+
+    const normalizedOptions = normalizeQuestionOptions(questionOptionsDraft);
+    if (choiceQuestionTypes.has(questionType) && normalizedOptions.length < 2) {
+      Alert.alert('Validation Error', 'Choice-based questions require at least 2 options.');
       return;
     }
 
@@ -283,17 +399,20 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       question: questionDraft.trim(),
       type: questionType,
       required: questionRequired,
+      options: normalizedOptions,
     };
 
     setCustomQuestions((previous) => [...previous, newQuestion]);
     setQuestionDraft('');
     setQuestionType('text');
     setQuestionRequired(false);
+    setQuestionOptionsDraft(['', '']);
   };
 
-  const syncAgendaItems = async (targetEventId: string, sessionDate: string) => {
+  const syncAgendaItems = async (targetEventId: string) => {
     const normalizedAgendaItems = agendaItems.map((item) => ({
       id: item.id,
+      sessionDate: (item.sessionDate || date).trim(),
       startTime: item.startTime.trim(),
       endTime: item.endTime.trim(),
       title: item.title.trim(),
@@ -319,7 +438,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           || (existing.speakerName || '') !== item.speakerName
           || existing.startTime !== item.startTime
           || existing.endTime !== item.endTime
-          || existing.sessionDate !== sessionDate;
+          || existing.sessionDate !== item.sessionDate;
 
         if (shouldUpdate) {
           updateRequests.push(
@@ -329,7 +448,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
               speakerName: item.speakerName,
               startTime: item.startTime,
               endTime: item.endTime,
-              sessionDate,
+              sessionDate: item.sessionDate,
               status: existing.status || 'scheduled',
             })
           );
@@ -343,7 +462,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             speakerName: item.speakerName,
             startTime: item.startTime,
             endTime: item.endTime,
-            sessionDate,
+            sessionDate: item.sessionDate,
             status: 'scheduled',
           })
         );
@@ -357,7 +476,45 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     await Promise.all([...updateRequests, ...createRequests, ...deleteRequests]);
   };
 
+  const syncTickets = async (targetEventId: string) => {
+    const existingResponse = await TicketService.getEventTickets(targetEventId);
+    const existingTickets = safeArray<TicketType>(existingResponse?.data?.tickets);
+    const existingTicketMap = new Map(existingTickets.map((ticket) => [ticket.id, ticket]));
+    const draftIds = new Set(ticketDrafts.filter((draft) => draft.id).map((draft) => draft.id as string));
+
+    const createRequests: Promise<any>[] = [];
+    const updateRequests: Promise<any>[] = [];
+
+    for (const draft of ticketDrafts) {
+      const normalizedCurrency = (draft.currency || 'LKR').trim().toUpperCase() || 'LKR';
+      const payload = {
+        eventId: targetEventId,
+        name: draft.name.trim(),
+        description: draft.description.trim() || undefined,
+        price: Number.parseFloat(draft.price),
+        currency: normalizedCurrency,
+        isFree: Number.parseFloat(draft.price) <= 0,
+        quantity: Number.parseInt(draft.quantity, 10),
+        maxPerUser: Number.parseInt(draft.maxPerUser, 10),
+        isActive: draft.isActive,
+      };
+
+      if (draft.id && existingTicketMap.has(draft.id)) {
+        updateRequests.push(TicketService.updateTicket(draft.id, payload));
+      } else {
+        createRequests.push(TicketService.createTicket(payload));
+      }
+    }
+
+    const deleteRequests = existingTickets
+      .filter((ticket) => !draftIds.has(ticket.id))
+      .map((ticket) => TicketService.deleteTicket(ticket.id));
+
+    await Promise.all([...createRequests, ...updateRequests, ...deleteRequests]);
+  };
+
   const handleSave = async () => {
+    Keyboard.dismiss();
     const parsedCapacity = Number.parseInt(capacity, 10);
     const trimmedDate = date.trim();
     const trimmedStart = startTime.trim();
@@ -406,8 +563,12 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     for (let index = 0; index < agendaItems.length; index += 1) {
       const item = agendaItems[index];
       const itemLabel = `Agenda item #${index + 1}`;
-      if (!item.title.trim() || !item.startTime.trim() || !item.endTime.trim()) {
-        Alert.alert('Validation Error', `${itemLabel} requires topic, start time, and end time.`);
+      if (!item.title.trim() || !item.sessionDate.trim() || !item.startTime.trim() || !item.endTime.trim()) {
+        Alert.alert('Validation Error', `${itemLabel} requires date, topic, start time, and end time.`);
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(item.sessionDate.trim()) || Number.isNaN(new Date(item.sessionDate.trim()).getTime())) {
+        Alert.alert('Validation Error', `${itemLabel} has an invalid date.`);
         return;
       }
       const agendaStart = parseTimeToMinutes(item.startTime.trim());
@@ -415,6 +576,56 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       if (agendaStart === null || agendaEnd === null || agendaEnd <= agendaStart) {
         Alert.alert('Validation Error', `${itemLabel} must have an end time after start time.`);
         return;
+      }
+    }
+
+    const normalizedQuestions = customQuestions.map((question) => ({
+      ...question,
+      options: normalizeQuestionOptions(safeArray<string>(question.options)),
+    }));
+
+    for (const question of normalizedQuestions) {
+      if (choiceQuestionTypes.has(question.type) && normalizeQuestionOptions(question.options || []).length < 2) {
+        Alert.alert('Validation Error', `Question "${question.question}" needs at least 2 options.`);
+        return;
+      }
+    }
+
+    const normalizedTicketDrafts = ticketDrafts.map((draft) => ({
+      ...draft,
+      name: draft.name.trim(),
+      description: draft.description.trim(),
+      currency: (draft.currency || 'LKR').trim().toUpperCase() || 'LKR',
+      priceNumber: Number.parseFloat(draft.price),
+      quantityNumber: Number.parseInt(draft.quantity, 10),
+      maxPerUserNumber: Number.parseInt(draft.maxPerUser, 10),
+    }));
+
+    if (pricingMode === 'ticketed') {
+      if (normalizedTicketDrafts.length < 1) {
+        Alert.alert('Validation Error', 'Ticketed events must have at least one ticket.');
+        return;
+      }
+
+      for (let index = 0; index < normalizedTicketDrafts.length; index += 1) {
+        const ticket = normalizedTicketDrafts[index];
+        const label = `Ticket #${index + 1}`;
+        if (!ticket.name) {
+          Alert.alert('Validation Error', `${label} requires a ticket name.`);
+          return;
+        }
+        if (!Number.isFinite(ticket.priceNumber) || ticket.priceNumber < 0) {
+          Alert.alert('Validation Error', `${label} has an invalid price.`);
+          return;
+        }
+        if (!Number.isFinite(ticket.quantityNumber) || ticket.quantityNumber <= 0) {
+          Alert.alert('Validation Error', `${label} must have quantity greater than 0.`);
+          return;
+        }
+        if (!Number.isFinite(ticket.maxPerUserNumber) || ticket.maxPerUserNumber <= 0 || ticket.maxPerUserNumber > ticket.quantityNumber) {
+          Alert.alert('Validation Error', `${label} max tickets per user must be greater than 0 and less than or equal to quantity.`);
+          return;
+        }
       }
     }
 
@@ -439,7 +650,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         endTime: trimmedEnd,
         capacity: parsedCapacity,
         category: category.trim(),
-        city: location?.name || '',
+        city: selectedVenue?.city || location?.name || '',
         location: (location && location.name) ? {
           name: location.name,
           address: location.address || '',
@@ -457,7 +668,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         visibility,
         coverImage: coverImage.trim() ? coverImage.trim() : undefined,
         requiresApproval,
-        customQuestions,
+        customQuestions: normalizedQuestions,
         branding: {
           primaryColor: brandingPrimaryColor,
           accentColor: brandingAccentColor,
@@ -475,7 +686,10 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       }
 
       if (targetEventId) {
-        await syncAgendaItems(targetEventId, trimmedDate);
+        await syncAgendaItems(targetEventId);
+        if (pricingMode === 'ticketed') {
+          await syncTickets(targetEventId);
+        }
       }
 
       navigation.goBack();
@@ -490,10 +704,15 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const saveDisabled = isSaving || (isEditing && status === 'cancelled');
   const hasSelectedLocation = Boolean(location?.name?.trim());
+  const selectedVenue = venues.find((venue) => venue.id === venueId) || null;
 
   return (
     <ScreenContainer>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 168 + Math.max(insets.bottom, 16) + 72 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <IconButton
             icon={<ArrowLeft size={20} color={theme.colors.text} />}
@@ -612,6 +831,49 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           ))}
         </View>
 
+        {(type === 'physical' || type === 'hybrid') ? (
+          <Card variant="raised" style={styles.questionCard}>
+            <Text style={styles.sectionTitle}>Venue</Text>
+            <Text style={styles.photoHint}>Select one of your saved venues or keep a custom location.</Text>
+
+            <View style={styles.venueRow}>
+              <TouchableOpacity
+                style={[styles.chip, !venueId && styles.chipSelected]}
+                onPress={() => setVenueId('')}
+              >
+                <Text style={[styles.chipText, !venueId && styles.chipTextSelected]}>Custom Location</Text>
+              </TouchableOpacity>
+
+              {venues.map((venue) => (
+                <TouchableOpacity
+                  key={venue.id}
+                  style={[styles.chip, venueId === venue.id && styles.chipSelected]}
+                  onPress={() => {
+                    setVenueId(venue.id);
+                    setLocation({
+                      name: venue.name,
+                      address: `${venue.address}, ${venue.city}`,
+                    });
+                    if (!capacity.trim()) {
+                      setCapacity(String(venue.capacity || ''));
+                    }
+                  }}
+                >
+                  <Text style={[styles.chipText, venueId === venue.id && styles.chipTextSelected]}>
+                    {venue.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {venues.length === 0 ? <Text style={styles.noVenueText}>No saved venues yet. You can continue with custom location.</Text> : null}
+            {selectedVenue ? (
+              <Text style={styles.questionMeta}>
+                Selected venue: {selectedVenue.address}, {selectedVenue.city} • Capacity {selectedVenue.capacity}
+              </Text>
+            ) : null}
+          </Card>
+        ) : null}
+
         <Text style={styles.label}>Pricing *</Text>
         <View style={styles.segmentRow}>
           {pricingModes.map((modeOption) => (
@@ -729,8 +991,13 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={styles.questionInfo}>
                   <Text style={styles.questionText}>{customQuestion.question}</Text>
                   <Text style={styles.questionMeta}>
-                    {safeUpper(customQuestion.type)} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
+                    {prettifyQuestionType(customQuestion.type)} {customQuestion.required ? '• REQUIRED' : '• OPTIONAL'}
                   </Text>
+                  {safeArray<string>(customQuestion.options).length > 0 ? (
+                    <Text style={styles.questionMeta}>
+                      Options: {safeArray<string>(customQuestion.options).join(', ')}
+                    </Text>
+                  ) : null}
                 </View>
                 <IconButton
                   icon={<X size={14} color={theme.colors.error} />}
@@ -753,19 +1020,60 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           />
 
           <Text style={styles.label}>Question Type</Text>
-          <View style={styles.segmentRow}>
+          <View style={styles.questionTypeRow}>
             {customQuestionTypes.map((typeOption) => (
               <TouchableOpacity
                 key={typeOption}
-                style={[styles.segment, questionType === typeOption && styles.segmentSelected]}
-                onPress={() => setQuestionType(typeOption)}
+                style={[styles.questionTypeChip, questionType === typeOption && styles.segmentSelected]}
+                onPress={() => {
+                  setQuestionType(typeOption);
+                  if (choiceQuestionTypes.has(typeOption)) {
+                    setQuestionOptionsDraft((previous) => (previous.length >= 2 ? previous : ['', '']));
+                  }
+                }}
               >
                 <Text style={[styles.segmentText, questionType === typeOption && styles.segmentTextSelected]}>
-                  {safeUpper(typeOption)}
+                  {prettifyQuestionType(typeOption)}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+
+          {choiceQuestionTypes.has(questionType) ? (
+            <View style={styles.choiceOptionsWrap}>
+              <Text style={styles.label}>Answer Options *</Text>
+              {questionOptionsDraft.map((option, index) => (
+                <View key={`option-${index}`} style={styles.choiceOptionRow}>
+                  <Input
+                    label={`Option ${index + 1}`}
+                    value={option}
+                    onChangeText={(value) => {
+                      setQuestionOptionsDraft((previous) => previous.map((item, itemIndex) => (
+                        itemIndex === index ? value : item
+                      )));
+                    }}
+                    placeholder={`Option ${index + 1}`}
+                    containerStyle={styles.choiceOptionInput}
+                  />
+                  <IconButton
+                    icon={<X size={14} color={theme.colors.error} />}
+                    onPress={() => {
+                      if (questionOptionsDraft.length <= 2) return;
+                      setQuestionOptionsDraft((previous) => previous.filter((_, itemIndex) => itemIndex !== index));
+                    }}
+                    variant="ghost"
+                    size={28}
+                  />
+                </View>
+              ))}
+              <Button
+                variant="ghost"
+                title="Add Option"
+                onPress={() => setQuestionOptionsDraft((previous) => [...previous, ''])}
+                icon={<Plus size={14} color={theme.colors.text} />}
+              />
+            </View>
+          ) : null}
 
           <Text style={styles.label}>Required</Text>
           <View style={styles.segmentRow}>
@@ -790,13 +1098,72 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           />
         </Card>
 
+        {pricingMode === 'ticketed' ? (
+          <Card variant="raised" style={styles.questionCard}>
+            <Text style={styles.sectionTitle}>Ticket Configuration</Text>
+            {ticketDrafts.length > 0 ? (
+              ticketDrafts.map((ticket, index) => (
+                <View key={`${ticket.id || 'new-ticket'}-${index}`} style={styles.questionRow}>
+                  <View style={styles.questionInfo}>
+                    <Text style={styles.questionText}>
+                      {ticket.name || 'Unnamed Ticket'} • {(Number.parseFloat(ticket.price) || 0) <= 0 ? 'FREE' : `${(ticket.currency || 'LKR').toUpperCase()} ${ticket.price}`}
+                    </Text>
+                    <Text style={styles.questionMeta}>
+                      Qty {ticket.quantity} • Max/User {ticket.maxPerUser} • {ticket.isActive ? 'ACTIVE' : 'INACTIVE'}
+                    </Text>
+                    {ticket.description ? <Text style={styles.questionMeta}>{ticket.description}</Text> : null}
+                  </View>
+                  <View style={styles.agendaRowActions}>
+                    <IconButton
+                      icon={<Edit2 size={14} color={theme.colors.primary} />}
+                      onPress={() => {
+                        setEditingTicketIndex(index);
+                        setTicketDraft(ticket);
+                        setIsTicketModalVisible(true);
+                      }}
+                      variant="ghost"
+                      size={30}
+                    />
+                    <IconButton
+                      icon={<X size={14} color={theme.colors.error} />}
+                      onPress={() => setTicketDrafts((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
+                      variant="ghost"
+                      size={30}
+                    />
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noQuestionText}>No tickets configured yet.</Text>
+            )}
+            <Button
+              variant="secondary"
+              title="Add Ticket"
+              onPress={() => {
+                setEditingTicketIndex(null);
+                setTicketDraft({
+                  name: '',
+                  description: '',
+                  price: '0',
+                  quantity: '100',
+                  maxPerUser: '1',
+                  isActive: true,
+                  currency: 'LKR',
+                });
+                setIsTicketModalVisible(true);
+              }}
+              icon={<Plus size={16} color={theme.colors.text} />}
+            />
+          </Card>
+        ) : null}
+
         <Card variant="raised" style={styles.questionCard}>
           <Text style={styles.sectionTitle}>Agenda</Text>
           {agendaItems.length > 0 ? (
             agendaItems.map((item, index) => (
               <View key={`${item.id || 'new'}-${index}`} style={styles.questionRow}>
                 <View style={styles.questionInfo}>
-                  <Text style={styles.questionText}>{item.startTime} - {item.endTime} • {item.title}</Text>
+                  <Text style={styles.questionText}>{item.sessionDate} • {item.startTime} - {item.endTime} • {item.title}</Text>
                   <Text style={styles.questionMeta}>{item.speakerName} {item.speakerName && item.description ? '•' : ''} {item.description}</Text>
                 </View>
                 <View style={styles.agendaRowActions}>
@@ -806,6 +1173,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                       setEditingAgendaIndex(index);
                       setAgendaDraft({
                         id: item.id,
+                        sessionDate: item.sessionDate,
                         startTime: item.startTime,
                         endTime: item.endTime,
                         title: item.title,
@@ -834,7 +1202,14 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             title="Add Agenda Item"
             onPress={() => {
               setEditingAgendaIndex(null);
-              setAgendaDraft({ startTime: '', endTime: '', title: '', speakerName: '', description: '' });
+              setAgendaDraft({
+                sessionDate: date || toDateString(new Date()),
+                startTime: '',
+                endTime: '',
+                title: '',
+                speakerName: '',
+                description: '',
+              });
               setIsAgendaModalVisible(true);
             }}
             icon={<Plus size={16} color={theme.colors.text} />}
@@ -855,12 +1230,16 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.pickerModal}>
             <Text style={styles.pickerTitle}>
-              {activePicker === 'date' ? 'Select Date' : activePicker === 'startTime' ? 'Select Start Time' : 'Select End Time'}
+              {activePicker === 'date' || activePicker === 'agendaDate'
+                ? 'Select Date'
+                : activePicker === 'startTime' || activePicker === 'agendaStartTime'
+                  ? 'Select Start Time'
+                  : 'Select End Time'}
             </Text>
             <View style={styles.pickerSurface}>
               <DateTimePicker
                 value={pickerValue}
-                mode={activePicker === 'date' ? 'date' : 'time'}
+                mode={activePicker === 'date' || activePicker === 'agendaDate' ? 'date' : 'time'}
                 display={Platform.OS === 'ios' ? 'spinner' : 'spinner'}
                 themeVariant="light"
                 textColor="#0B0B0C"
@@ -883,8 +1262,24 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.agendaModal}>
             <Text style={styles.sectionTitle}>{editingAgendaIndex === null ? 'New Agenda Item' : 'Edit Agenda Item'}</Text>
-            <Input label="Time *" value={agendaDraft.startTime} onChangeText={t => setAgendaDraft({...agendaDraft, startTime: t})} placeholder="09:00" />
-            <Input label="End Time *" value={agendaDraft.endTime} onChangeText={t => setAgendaDraft({...agendaDraft, endTime: t})} placeholder="10:00" />
+            <Text style={styles.label}>Date *</Text>
+            <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('agendaDate')}>
+              <Text style={styles.pickerValue}>{agendaDraft.sessionDate || 'Pick a date'}</Text>
+            </TouchableOpacity>
+            <View style={styles.row}>
+              <View style={styles.flexHalf}>
+                <Text style={styles.label}>Start Time *</Text>
+                <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('agendaStartTime')}>
+                  <Text style={styles.pickerValue}>{agendaDraft.startTime || 'Pick start time'}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.flexHalf}>
+                <Text style={styles.label}>End Time *</Text>
+                <TouchableOpacity style={styles.pickerButton} onPress={() => openPicker('agendaEndTime')}>
+                  <Text style={styles.pickerValue}>{agendaDraft.endTime || 'Pick end time'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             <Input label="Topic *" value={agendaDraft.title} onChangeText={t => setAgendaDraft({...agendaDraft, title: t})} placeholder="Keynote" />
             <Input label="Speaker Name" value={agendaDraft.speakerName} onChangeText={t => setAgendaDraft({...agendaDraft, speakerName: t})} placeholder="Jane Doe" />
             <Input label="Description" value={agendaDraft.description} onChangeText={t => setAgendaDraft({...agendaDraft, description: t})} placeholder="Topic description..." multiline />
@@ -894,8 +1289,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
               <View style={styles.flexHalf}>
                 <Button variant="primary" title={editingAgendaIndex === null ? 'Add' : 'Save'} onPress={() => {
-                  if (!agendaDraft.startTime || !agendaDraft.endTime || !agendaDraft.title.trim()) {
-                    Alert.alert('Error', 'Start time, end time, and topic are required');
+                  if (!agendaDraft.sessionDate || !agendaDraft.startTime || !agendaDraft.endTime || !agendaDraft.title.trim()) {
+                    Alert.alert('Error', 'Date, start time, end time, and topic are required');
                     return;
                   }
                   const draftStart = parseTimeToMinutes(agendaDraft.startTime);
@@ -909,10 +1304,118 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                   } else {
                     setAgendaItems(prev => [...prev, { ...agendaDraft }]);
                   }
-                  setAgendaDraft({ startTime: '', endTime: '', title: '', speakerName: '', description: '' });
+                  setAgendaDraft({
+                    sessionDate: date || toDateString(new Date()),
+                    startTime: '',
+                    endTime: '',
+                    title: '',
+                    speakerName: '',
+                    description: '',
+                  });
                   setEditingAgendaIndex(null);
                   setIsAgendaModalVisible(false);
                 }} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={isTicketModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.agendaModal}>
+            <Text style={styles.sectionTitle}>{editingTicketIndex === null ? 'New Ticket' : 'Edit Ticket'}</Text>
+            <Input label="Ticket Name *" value={ticketDraft.name} onChangeText={(value) => setTicketDraft((previous) => ({ ...previous, name: value }))} placeholder="General Admission" />
+            <Input label="Description" value={ticketDraft.description} onChangeText={(value) => setTicketDraft((previous) => ({ ...previous, description: value }))} placeholder="Access details" />
+            <View style={styles.row}>
+              <View style={styles.flexHalf}>
+                <Input label="Price *" value={ticketDraft.price} onChangeText={(value) => setTicketDraft((previous) => ({ ...previous, price: value }))} keyboardType="numeric" placeholder="0" />
+              </View>
+              <View style={styles.flexHalf}>
+                <Input label="Currency" value={ticketDraft.currency} onChangeText={(value) => setTicketDraft((previous) => ({ ...previous, currency: value }))} placeholder="LKR" autoCapitalize="characters" />
+              </View>
+            </View>
+            <View style={styles.row}>
+              <View style={styles.flexHalf}>
+                <Input label="Quantity *" value={ticketDraft.quantity} onChangeText={(value) => setTicketDraft((previous) => ({ ...previous, quantity: value }))} keyboardType="numeric" placeholder="100" />
+              </View>
+              <View style={styles.flexHalf}>
+                <Input label="Max/User *" value={ticketDraft.maxPerUser} onChangeText={(value) => setTicketDraft((previous) => ({ ...previous, maxPerUser: value }))} keyboardType="numeric" placeholder="1" />
+              </View>
+            </View>
+            <Text style={styles.label}>Status</Text>
+            <View style={styles.segmentRow}>
+              {[true, false].map((value) => (
+                <TouchableOpacity
+                  key={value ? 'ticket-active' : 'ticket-inactive'}
+                  style={[styles.segment, ticketDraft.isActive === value && styles.segmentSelected]}
+                  onPress={() => setTicketDraft((previous) => ({ ...previous, isActive: value }))}
+                >
+                  <Text style={[styles.segmentText, ticketDraft.isActive === value && styles.segmentTextSelected]}>
+                    {value ? 'ACTIVE' : 'INACTIVE'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.row}>
+              <View style={styles.flexHalf}>
+                <Button variant="secondary" title="Cancel" onPress={() => { setIsTicketModalVisible(false); setEditingTicketIndex(null); }} />
+              </View>
+              <View style={styles.flexHalf}>
+                <Button
+                  variant="primary"
+                  title={editingTicketIndex === null ? 'Add' : 'Save'}
+                  onPress={() => {
+                    const parsedPrice = Number.parseFloat(ticketDraft.price);
+                    const parsedQuantity = Number.parseInt(ticketDraft.quantity, 10);
+                    const parsedMaxPerUser = Number.parseInt(ticketDraft.maxPerUser, 10);
+
+                    if (!ticketDraft.name.trim()) {
+                      Alert.alert('Error', 'Ticket name is required');
+                      return;
+                    }
+                    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+                      Alert.alert('Error', 'Price must be 0 or greater');
+                      return;
+                    }
+                    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+                      Alert.alert('Error', 'Quantity must be greater than 0');
+                      return;
+                    }
+                    if (!Number.isFinite(parsedMaxPerUser) || parsedMaxPerUser <= 0 || parsedMaxPerUser > parsedQuantity) {
+                      Alert.alert('Error', 'Max per user must be > 0 and <= quantity');
+                      return;
+                    }
+
+                    const nextDraft: TicketDraft = {
+                      ...ticketDraft,
+                      name: ticketDraft.name.trim(),
+                      description: ticketDraft.description.trim(),
+                      currency: (ticketDraft.currency || 'LKR').trim().toUpperCase() || 'LKR',
+                      price: String(parsedPrice),
+                      quantity: String(parsedQuantity),
+                      maxPerUser: String(parsedMaxPerUser),
+                    };
+
+                    if (editingTicketIndex !== null) {
+                      setTicketDrafts((previous) => previous.map((item, index) => (index === editingTicketIndex ? { ...nextDraft, id: item.id } : item)));
+                    } else {
+                      setTicketDrafts((previous) => [...previous, nextDraft]);
+                    }
+
+                    setTicketDraft({
+                      name: '',
+                      description: '',
+                      price: '0',
+                      quantity: '100',
+                      maxPerUser: '1',
+                      isActive: true,
+                      currency: 'LKR',
+                    });
+                    setEditingTicketIndex(null);
+                    setIsTicketModalVisible(false);
+                  }}
+                />
               </View>
             </View>
           </View>
@@ -1074,6 +1577,8 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryLight,
   },
   venueRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing.s,
     marginBottom: theme.spacing.m,
   },
@@ -1163,6 +1668,33 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   questionInfo: {
+    flex: 1,
+  },
+  questionTypeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.s,
+    marginBottom: theme.spacing.m,
+  },
+  questionTypeChip: {
+    minHeight: 42,
+    borderRadius: theme.borderRadius.m,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.m,
+  },
+  choiceOptionsWrap: {
+    marginBottom: theme.spacing.s,
+  },
+  choiceOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.s,
+  },
+  choiceOptionInput: {
     flex: 1,
   },
   agendaRowActions: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   Platform,
   ScrollView,
   Image,
+  Keyboard,
+  TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, User, Phone, Image as ImageIcon } from 'lucide-react-native';
 import { Input, Button, IconButton, LoadingState } from '../../components';
@@ -24,8 +26,11 @@ const phoneRegex = /^\+?[0-9\s\-()]{7,20}$/;
 
 export const EditProfileScreen = () => {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const authUser = useAuthStore((state) => state.user);
   const updateAuthUser = useAuthStore((state) => state.updateUser);
+  const phoneRef = useRef<TextInput>(null);
+  const profileImageRef = useRef<TextInput>(null);
 
   const [name, setName] = useState(authUser?.name || '');
   const [phone, setPhone] = useState(authUser?.phone || '');
@@ -54,6 +59,7 @@ export const EditProfileScreen = () => {
   }, []);
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     const normalizedName = name.trim();
     const normalizedPhone = phone.trim();
     const normalizedProfileImage = profileImage.trim();
@@ -145,16 +151,22 @@ export const EditProfileScreen = () => {
               value={name}
               onChangeText={setName}
               leftIcon={<User size={18} color={theme.colors.textMuted} />}
+              returnKeyType="next"
+              onSubmitEditing={() => phoneRef.current?.focus()}
             />
             <Input
+              ref={phoneRef}
               label="Phone number"
               placeholder="Enter your phone number"
               keyboardType="phone-pad"
               value={phone}
               onChangeText={setPhone}
               leftIcon={<Phone size={18} color={theme.colors.textMuted} />}
+              returnKeyType="next"
+              onSubmitEditing={() => profileImageRef.current?.focus()}
             />
             <Input
+              ref={profileImageRef}
               label="Profile image URL"
               placeholder="/uploads/your-image.jpg"
               autoCapitalize="none"
@@ -163,6 +175,8 @@ export const EditProfileScreen = () => {
               onChangeText={setProfileImage}
               leftIcon={<ImageIcon size={18} color={theme.colors.textMuted} />}
               hint="Upload an image or paste a direct URL."
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
             />
             {profileImage ? <Image source={{ uri: resolveImageUrl(profileImage) || profileImage }} style={styles.profilePreview} /> : null}
             <Button
@@ -182,6 +196,7 @@ export const EditProfileScreen = () => {
             isLoading={isLoading}
             variant="primary"
             size="lg"
+            style={{ marginBottom: Math.max(insets.bottom, 16) + 84 }}
           />
         </View>
       </SafeAreaView>

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Keyboard, TextInput } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostAdminVenueStackParamList } from '../../../types/navigation';
 import { ScreenContainer, Input, Button, LoadingState, IconButton, Card } from '../../../components';
 import { theme } from '../../../constants/theme';
@@ -21,11 +22,18 @@ interface Props {
 export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const venueId = route.params?.venueId;
   const isEditing = !!venueId;
+  const insets = useSafeAreaInsets();
+  const addressRef = useRef<TextInput>(null);
+  const cityRef = useRef<TextInput>(null);
+  const capacityRef = useRef<TextInput>(null);
+  const contactRef = useRef<TextInput>(null);
+  const descriptionRef = useRef<TextInput>(null);
 
   const [isLoading, setIsLoading] = useState(isEditing);
   const [isSaving, setIsSaving] = useState(false);
   
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [capacity, setCapacity] = useState('');
@@ -47,6 +55,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
       }
 
       setName(safeString(venue.name, ''));
+      setDescription(safeString((venue as any).description, ''));
       setAddress(safeString(venue.address, ''));
       setCity(safeString(venue.city, ''));
       setCapacity(String(Number.isFinite(Number(venue.capacity)) ? Number(venue.capacity) : ''));
@@ -61,6 +70,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     const parsedCapacity = Number.parseInt(capacity, 10);
     if (!name.trim() || !address.trim() || !city.trim() || !Number.isFinite(parsedCapacity) || parsedCapacity <= 0) {
       Alert.alert('Error', 'Please fill all required fields');
@@ -71,6 +81,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
       setIsSaving(true);
       const venueData = {
         name: name.trim(),
+        description: description.trim(),
         address: address.trim(),
         city: city.trim(),
         capacity: parsedCapacity,
@@ -107,11 +118,62 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.form}>
-        <Input label="Venue name *" value={name} onChangeText={setName} placeholder="Main Hall" />
-        <Input label="Address *" value={address} onChangeText={setAddress} placeholder="123 Event Street" />
-        <Input label="City *" value={city} onChangeText={setCity} placeholder="Colombo" />
-        <Input label="Capacity *" value={capacity} onChangeText={setCapacity} placeholder="500" keyboardType="numeric" />
-        <Input label="Contact info" value={contactInfo} onChangeText={setContactInfo} placeholder="contact@venue.com" />
+        <Input
+          label="Venue name *"
+          value={name}
+          onChangeText={setName}
+          placeholder="Main Hall"
+          returnKeyType="next"
+          onSubmitEditing={() => addressRef.current?.focus()}
+        />
+        <Input
+          ref={addressRef}
+          label="Address *"
+          value={address}
+          onChangeText={setAddress}
+          placeholder="123 Event Street"
+          returnKeyType="next"
+          onSubmitEditing={() => cityRef.current?.focus()}
+        />
+        <Input
+          ref={cityRef}
+          label="City *"
+          value={city}
+          onChangeText={setCity}
+          placeholder="Colombo"
+          returnKeyType="next"
+          onSubmitEditing={() => capacityRef.current?.focus()}
+        />
+        <Input
+          ref={capacityRef}
+          label="Capacity *"
+          value={capacity}
+          onChangeText={setCapacity}
+          placeholder="500"
+          keyboardType="numeric"
+          returnKeyType="next"
+          onSubmitEditing={() => contactRef.current?.focus()}
+        />
+        <Input
+          ref={contactRef}
+          label="Contact info"
+          value={contactInfo}
+          onChangeText={setContactInfo}
+          placeholder="contact@venue.com"
+          returnKeyType="next"
+          onSubmitEditing={() => descriptionRef.current?.focus()}
+        />
+        <Input
+          ref={descriptionRef}
+          label="Description"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Describe this venue"
+          multiline
+          numberOfLines={3}
+          returnKeyType="done"
+          onSubmitEditing={handleSave}
+        />
 
         <View style={styles.segmentedControlSection}>
           <Text style={styles.fieldLabel}>Venue Type</Text>
@@ -138,7 +200,7 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
           isLoading={isSaving}
           variant="primary"
           size="lg"
-          style={styles.saveBtn}
+          style={{ ...styles.saveBtn, marginBottom: Math.max(insets.bottom, 16) + 84 }}
         />
       </View>
     </ScreenContainer>

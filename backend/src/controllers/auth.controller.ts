@@ -61,6 +61,10 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`),
 });
 
+const verifyResetOtpSchema = z.object({
+  token: z.string().trim().min(1, 'Reset token is required'),
+});
+
 const handleValidationError = (error: unknown, next: NextFunction) => {
   if (error instanceof z.ZodError) {
     return next(new AppError(error.issues.map((issue) => issue.message).join(', '), 400));
@@ -277,6 +281,37 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       data: {
         user: safeUser,
       },
+    });
+  } catch (error) {
+    handleValidationError(error, next);
+  }
+};
+
+export const verifyResetOtp = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validatedData = verifyResetOtpSchema.parse(req.body);
+    const hashedToken = crypto.createHash('sha256').update(validatedData.token).digest('hex');
+
+    const userDoc = await UserModel.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+isActive +isSuspended');
+
+    if (!userDoc) {
+      return next(new AppError('Invalid or expired reset token', 400));
+    }
+
+    if (!userDoc.isActive) {
+      return next(new AppError('This account is deactivated.', 400));
+    }
+
+    if (userDoc.isSuspended) {
+      return next(new AppError('This account is suspended.', 403));
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'OTP verified successfully.',
     });
   } catch (error) {
     handleValidationError(error, next);

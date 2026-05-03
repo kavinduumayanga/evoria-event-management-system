@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Alert, Keyboard, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowLeft, User, Mail, Lock } from 'lucide-react-native';
@@ -14,6 +14,8 @@ type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList
 interface Props { navigation: RegisterScreenNavigationProp; }
 
 export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +23,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const login = useAuthStore((state) => state.login);
 
   const handleRegister = async () => {
+    Keyboard.dismiss();
     if (!name || !email || !password) return Alert.alert('Validation', 'Please fill all fields.');
     try {
       setIsLoading(true);
@@ -48,9 +51,39 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           <Card variant="outline" noPadding style={styles.formCard}>
             <View style={styles.formInner}>
-              <Input label="Full Name" placeholder="John Doe" value={name} onChangeText={setName} leftIcon={<User size={20} color={theme.colors.primary} />} />
-              <Input label="Email Address" placeholder="hello@example.com" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} leftIcon={<Mail size={20} color={theme.colors.primary} />} />
-              <Input label="Password" placeholder="Create a strong password" isPassword value={password} onChangeText={setPassword} leftIcon={<Lock size={20} color={theme.colors.primary} />} containerStyle={styles.noMarginBottom} />
+              <Input
+                label="Full Name"
+                placeholder="John Doe"
+                value={name}
+                onChangeText={setName}
+                leftIcon={<User size={20} color={theme.colors.primary} />}
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+              />
+              <Input
+                ref={emailRef}
+                label="Email Address"
+                placeholder="hello@example.com"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+                leftIcon={<Mail size={20} color={theme.colors.primary} />}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+              />
+              <Input
+                ref={passwordRef}
+                label="Password"
+                placeholder="Create a strong password"
+                isPassword
+                value={password}
+                onChangeText={setPassword}
+                leftIcon={<Lock size={20} color={theme.colors.primary} />}
+                containerStyle={styles.noMarginBottom}
+                returnKeyType="done"
+                onSubmitEditing={handleRegister}
+              />
             </View>
           </Card>
         </ScrollView>

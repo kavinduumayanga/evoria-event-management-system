@@ -61,6 +61,7 @@ export const ProfileScreen = () => {
         onPress: async () => {
           try {
             await UserService.deactivateAccount();
+            Alert.alert('Account Deactivated', 'Your account was deactivated successfully.');
             await logout();
           } catch (err: any) {
             Alert.alert('Failed', getApiErrorMessage(err, 'Unable to deactivate account.'));
