@@ -448,6 +448,24 @@ export const EventService = {
     const response = await apiClient.get('/events/search', { params });
     return response.data;
   },
+  getDiscoverEvents: async (params: EventSearchParams = {}) => {
+    try {
+      const response = await apiClient.get('/events/discover', { params });
+      return response.data;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const serverMessage = String(error?.response?.data?.message || '').toLowerCase();
+      const isMissingDiscoverRoute = status === 404 || serverMessage.includes('event not found');
+
+      // Backward compatibility for environments where /events/discover is not deployed yet.
+      if (isMissingDiscoverRoute) {
+        const fallbackResponse = await apiClient.get('/events/search', { params });
+        return fallbackResponse.data;
+      }
+
+      throw error;
+    }
+  },
   getTrendingEvents: async (limit = 10) => {
     const response = await apiClient.get('/events/trending', { params: { limit } });
     return response.data;

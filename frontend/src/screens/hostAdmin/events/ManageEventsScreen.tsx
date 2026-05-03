@@ -40,7 +40,7 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
   const onRefresh = useCallback(() => { setIsRefreshing(true); fetchEvents(); }, []);
 
   const handleDelete = (id: string) => {
-    Alert.alert('Delete Event', 'Delete this event along with all its tickets and sessions?', [
+    Alert.alert('Delete Event', 'Are you sure you want to delete this event?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
@@ -58,7 +58,7 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
     const label = nextStatus === 'published' ? 'Publish' : 'Cancel';
     const msg = nextStatus === 'published'
       ? 'Publish this event now?'
-      : 'Cancel this event? Attendees will no longer be able to book.';
+      : 'Are you sure you want to cancel this event?';
     Alert.alert(`${label} Event`, msg, [
       { text: 'No', style: 'cancel' },
       {

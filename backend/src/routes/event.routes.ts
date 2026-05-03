@@ -9,6 +9,7 @@ import {
   updateEventStatus,
   updateEventVisibility,
   searchEvents,
+  getDiscoverEvents,
   getTrendingEvents,
   incrementEventView,
   getRecommendedEvents,
@@ -34,6 +35,7 @@ import { protect } from '../middleware/auth.middleware';
 const router = Router();
 
 router.get('/', getEvents);
+router.get('/discover', getDiscoverEvents);
 router.get('/search', searchEvents);
 router.get('/trending', getTrendingEvents);
 router.get('/recommended', getRecommendedEvents);

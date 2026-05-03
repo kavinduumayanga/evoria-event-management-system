@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Share as RNShare, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Share as RNShare, Linking, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
@@ -54,14 +54,40 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const hostName = safeTitle(host?.name, 'Dallas Matcha Club');
   const coverImage = resolveImageUrl(publicData?.event.image || event.coverImage);
   const formattedDate = formatSafeDate(event.date, 'Today', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const agendaSessions = publicData?.agenda?.sessions || [];
   const isSoldOut = Number(event.capacity) > 0 && Number(event.bookingCount) >= Number(event.capacity);
   const hasRegistrationInventory = safeString(event.pricingMode, 'ticketed') === 'free' || tickets.some(t => t.isActive && t.quantity > t.soldCount);
   const canRegister = safeStatus(event.status, 'draft') === 'published' && safeString(event.visibility, 'private') === 'public' && !isSoldOut && hasRegistrationInventory;
-  const hasLocationCoordinates = typeof event.location?.lat === 'number'
-    && typeof event.location?.lng === 'number'
-    && (event.location.lat !== 0 || event.location.lng !== 0);
+  const isManageableByCurrentUser = Boolean(publicData?.event?.isManageableByCurrentUser);
+  const isCancelled = safeStatus(event.status, 'draft') === 'cancelled';
+  const toFiniteCoordinate = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const rawLocation = (event as any).location;
+  const publicLocation = publicData?.event?.location;
+  const eventLocationName = typeof rawLocation === 'string'
+    ? rawLocation.trim()
+    : safeString(rawLocation?.name, '').trim();
+  const eventLocationAddress = typeof rawLocation === 'object' && rawLocation
+    ? safeString(rawLocation.address, '').trim()
+    : '';
+  const locationName = eventLocationName || safeString(publicLocation?.name || publicLocation?.label, '').trim();
+  const locationAddress = eventLocationAddress || safeString(publicLocation?.address, '').trim();
+  const eventLat = typeof rawLocation === 'object' && rawLocation ? toFiniteCoordinate(rawLocation.lat) : null;
+  const eventLng = typeof rawLocation === 'object' && rawLocation ? toFiniteCoordinate(rawLocation.lng) : null;
+  const publicLat = toFiniteCoordinate(publicLocation?.lat);
+  const publicLng = toFiniteCoordinate(publicLocation?.lng);
+  const resolvedLat = eventLat ?? publicLat;
+  const resolvedLng = eventLng ?? publicLng;
+  const hasLocationCoordinates = resolvedLat !== null && resolvedLng !== null && (resolvedLat !== 0 || resolvedLng !== 0);
   const locationCoordinates = hasLocationCoordinates
-    ? { lat: event.location!.lat as number, lng: event.location!.lng as number }
+    ? { lat: resolvedLat as number, lng: resolvedLng as number }
     : null;
 
   const handleShare = async () => {
@@ -79,6 +105,57 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     if (email) Linking.openURL(`mailto:${email}`);
   };
 
+  const handleEditEvent = () => {
+    if (!eventId) return;
+    navigation.navigate('EventForm', { eventId });
+  };
+
+  const handleCancelEvent = () => {
+    if (!eventId) return;
+    Alert.alert(
+      'Cancel Event',
+      'Are you sure you want to cancel this event?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await EventService.updateEventStatus(eventId, 'cancelled');
+              await fetchEventDetails();
+            } catch (cancelError: any) {
+              Alert.alert('Error', cancelError?.response?.data?.message || 'Failed to cancel event.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteEvent = () => {
+    if (!eventId) return;
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await EventService.deleteEvent(eventId);
+              navigation.goBack();
+            } catch (deleteError: any) {
+              Alert.alert('Error', deleteError?.response?.data?.message || 'Failed to delete event.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.root}>
       <LinearGradient colors={['#4A4232', '#000000']} style={StyleSheet.absoluteFillObject} />
@@ -94,6 +171,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.headerInfo}>
           <Text style={styles.title}>{safeTitle(event.title, 'Untitled Event')}</Text>
+          {isCancelled ? <Text style={styles.cancelledChip}>Cancelled</Text> : null}
           <View style={styles.calendarRow}>
             <View style={styles.calendarIcon} />
             <Text style={styles.calendarText}>{hostName} Events Calendar &gt;</Text>
@@ -128,17 +206,36 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </View>
 
+        {isManageableByCurrentUser ? (
+          <View style={styles.ownerActionsRow}>
+            <TouchableOpacity style={styles.ownerActionButton} onPress={handleEditEvent} activeOpacity={0.85}>
+              <Text style={styles.ownerActionText}>Edit Event</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.ownerActionButton, isCancelled && styles.ownerActionDisabled]}
+              onPress={handleCancelEvent}
+              activeOpacity={0.85}
+              disabled={isCancelled}
+            >
+              <Text style={styles.ownerActionText}>Cancel Event</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.ownerActionButton, styles.ownerActionDelete]} onPress={handleDeleteEvent} activeOpacity={0.85}>
+              <Text style={styles.ownerActionDeleteText}>Delete Event</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <SectionBlock title="Location" style={styles.sectionBlock}>
-          {event.type === 'online' && !event.location?.name ? (
+          {event.type === 'online' && !locationName ? (
             <Text style={styles.locationTitle}>Online Event</Text>
           ) : (
             <>
               <Text style={styles.locationTitle} numberOfLines={2}>
-                {event.location?.name || venue?.name || 'TBA'}
+                {locationName || venue?.name || 'TBA'}
               </Text>
-              {(event.location?.address || venue?.address) ? (
+              {(locationAddress || venue?.address) ? (
                 <Text style={styles.locationSubtitle} numberOfLines={2}>
-                  {event.location?.address || venue?.address}
+                  {locationAddress || venue?.address}
                 </Text>
               ) : null}
 
@@ -170,12 +267,12 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Text style={styles.mapOpenText}>📍 Open in Maps</Text>
                   </View>
                 </TouchableOpacity>
-              ) : (venue?.address || event.location?.name) ? (
+              ) : (venue?.address || locationName) ? (
                 <TouchableOpacity
                   style={[styles.mapMockup, styles.mapFallback]}
                   activeOpacity={0.85}
                   onPress={() => {
-                    const query = venue?.address || event.location?.name || '';
+                    const query = venue?.address || locationName || '';
                     if (query) Linking.openURL(`https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`);
                   }}
                 >
@@ -205,7 +302,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.description}>{safeString(event.description, "We're celebrating National Matcha Day with our biggest event yet! Join us for a full-day matcha experience featuring your favorite local vendors, a live DJ, giveaways, and interactive experiences!")}</Text>
           <View style={styles.aboutMetaRow}>
             <MapPin size={16} color="#A3A3A3" />
-            <Text style={styles.aboutMetaText}>{event.location?.name || venue?.name || 'Online / TBA'}</Text>
+            <Text style={styles.aboutMetaText}>{locationName || venue?.name || 'Online / TBA'}</Text>
           </View>
           <View style={styles.aboutMetaRow}>
             <CalendarIcon size={16} color="#A3A3A3" />
@@ -219,6 +316,43 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.tagPill}>
             <Text style={styles.tagText}># Food & Drink</Text>
           </View>
+        </SectionBlock>
+
+        <SectionBlock title="Agenda" style={styles.sectionBlock}>
+          {agendaSessions.length === 0 ? (
+            <Text style={styles.agendaEmptyText}>No agenda has been added for this event yet.</Text>
+          ) : (
+            <View style={styles.agendaList}>
+              {agendaSessions.map((session) => {
+                const sessionTitle = safeString(session.title, 'Session');
+                const hasStart = safeString(session.startTime, '').trim().length > 0;
+                const hasEnd = safeString(session.endTime, '').trim().length > 0;
+                const speaker = safeString(session.speakerName, '').trim() || safeString(host?.name, '').trim();
+                const description = safeString(session.description, '').trim();
+
+                return (
+                  <View key={session.id} style={styles.agendaCard}>
+                    <Text style={styles.agendaTitle}>{sessionTitle}</Text>
+                    {(hasStart || hasEnd) ? (
+                      <View style={styles.agendaMetaRow}>
+                        <Clock size={14} color="#A3A3A3" />
+                        <Text style={styles.agendaMetaText}>
+                          {hasStart && hasEnd ? `${session.startTime} - ${session.endTime}` : (session.startTime || session.endTime)}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {speaker ? (
+                      <View style={styles.agendaMetaRow}>
+                        <Text style={styles.agendaMetaLabel}>Speaker</Text>
+                        <Text style={styles.agendaMetaText}>{speaker}</Text>
+                      </View>
+                    ) : null}
+                    {description ? <Text style={styles.agendaDescription}>{description}</Text> : null}
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </SectionBlock>
       </ScrollView>
 
@@ -269,12 +403,60 @@ const styles = StyleSheet.create({
   featuredText: { color: '#000', fontWeight: '600', fontSize: 12 },
   headerInfo: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 24 },
   title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginBottom: 12 },
+  cancelledChip: {
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    backgroundColor: 'rgba(250,82,82,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(250,82,82,0.6)',
+    color: '#FA5252',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    textTransform: 'uppercase',
+  },
   calendarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   calendarIcon: { width: 16, height: 16, backgroundColor: '#A3A3A3', borderRadius: 4, marginRight: 8 },
   calendarText: { color: '#A3A3A3', fontSize: 16, fontWeight: '500' },
   timeText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   actionRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12, marginBottom: 32 },
   actionFlex1: { flex: 1 },
+  ownerActionsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 10,
+    marginBottom: 24,
+  },
+  ownerActionButton: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  ownerActionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ownerActionDelete: {
+    borderColor: 'rgba(250,82,82,0.75)',
+    backgroundColor: 'rgba(250,82,82,0.16)',
+  },
+  ownerActionDeleteText: {
+    color: '#FA5252',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ownerActionDisabled: {
+    opacity: 0.45,
+  },
   sectionBlock: { paddingHorizontal: 20, marginBottom: 32 },
   locationTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginBottom: 4 },
   locationSubtitle: { color: '#A3A3A3', fontSize: 14, marginBottom: 16 },
@@ -322,6 +504,50 @@ const styles = StyleSheet.create({
   aboutMetaText: { color: '#FFFFFF', fontSize: 16, marginLeft: 12 },
   tagPill: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, alignSelf: 'flex-start', marginTop: 16 },
   tagText: { color: '#A3A3A3', fontSize: 14, fontWeight: '500' },
+  agendaList: { gap: 12 },
+  agendaCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: 14,
+    ...theme.shadows.sm,
+  },
+  agendaTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  agendaMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  agendaMetaLabel: {
+    color: '#A3A3A3',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  agendaMetaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  agendaDescription: {
+    color: '#CFCFCF',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  agendaEmptyText: {
+    color: '#A3A3A3',
+    fontSize: 14,
+    lineHeight: 21,
+  },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   bottomSheet: { backgroundColor: '#1E1E1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 },
   sheetTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
