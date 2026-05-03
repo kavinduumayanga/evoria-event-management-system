@@ -62,6 +62,12 @@ const createEventSchema = z.object({
   city: z.string().trim().optional().default(''),
   tags: z.array(z.string().trim()).optional().default([]),
   venueId: z.union([z.string().trim(), z.null()]).optional(),
+  location: z.object({
+    name: z.string().trim().optional(),
+    address: z.string().trim().optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional()
+  }).nullable().optional(),
   type: z.enum(EVENT_TYPES),
   pricingMode: z.enum(EVENT_PRICING_MODES).default('ticketed'),
   visibility: z.enum(EVENT_VISIBILITIES).default('public'),
@@ -106,6 +112,7 @@ interface EventInput {
   city: string;
   tags: string[];
   venueId: string | null;
+  location?: { name?: string; address?: string; lat?: number; lng?: number } | null;
   type: EventType;
   pricingMode: EventPricingMode;
   visibility: EventVisibility;
@@ -212,6 +219,34 @@ const normalizeMeetingLink = (meetingLink: string | undefined): string | undefin
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const normalizeLocation = (
+  location: { name?: string; address?: string; lat?: number; lng?: number } | null | undefined,
+) => {
+  if (!location) return null;
+
+  const name = String(location.name || '').trim();
+  const address = String(location.address || '').trim();
+  const hasLat = typeof location.lat === 'number' && Number.isFinite(location.lat);
+  const hasLng = typeof location.lng === 'number' && Number.isFinite(location.lng);
+
+  if (!name && !address && !hasLat && !hasLng) {
+    return null;
+  }
+
+  return {
+    ...(name ? { name } : {}),
+    address,
+    ...(hasLat ? { lat: location.lat } : {}),
+    ...(hasLng ? { lng: location.lng } : {}),
+  };
+};
+
+const resolveLocationLabel = (eventInput: Pick<EventInput, 'location' | 'city'>): string => {
+  const locationName = String(eventInput.location?.name || '').trim();
+  if (locationName) return locationName;
+  return String(eventInput.city || '').trim();
+};
+
 const normalizePricingMode = (pricingMode: unknown): EventPricingMode => {
   return pricingMode === 'free' ? 'free' : 'ticketed';
 };
@@ -280,10 +315,6 @@ const validateVenueRules = async (type: EventType, venueId: string | null) => {
     throw new AppError('Event type is invalid', 400);
   }
 
-  if ((type === 'physical' || type === 'hybrid') && !venueId) {
-    throw new AppError('Venue is required for physical and hybrid events', 400);
-  }
-
   if (venueId) {
     const venue = await VenueModel.findById(venueId);
     if (!venue) {
@@ -319,6 +350,22 @@ const validateEventData = async (eventInput: EventInput) => {
 
   if (eventInput.capacity <= 0) {
     throw new AppError('Capacity must be greater than 0', 400);
+  }
+
+  if (eventInput.type === 'physical' || eventInput.type === 'hybrid') {
+    const locationLabel = resolveLocationLabel(eventInput);
+    if (!locationLabel) {
+      throw new AppError('Location is required for physical and hybrid events', 400);
+    }
+  }
+
+  if (eventInput.location) {
+    const hasLat = typeof eventInput.location.lat === 'number' && Number.isFinite(eventInput.location.lat);
+    const hasLng = typeof eventInput.location.lng === 'number' && Number.isFinite(eventInput.location.lng);
+
+    if (hasLat !== hasLng) {
+      throw new AppError('Location coordinates must include both latitude and longitude', 400);
+    }
   }
 
   if (eventInput.type === 'online' || eventInput.type === 'hybrid') {
@@ -368,6 +415,7 @@ const toEventInputForCreate = (validatedData: z.infer<typeof createEventSchema>)
     city: normalizeOptionalText(validatedData.city),
     tags: normalizeTags(validatedData.tags),
     venueId: normalizeVenueId(validatedData.venueId),
+    location: normalizeLocation(validatedData.location),
     type: validatedData.type,
     pricingMode: validatedData.pricingMode,
     visibility: validatedData.visibility,
@@ -400,6 +448,9 @@ const toMergedEventInputForUpdate = (event: any, updates: z.infer<typeof updateE
     venueId: Object.prototype.hasOwnProperty.call(updates, 'venueId')
       ? normalizeVenueId(updates.venueId)
       : normalizeVenueId(event.venueId),
+    location: Object.prototype.hasOwnProperty.call(updates, 'location')
+      ? normalizeLocation(updates.location)
+      : normalizeLocation(event.location),
     type: updates.type !== undefined ? updates.type : event.type,
     pricingMode: updates.pricingMode !== undefined ? updates.pricingMode : normalizePricingMode(event.pricingMode),
     visibility: updates.visibility !== undefined ? updates.visibility : event.visibility,
@@ -457,6 +508,10 @@ const toEventUpdatePayload = (updates: z.infer<typeof updateEventSchema>) => {
     payload.venueId = normalizeVenueId(updates.venueId);
   }
 
+  if (Object.prototype.hasOwnProperty.call(updates, 'location')) {
+    payload.location = normalizeLocation(updates.location);
+  }
+
   if (Object.prototype.hasOwnProperty.call(updates, 'coverImage')) {
     payload.coverImage = normalizeCoverImage(updates.coverImage) || null;
   }
@@ -497,6 +552,14 @@ const ensurePublishable = async (event: any) => {
   }
 
   await validateVenueRules(event.type as EventType, normalizeVenueId(event.venueId));
+
+  if (event.type === 'physical' || event.type === 'hybrid') {
+    const locationName = String(event.location?.name || '').trim();
+    const city = String(event.city || '').trim();
+    if (!locationName && !city) {
+      throw new AppError('Location is required before publishing physical and hybrid events', 400);
+    }
+  }
 
   if (event.type === 'online' || event.type === 'hybrid') {
     const meetingLink = normalizeMeetingLink(event.meetingLink);
@@ -796,7 +859,7 @@ export const getEventCalendar = async (req: Request, res: Response, next: NextFu
     const endDate = combineDateAndTime(event.date, event.endTime);
     let location = event.type === 'online'
       ? (event.meetingLink || 'Online')
-      : (event.city || 'Venue');
+      : (event.location?.name || event.city || 'Venue');
 
     if (event.type !== 'online' && event.venueId) {
       const venue = await VenueModel.findById(event.venueId);
@@ -861,7 +924,7 @@ export const downloadEventCalendarIcs = async (req: Request, res: Response, next
     const endDate = combineDateAndTime(event.date, event.endTime);
     let location = event.type === 'online'
       ? (event.meetingLink || 'Online')
-      : (event.city || 'Venue');
+      : (event.location?.name || event.city || 'Venue');
 
     if (event.type !== 'online' && event.venueId) {
       const venue = await VenueModel.findById(event.venueId);
@@ -1012,11 +1075,19 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
 
     const freeRegistrationOptions = ticketOptions.filter((ticket) => ticket.isFree);
     const registrationQuestions = getEventRegistrationQuestions(event);
+    const locationName = String(event.location?.name || '').trim();
+    const locationAddress = String(event.location?.address || '').trim();
+    const locationLat = typeof event.location?.lat === 'number' && Number.isFinite(event.location.lat)
+      ? event.location.lat
+      : null;
+    const locationLng = typeof event.location?.lng === 'number' && Number.isFinite(event.location.lng)
+      ? event.location.lng
+      : null;
+    const venueFallbackLabel = venue ? `${venue.name}, ${venue.city}` : '';
     const locationLabel = event.type === 'online'
       ? (event.meetingLink || 'Online')
-      : venue
-        ? `${venue.name}, ${venue.city}`
-        : (event.city || 'Venue');
+      : (locationName || venueFallbackLabel || event.city || 'Venue');
+    const resolvedLocationAddress = locationAddress || (venue ? `${venue.address}, ${venue.city}` : '');
 
     res.status(200).json({
       status: 'success',
@@ -1058,6 +1129,10 @@ export const getPublicEventBySlug = async (req: Request, res: Response, next: Ne
           description: event.description,
           location: {
             label: locationLabel,
+            name: locationName || locationLabel,
+            address: resolvedLocationAddress,
+            lat: locationLat,
+            lng: locationLng,
             city: event.city || '',
             venue: venue
               ? {

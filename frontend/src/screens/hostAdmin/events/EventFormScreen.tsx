@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, Platform, Modal } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Plus, X, Upload, HelpCircle } from 'lucide-react-native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState, Card, IconButton } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, LocationSearchInput } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { EventService, UploadService, VenueService } from '../../../api/services';
+import { EventService, UploadService, VenueService, SessionService } from '../../../api/services';
 import { Event, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode, Venue } from '../../../types';
 import { resolveImageUrl } from '../../../utils/imageUrl';
 import { useAuthStore } from '../../../store/auth.store';
@@ -76,7 +76,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [endTime, setEndTime] = useState('');
   const [capacity, setCapacity] = useState('');
   const [category, setCategory] = useState('');
-  const [city, setCity] = useState('');
+  const [location, setLocation] = useState<{name: string, address: string, lat?: number, lng?: number} | null>(null);
+  const [locationInputResetKey, setLocationInputResetKey] = useState(0);
   const [tagsInput, setTagsInput] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
   const [venueId, setVenueId] = useState('');
@@ -93,6 +94,10 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [questionDraft, setQuestionDraft] = useState('');
   const [questionType, setQuestionType] = useState<CustomQuestionType>('text');
   const [questionRequired, setQuestionRequired] = useState(false);
+
+  const [agendaItems, setAgendaItems] = useState<{ id?: string, startTime: string, title: string, speakerName: string, description: string }[]>([]);
+  const [isAgendaModalVisible, setIsAgendaModalVisible] = useState(false);
+  const [agendaDraft, setAgendaDraft] = useState({ startTime: '', title: '', speakerName: '', description: '' });
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
@@ -120,7 +125,11 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setEndTime(event.endTime || '');
         setCapacity(String(event.capacity || ''));
         setCategory(event.category || '');
-        setCity(event.city || '');
+        if (event.location) {
+          setLocation({ name: event.location.name, address: event.location.address || '', lat: event.location.lat, lng: event.location.lng });
+        } else if (event.city) {
+          setLocation({ name: event.city, address: '' });
+        }
         setTagsInput((event.tags || []).join(', '));
         setMeetingLink(event.meetingLink || '');
         setVenueId(event.venueId || '');
@@ -148,24 +157,33 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const handleDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'set' && selectedDate) {
       setDate(toDateString(selectedDate));
+      if (Platform.OS === 'ios') setShowDatePicker(false);
+    } else if (event.type === 'dismissed') {
+      setShowDatePicker(false);
     }
   };
 
-  const handleStartTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowStartTimePicker(false);
-    if (selectedDate) {
+  const handleStartTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setShowStartTimePicker(false);
+    if (event.type === 'set' && selectedDate) {
       setStartTime(toTimeString(selectedDate));
+      if (Platform.OS === 'ios') setShowStartTimePicker(false);
+    } else if (event.type === 'dismissed') {
+      setShowStartTimePicker(false);
     }
   };
 
-  const handleEndTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowEndTimePicker(false);
-    if (selectedDate) {
+  const handleEndTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setShowEndTimePicker(false);
+    if (event.type === 'set' && selectedDate) {
       setEndTime(toTimeString(selectedDate));
+      if (Platform.OS === 'ios') setShowEndTimePicker(false);
+    } else if (event.type === 'dismissed') {
+      setShowEndTimePicker(false);
     }
   };
 
@@ -255,8 +273,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
-    if (requiresVenue && !venueId) {
-      Alert.alert('Validation Error', 'Please select a venue for physical or hybrid events.');
+    if (requiresVenue && !location?.name?.trim()) {
+      Alert.alert('Validation Error', 'Please select a location for physical/hybrid events.');
       return;
     }
 
@@ -286,7 +304,13 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         endTime: trimmedEnd,
         capacity: parsedCapacity,
         category: category.trim(),
-        city: city.trim(),
+        city: location?.name || '',
+        location: (location && location.name) ? {
+          name: location.name,
+          address: location.address || '',
+          ...(typeof location.lat === 'number' && Number.isFinite(location.lat) ? { lat: location.lat } : {}),
+          ...(typeof location.lng === 'number' && Number.isFinite(location.lng) ? { lng: location.lng } : {}),
+        } : undefined,
         tags: tagsInput
           .split(',')
           .map((tag) => tag.trim())
@@ -307,8 +331,25 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
       if (isEditing) {
         await EventService.updateEvent(eventId!, eventData);
+        // We do not save new agenda items on edit directly here, to avoid complexity.
+        // Usually edits are done in Manage Sessions.
       } else {
-        await EventService.createEvent(eventData);
+        const response = await EventService.createEvent(eventData);
+        const newEventId = response.data?.event?.id;
+        if (newEventId && agendaItems.length > 0) {
+          await Promise.all(
+            agendaItems.map(item => SessionService.createSession({
+              eventId: newEventId,
+              title: item.title,
+              description: item.description,
+              speakerName: item.speakerName,
+              startTime: item.startTime,
+              endTime: item.startTime, // fallback
+              sessionDate: trimmedDate,
+              status: 'scheduled'
+            }))
+          ).catch(e => console.log('Failed to save some agenda items', e));
+        }
       }
 
       navigation.goBack();
@@ -322,6 +363,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) return <LoadingState />;
 
   const saveDisabled = isSaving || (isEditing && status === 'cancelled');
+  const hasSelectedLocation = Boolean(location?.name?.trim());
 
   return (
     <ScreenContainer>
@@ -394,7 +436,39 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         <Input label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
-        <Input label="City" value={city} onChangeText={setCity} placeholder="Colombo" />
+        <LocationSearchInput
+          key={`location-search-${locationInputResetKey}`}
+          label="Location"
+          placeholder="Search location (e.g. SLIIT Malabe)..."
+          initialValue={location?.name || ''}
+          onSelect={(loc) => {
+            setLocation(loc);
+          }}
+        />
+        {location && hasSelectedLocation && (
+          <View style={styles.locationPreview}>
+            <View style={styles.locationPreviewTop}>
+              <View style={styles.locationPreviewTextWrap}>
+                <Text style={styles.locationPreviewName} numberOfLines={2}>{location.name}</Text>
+                {location.address ? <Text style={styles.locationPreviewAddr} numberOfLines={2}>{location.address}</Text> : null}
+              </View>
+            </View>
+            <View style={styles.locationPreviewActionsRow}>
+              <TouchableOpacity style={styles.locationActionButton} onPress={() => setLocation(null)}>
+                <Text style={styles.locationActionText}>Change</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.locationActionButton, styles.locationRemoveButton]}
+                onPress={() => {
+                  setLocation(null);
+                  setLocationInputResetKey((previous) => previous + 1);
+                }}
+              >
+                <Text style={[styles.locationActionText, styles.locationRemoveText]}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <Text style={styles.label}>Event Type *</Text>
         <View style={styles.segmentRow}>
@@ -609,6 +683,36 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           />
         </Card>
 
+        {!isEditing && (
+          <Card variant="raised" style={styles.questionCard}>
+            <Text style={styles.sectionTitle}>Agenda</Text>
+            {agendaItems.length > 0 ? (
+              agendaItems.map((item, index) => (
+                <View key={index} style={styles.questionRow}>
+                  <View style={styles.questionInfo}>
+                    <Text style={styles.questionText}>{item.startTime} - {item.title}</Text>
+                    <Text style={styles.questionMeta}>{item.speakerName} • {item.description}</Text>
+                  </View>
+                  <IconButton
+                    icon={<X size={14} color={theme.colors.error} />}
+                    onPress={() => setAgendaItems(prev => prev.filter((_, i) => i !== index))}
+                    variant="ghost"
+                    size={30}
+                  />
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noQuestionText}>No agenda items added yet.</Text>
+            )}
+            <Button
+              variant="secondary"
+              title="Add Agenda Item"
+              onPress={() => setIsAgendaModalVisible(true)}
+              icon={<Plus size={16} color={theme.colors.text} />}
+            />
+          </Card>
+        )}
+
         <Button
           variant="primary"
           title={isEditing ? 'Save Changes' : 'Create Event'}
@@ -644,6 +748,34 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
           onChange={handleEndTimeChange}
         />
       ) : null}
+
+      <Modal visible={isAgendaModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.agendaModal}>
+            <Text style={styles.sectionTitle}>New Agenda Item</Text>
+            <Input label="Time *" value={agendaDraft.startTime} onChangeText={t => setAgendaDraft({...agendaDraft, startTime: t})} placeholder="09:00" />
+            <Input label="Topic *" value={agendaDraft.title} onChangeText={t => setAgendaDraft({...agendaDraft, title: t})} placeholder="Keynote" />
+            <Input label="Speaker Name" value={agendaDraft.speakerName} onChangeText={t => setAgendaDraft({...agendaDraft, speakerName: t})} placeholder="Jane Doe" />
+            <Input label="Description" value={agendaDraft.description} onChangeText={t => setAgendaDraft({...agendaDraft, description: t})} placeholder="Topic description..." multiline />
+            <View style={styles.row}>
+              <View style={styles.flexHalf}>
+                <Button variant="secondary" title="Cancel" onPress={() => setIsAgendaModalVisible(false)} />
+              </View>
+              <View style={styles.flexHalf}>
+                <Button variant="primary" title="Add" onPress={() => {
+                  if (!agendaDraft.startTime || !agendaDraft.title) {
+                    Alert.alert('Error', 'Time and Topic are required');
+                    return;
+                  }
+                  setAgendaItems(prev => [...prev, { ...agendaDraft }]);
+                  setAgendaDraft({ startTime: '', title: '', speakerName: '', description: '' });
+                  setIsAgendaModalVisible(false);
+                }} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -692,6 +824,57 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textSecondary,
     marginTop: 2,
+  },
+  locationPreview: {
+    backgroundColor: theme.colors.primarySubtle,
+    borderRadius: theme.borderRadius.m,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    padding: theme.spacing.m,
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.s,
+  },
+  locationPreviewTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  locationPreviewTextWrap: {
+    flex: 1,
+  },
+  locationPreviewName: {
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
+    marginBottom: 2,
+  },
+  locationPreviewAddr: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: 2,
+  },
+  locationPreviewActionsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    marginTop: theme.spacing.s,
+  },
+  locationActionButton: {
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.round,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: 'transparent',
+  },
+  locationActionText: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    fontWeight: '700',
+  },
+  locationRemoveButton: {
+    borderColor: theme.colors.error,
+  },
+  locationRemoveText: {
+    color: theme.colors.error,
   },
   row: {
     flexDirection: 'row',
@@ -798,38 +981,33 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 140,
     borderRadius: theme.borderRadius.m,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
+    backgroundColor: '#333',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: theme.spacing.m,
   },
   coverPlaceholderText: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
+    color: '#666',
+    fontWeight: 'bold',
   },
   colorLabel: {
     ...theme.typography.caption,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
-    marginTop: theme.spacing.xs,
+    color: theme.colors.textMuted,
+    marginBottom: 8,
   },
   colorRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.s,
-    marginBottom: theme.spacing.s,
+    gap: 12,
+    marginBottom: 24,
   },
   colorBubble: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   colorBubbleSelected: {
-    borderColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#FFF',
   },
   questionCard: {
     marginBottom: theme.spacing.m,
@@ -837,32 +1015,42 @@ const styles = StyleSheet.create({
   questionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.s,
-    paddingBottom: theme.spacing.s,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: 12,
+    borderRadius: theme.borderRadius.m,
+    marginBottom: 8,
   },
   questionInfo: {
     flex: 1,
-    marginRight: theme.spacing.s,
   },
   questionText: {
     ...theme.typography.body,
     color: theme.colors.text,
+    fontWeight: '600',
   },
   questionMeta: {
-    ...theme.typography.small,
-    color: theme.colors.primaryLight,
-    marginTop: 4,
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
   },
   noQuestionText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    marginBottom: theme.spacing.s,
+    marginBottom: 16,
   },
   saveButton: {
-    marginTop: theme.spacing.m,
-    marginBottom: theme.spacing.xl,
+    marginTop: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  agendaModal: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
 });

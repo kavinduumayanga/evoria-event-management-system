@@ -18,6 +18,7 @@ export * from './SectionBlock';
 export * from './Input';               // Input + FormInput alias
 export * from './InputField';
 export * from './Select';
+export * from './LocationSearchInput';
 
 // Buttons
 export * from './Button';              // Button + PrimaryButton + SecondaryButton + GhostButton

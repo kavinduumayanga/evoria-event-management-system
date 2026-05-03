@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { Calendar, MapPin, Clock } from 'lucide-react-native';
 import { Event } from '../types';
 import { safeString } from '../utils/safeText';
 
@@ -13,9 +14,12 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
   const imageUrl = safeString(event.coverImage);
   const title = safeString(event.title, 'Untitled Event');
   const description = safeString(event.description, 'No description available.');
+  const eventDate = safeString(event.date, 'TBA');
+  const eventTime = safeString(event.startTime, 'TBA');
+  const eventLocation = safeString(event.city, 'Online / TBA');
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.imageContainer}>
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={styles.image} />
@@ -24,10 +28,29 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
             <Text style={styles.placeholderText}>E</Text>
           </View>
         )}
+        <View style={styles.pricingBadge}>
+          <Text style={styles.pricingText}>{event.pricingMode === 'free' ? 'FREE' : 'PAID'}</Text>
+        </View>
       </View>
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
         <Text style={styles.description} numberOfLines={2}>{description}</Text>
+        
+        <View style={styles.detailsRow}>
+          <View style={styles.detailItem}>
+            <Calendar color="#A3A3A3" size={14} />
+            <Text style={styles.detailText}>{eventDate}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Clock color="#A3A3A3" size={14} />
+            <Text style={styles.detailText}>{eventTime}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.detailItem}>
+          <MapPin color="#A3A3A3" size={14} />
+          <Text style={styles.detailText}>{eventLocation}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -35,21 +58,35 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
     marginBottom: 24,
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  imageContainer: {
-    width: 64,
-    height: 64,
+    backgroundColor: '#1E1E1E',
     borderRadius: 16,
     overflow: 'hidden',
-    marginRight: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  imageContainer: {
+    width: '100%',
+    height: 180,
+    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
+  },
+  pricingBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  pricingText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   placeholderImage: {
     backgroundColor: '#333',
@@ -57,24 +94,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   placeholderText: {
-    fontSize: 24,
+    fontSize: 48,
     color: '#666',
     fontWeight: 'bold',
   },
   content: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 16,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 6,
     letterSpacing: -0.2,
   },
   description: {
     fontSize: 14,
     color: '#A3A3A3',
     lineHeight: 20,
+    marginBottom: 12,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 16,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailText: {
+    color: '#A3A3A3',
+    fontSize: 13,
+    marginLeft: 6,
   },
 });

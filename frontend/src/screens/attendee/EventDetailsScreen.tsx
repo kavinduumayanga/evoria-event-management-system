@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Share as RNShare, Linking } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
@@ -27,6 +27,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [publicData, setPublicData] = useState<PublicEventDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
 
   const fetchEventDetails = useCallback(async () => {
     if (!eventId) return;
@@ -56,11 +57,32 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const isSoldOut = Number(event.capacity) > 0 && Number(event.bookingCount) >= Number(event.capacity);
   const hasRegistrationInventory = safeString(event.pricingMode, 'ticketed') === 'free' || tickets.some(t => t.isActive && t.quantity > t.soldCount);
   const canRegister = safeStatus(event.status, 'draft') === 'published' && safeString(event.visibility, 'private') === 'public' && !isSoldOut && hasRegistrationInventory;
+  const hasLocationCoordinates = typeof event.location?.lat === 'number'
+    && typeof event.location?.lng === 'number'
+    && (event.location.lat !== 0 || event.location.lng !== 0);
+  const locationCoordinates = hasLocationCoordinates
+    ? { lat: event.location!.lat as number, lng: event.location!.lng as number }
+    : null;
+
+  const handleShare = async () => {
+    const slug = publicSlug || event.publicSlug;
+    if (!slug) return;
+    try {
+      await RNShare.share({
+        message: `Check out this event: ${EventService.buildPublicEventUrl(slug)}`,
+      });
+    } catch (e) {}
+  };
+
+  const handleContact = () => {
+    const email = publicData?.event.contactDetails?.email || host?.email;
+    if (email) Linking.openURL(`mailto:${email}`);
+  };
 
   return (
     <View style={styles.root}>
       <LinearGradient colors={['#4A4232', '#000000']} style={StyleSheet.absoluteFillObject} />
-      <HeaderBar variant="event" transparent />
+      <HeaderBar variant="event" transparent onShare={handleShare} />
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.imageCard}>
@@ -94,24 +116,74 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <SecondaryButton
               title="Contact"
               icon={<Mail color="#FFF" size={20} />}
-              onPress={() => {}}
+              onPress={handleContact}
             />
           </View>
           <View style={styles.actionFlex1}>
             <SecondaryButton
               title="More"
               icon={<MoreHorizontal color="#FFF" size={20} />}
-              onPress={() => {}}
+              onPress={() => setIsMoreModalVisible(true)}
             />
           </View>
         </View>
 
         <SectionBlock title="Location" style={styles.sectionBlock}>
-          <Text style={styles.locationTitle}>{venue?.name || 'Irving Mall'}</Text>
-          <Text style={styles.locationSubtitle}>{venue?.address || '3880 Irving Mall, Irving, TX 75062, USA'}</Text>
-          <View style={styles.mapMockup}>
-            <Image source={{uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=600&auto=format&fit=crop'}} style={StyleSheet.absoluteFillObject} />
-          </View>
+          {event.type === 'online' && !event.location?.name ? (
+            <Text style={styles.locationTitle}>Online Event</Text>
+          ) : (
+            <>
+              <Text style={styles.locationTitle} numberOfLines={2}>
+                {event.location?.name || venue?.name || 'TBA'}
+              </Text>
+              {(event.location?.address || venue?.address) ? (
+                <Text style={styles.locationSubtitle} numberOfLines={2}>
+                  {event.location?.address || venue?.address}
+                </Text>
+              ) : null}
+
+              {/* Map preview – opens OSM on tap */}
+              {locationCoordinates ? (
+                <TouchableOpacity
+                  style={styles.mapMockup}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    const { lat, lng } = locationCoordinates;
+                    Linking.openURL(
+                      `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`
+                    );
+                  }}
+                >
+                  <Image
+                    source={{ uri: `https://tile.openstreetmap.org/14/${
+                      Math.floor((locationCoordinates.lng + 180) / 360 * Math.pow(2, 14))
+                    }/${
+                      Math.floor((1 - Math.log(Math.tan(locationCoordinates.lat * Math.PI / 180) + 1 / Math.cos(locationCoordinates.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, 14))
+                    }.png` }}
+                    style={StyleSheet.absoluteFillObject}
+                    defaultSource={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=600&auto=format&fit=crop' }}
+                  />
+                  <View style={styles.mapPinMarker}>
+                    <MapPin size={16} color="#0B0B0C" />
+                  </View>
+                  <View style={styles.mapOpenBadge}>
+                    <Text style={styles.mapOpenText}>📍 Open in Maps</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : (venue?.address || event.location?.name) ? (
+                <TouchableOpacity
+                  style={[styles.mapMockup, styles.mapFallback]}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    const query = venue?.address || event.location?.name || '';
+                    if (query) Linking.openURL(`https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`);
+                  }}
+                >
+                  <Text style={styles.mapFallbackText}>📍 Open location in Maps</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
+          )}
         </SectionBlock>
 
         <SectionBlock title="Host" style={styles.sectionBlock}>
@@ -133,7 +205,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.description}>{safeString(event.description, "We're celebrating National Matcha Day with our biggest event yet! Join us for a full-day matcha experience featuring your favorite local vendors, a live DJ, giveaways, and interactive experiences!")}</Text>
           <View style={styles.aboutMetaRow}>
             <MapPin size={16} color="#A3A3A3" />
-            <Text style={styles.aboutMetaText}>{venue?.name || 'Irving Mall (AMC entrance by Chick-fil-A)'}</Text>
+            <Text style={styles.aboutMetaText}>{event.location?.name || venue?.name || 'Online / TBA'}</Text>
           </View>
           <View style={styles.aboutMetaRow}>
             <CalendarIcon size={16} color="#A3A3A3" />
@@ -149,6 +221,23 @@ export const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </SectionBlock>
       </ScrollView>
+
+      <Modal visible={isMoreModalVisible} transparent animationType="slide" onRequestClose={() => setIsMoreModalVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsMoreModalVisible(false)}>
+          <View style={styles.bottomSheet}>
+            <Text style={styles.sheetTitle}>More Options</Text>
+            <TouchableOpacity style={styles.sheetOption} onPress={() => { setIsMoreModalVisible(false); /* Add logic */ }}>
+              <Text style={styles.sheetOptionText}>Add to Calendar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetOption} onPress={() => { setIsMoreModalVisible(false); const slug = publicSlug || event.publicSlug; if (slug) Linking.openURL(EventService.buildPublicEventUrl(slug)); }}>
+              <Text style={styles.sheetOptionText}>Open in Browser</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetOption} onPress={() => { setIsMoreModalVisible(false); /* Add logic */ }}>
+              <Text style={[styles.sheetOptionText, { color: '#FF453A' }]}>Report Event</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -189,7 +278,37 @@ const styles = StyleSheet.create({
   sectionBlock: { paddingHorizontal: 20, marginBottom: 32 },
   locationTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginBottom: 4 },
   locationSubtitle: { color: '#A3A3A3', fontSize: 14, marginBottom: 16 },
-  mapMockup: { height: 160, borderRadius: 16, overflow: 'hidden', backgroundColor: '#333' },
+  mapMockup: { height: 160, borderRadius: 16, overflow: 'hidden', backgroundColor: '#333', marginTop: 12 },
+  mapPinMarker: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+    alignSelf: 'center',
+    marginTop: 56,
+  },
+  mapOpenBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  mapOpenText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
+  mapFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  mapFallbackText: { color: '#A3A3A3', fontSize: 15, fontWeight: '500' },
   hostRow: { flexDirection: 'row', alignItems: 'center' },
   hostAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#5D8B84', marginRight: 16 },
   hostName: { color: '#FFFFFF', fontSize: 18, fontWeight: '500' },
@@ -203,4 +322,9 @@ const styles = StyleSheet.create({
   aboutMetaText: { color: '#FFFFFF', fontSize: 16, marginLeft: 12 },
   tagPill: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, alignSelf: 'flex-start', marginTop: 16 },
   tagText: { color: '#A3A3A3', fontSize: 14, fontWeight: '500' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  bottomSheet: { backgroundColor: '#1E1E1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 },
+  sheetTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
+  sheetOption: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  sheetOptionText: { color: '#FFFFFF', fontSize: 16 },
 });

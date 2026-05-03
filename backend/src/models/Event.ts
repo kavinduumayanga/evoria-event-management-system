@@ -21,6 +21,15 @@ const eventSchema = new Schema({
   adminIds: { type: [String], default: [] },
   publicSlug: { type: String, required: true, unique: true, trim: true, lowercase: true, index: true },
   venueId: { type: String, default: null },
+  location: {
+    type: new Schema({
+      name: { type: String, trim: true },
+      address: { type: String, trim: true, default: '' },
+      lat: { type: Number },
+      lng: { type: Number },
+    }, { _id: false }),
+    default: null,
+  },
   type: { type: String, enum: ['online', 'physical', 'hybrid'], required: true },
   pricingMode: { type: String, enum: ['free', 'ticketed'], default: 'ticketed' },
   category: { type: String, trim: true, default: '' },

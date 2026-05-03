@@ -164,7 +164,14 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const eventType = safeLower(event.type, 'physical');
   const host = typeof event.host === 'object' && event.host ? event.host : null;
   const hostName = safeTitle(host?.name, 'Host unavailable');
-  const locationLabel = safeString(event.location?.label, eventType === 'online' ? 'Online' : 'Location not specified');
+  const locationName = safeString(
+    event.location?.name || event.location?.label,
+    eventType === 'online' ? 'Online' : 'Location not specified',
+  );
+  const locationAddress = safeString(event.location?.address, '');
+  const locationLat = typeof event.location?.lat === 'number' ? event.location.lat : null;
+  const locationLng = typeof event.location?.lng === 'number' ? event.location.lng : null;
+  const hasLocationCoordinates = locationLat !== null && locationLng !== null && (locationLat !== 0 || locationLng !== 0);
   const dateLabel = formatSafeDate(event.date, 'Date unavailable');
   const startTimeLabel = formatSafeTime(event.startTime, 'Time unavailable');
   const endTimeLabel = formatSafeTime(event.endTime, 'Time unavailable');
@@ -173,6 +180,15 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
   const aboutLabel = safeString(event.about, '');
   const isSoldOut = tickets.every((t) => (Number.isFinite(Number(t.remaining)) ? Number(t.remaining) : 0) <= 0);
   const isTicketedEvent = safeString(event.pricingMode, 'ticketed') === 'ticketed';
+  const buildMapTilePreviewUrl = (lat: number, lng: number) => {
+    const zoom = 14;
+    const clampedLat = Math.max(Math.min(lat, 85.0511), -85.0511);
+    const xTile = Math.floor(((lng + 180) / 360) * Math.pow(2, zoom));
+    const yTile = Math.floor(
+      ((1 - Math.log(Math.tan((clampedLat * Math.PI) / 180) + (1 / Math.cos((clampedLat * Math.PI) / 180))) / Math.PI) / 2) * Math.pow(2, zoom)
+    );
+    return `https://tile.openstreetmap.org/${zoom}/${xTile}/${yTile}.png`;
+  };
 
   return (
     <ScreenContainer style={styles.screen}>
@@ -218,7 +234,7 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
               </View>
               <View style={styles.metaRow}>
                 <MapPin size={14} color={theme.colors.accent} />
-                <Text style={styles.metaText}>{locationLabel}</Text>
+                <Text style={styles.metaText}>{locationName}</Text>
               </View>
               <View style={styles.metaDivider} />
               <View style={styles.metaTagRow}>
@@ -228,6 +244,28 @@ export const PublicEventDetailsScreen: React.FC<Props> = ({ navigation, route })
               {hostName ? <Text style={styles.hostText}>Hosted by {hostName}</Text> : null}
             </View>
           </Card>
+
+          {eventType !== 'online' && hasLocationCoordinates ? (
+            <Card variant="raised" style={styles.locationCard} noPadding>
+              <View style={styles.locationCardInner}>
+                <Text style={styles.locationTitle}>{locationName}</Text>
+                {locationAddress ? <Text style={styles.locationAddress}>{locationAddress}</Text> : null}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.mapPreview}
+                  onPress={() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${locationLat}&mlon=${locationLng}#map=16/${locationLat}/${locationLng}`)}
+                >
+                  <Image
+                    source={{ uri: buildMapTilePreviewUrl(locationLat, locationLng) }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View style={styles.mapPinMarker}>
+                    <MapPin size={16} color={theme.colors.primary} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </Card>
+          ) : null}
 
           {/* Action buttons */}
           <View style={styles.actionRow}>
@@ -408,6 +446,31 @@ const styles = StyleSheet.create({
   metaDivider: { height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.xs },
   metaTagRow: { flexDirection: 'row', gap: theme.spacing.s, flexWrap: 'wrap' },
   hostText: { ...theme.typography.caption, color: theme.colors.textMuted },
+  locationCard: { marginTop: theme.spacing.m, borderRadius: theme.borderRadius.l, overflow: 'hidden' },
+  locationCardInner: { padding: theme.spacing.m },
+  locationTitle: { ...theme.typography.bodyMedium, color: theme.colors.text },
+  locationAddress: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 2 },
+  mapPreview: {
+    height: 150,
+    borderRadius: theme.borderRadius.m,
+    overflow: 'hidden',
+    marginTop: theme.spacing.s,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapPinMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   actionRow: { flexDirection: 'row', gap: theme.spacing.s, marginTop: theme.spacing.m, flexWrap: 'wrap' },
   actionChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
