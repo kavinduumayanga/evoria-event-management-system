@@ -158,7 +158,11 @@ export const LocationSearchInput: React.FC<LocationSearchInputProps> = ({ label 
                 <View style={styles.resultTextContainer}>
                   <Text style={styles.resultNameText} numberOfLines={1}>{item.name}</Text>
                   <Text style={styles.resultAddressText} numberOfLines={1}>{item.displayName}</Text>
-                  <Text style={styles.resultCoordsText}>{item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}</Text>
+                  <Text style={styles.resultCoordsText}>
+                    {Number.isFinite(item.latitude) && Number.isFinite(item.longitude)
+                      ? `${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}`
+                      : 'Coordinates unavailable'}
+                  </Text>
                 </View>
               </TouchableOpacity>
             )}

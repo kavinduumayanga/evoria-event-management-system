@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'rea
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { HeaderBar, PrimaryButton, InputField, GlassCard, SectionBlock, LoadingState, ErrorState } from '../../components';
+import { HeaderBar, PrimaryButton, InputField, GlassCard, SectionBlock, LoadingState, ErrorState, EmptyState } from '../../components';
 import apiClient from '../../api/client';
 import { Event, EventCustomQuestion, TicketType } from '../../types';
 import { BookingService, TicketService } from '../../api/services';
 import { useAuthStore } from '../../store/auth.store';
 import { safeStatus, safeString, safeTitle } from '../../utils/safeText';
+import { safeArray } from '../../utils/safeData';
 
 type TicketSelectionNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'TicketSelection'>;
 type TicketSelectionRouteProp = RouteProp<AttendeeHomeStackParamList, 'TicketSelection'>;
@@ -35,8 +36,9 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       setIsLoading(true); setError(null);
       if (!eventId) return;
       const [eventRes, ticketRes] = await Promise.all([ apiClient.get(`/events/${eventId}`), apiClient.get(`/tickets/event/${eventId}`) ]);
-      setEvent(eventRes.data.data.event);
-      setTickets(ticketRes.data.data.tickets.filter((t: TicketType) => t.isActive));
+      setEvent((eventRes?.data?.data?.event as Event) || null);
+      const availableTickets = safeArray<TicketType>(ticketRes?.data?.data?.tickets).filter((t) => Boolean(t?.isActive));
+      setTickets(availableTickets);
     } catch (err: any) { setError(err.response?.data?.message || 'Failed to fetch tickets'); } finally { setIsLoading(false); }
   };
 
@@ -44,7 +46,10 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
     if (!selectedTicket || !event) return;
     try {
       setIsBooking(true);
-      const customAnswers = event.customQuestions?.map(q => ({ questionId: q.id, answer: customAnswerMap[q.id] || '' })) || [];
+      const customAnswers = safeArray<EventCustomQuestion>(event.customQuestions).map((q) => ({
+        questionId: q.id,
+        answer: customAnswerMap[q.id] || '',
+      }));
       if (selectedTicket.isFree) {
         const res = await BookingService.createBooking({ eventId, ticketTypeId: selectedTicket.id, quantity, customAnswers, allowWaitlist: false });
         navigation.navigate('BookingConfirmation', { bookingId: res.data.booking.id });
@@ -63,10 +68,15 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         <SectionBlock title="Tickets">
-          {tickets.map(ticket => {
+          {tickets.length === 0 ? (
+            <EmptyState
+              title="No Tickets Available"
+              message="This event does not currently have any active tickets."
+            />
+          ) : tickets.map((ticket, index) => {
             const isSelected = selectedTicket?.id === ticket.id;
             return (
-              <TouchableOpacity key={ticket.id} onPress={() => setSelectedTicket(ticket)} activeOpacity={0.8} style={styles.ticketWrap}>
+              <TouchableOpacity key={safeString(ticket.id, `ticket-${index}`)} onPress={() => setSelectedTicket(ticket)} activeOpacity={0.8} style={styles.ticketWrap}>
                 <GlassCard variant={isSelected ? 'light' : 'dark'} style={[styles.ticketCard, isSelected && styles.ticketCardSelected]}>
                   <View style={styles.ticketTopRow}>
                     <Text style={styles.ticketName}>{ticket.name}</Text>
@@ -79,10 +89,10 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
           })}
         </SectionBlock>
 
-        {event?.customQuestions && event.customQuestions.length > 0 && (
+        {safeArray<EventCustomQuestion>(event?.customQuestions).length > 0 && (
           <SectionBlock title="Additional Information">
             <GlassCard variant="dark" style={styles.formCard}>
-              {event.customQuestions.map(q => (
+              {safeArray<EventCustomQuestion>(event?.customQuestions).map(q => (
                 <InputField
                   key={q.id}
                   label={q.question}
@@ -99,7 +109,7 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
         <PrimaryButton
           title={selectedTicket ? `Continue (${quantity})` : 'Select a ticket'}
           onPress={handleContinue}
-          disabled={!selectedTicket || isBooking}
+          disabled={!selectedTicket || isBooking || tickets.length === 0}
           isLoading={isBooking}
         />
       </View>

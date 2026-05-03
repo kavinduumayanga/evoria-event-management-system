@@ -13,8 +13,8 @@ import { protect } from '../middleware/auth.middleware';
 const router = Router();
 
 router.get('/', getTickets);
-router.get('/:id', getTicket);
 router.get('/event/:eventId', getEventTickets);
+router.get('/:id', getTicket);
 
 router.use(protect);
 router.post('/apply-promo', applyPromoCode);

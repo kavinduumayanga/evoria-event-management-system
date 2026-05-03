@@ -34,6 +34,7 @@ export * from './StatusBadge';
 export * from './LoadingState';        // LoadingState + Skeleton
 export * from './EmptyState';
 export * from './ErrorState';
+export * from './AppErrorBoundary';
 
 // Cards / Content
 export * from './EventCard';
@@ -53,4 +54,3 @@ export * from './GradientBackground';
 
 // Overlays
 export * from './ToastProvider';
-

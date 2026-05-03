@@ -8,7 +8,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   CalendarDays, Users, DollarSign, UserCheck,
-  TrendingUp, Settings,
+  Settings,
 } from 'lucide-react-native';
 import {
   ScreenContainer, StatCard, EventCard,
@@ -17,6 +17,15 @@ import {
 import { theme } from '../../constants/theme';
 import { AnalyticsService, EventService, UserService } from '../../api/services';
 import { Event, DashboardAnalytics } from '../../types';
+import { safeArray } from '../../utils/safeData';
+import { safeString } from '../../utils/safeText';
+
+const normalizeDashboardAnalytics = (payload: any): DashboardAnalytics => ({
+  totalEvents: Number(payload?.totalEvents || 0),
+  totalBookings: Number(payload?.totalBookings || 0),
+  totalRevenue: Number(payload?.totalRevenue || 0),
+  totalAttendees: Number(payload?.totalAttendees || 0),
+});
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
@@ -35,15 +44,19 @@ export const DashboardScreen = () => {
   const fetchData = async () => {
     try {
       setError(null);
-      const [userRes, analyticsRes, eventsRes] = await Promise.all([
+      const [userRes, analyticsRes] = await Promise.all([
         UserService.getMe(),
         AnalyticsService.getDashboardAnalytics(),
-        EventService.getEvents(),
       ]);
-      setUserName(userRes.data.user.name);
-      setAnalytics(analyticsRes.data);
-      setRecentEvents((eventsRes.data.events || []).slice(0, 3));
-    } catch {
+
+      const userId = safeString(userRes?.data?.user?.id, '');
+      const hostEventsRes = userId ? await EventService.getHostEvents(userId) : { data: { events: [] } };
+
+      setUserName(safeString(userRes?.data?.user?.name, ''));
+      setAnalytics(normalizeDashboardAnalytics(analyticsRes?.data));
+      setRecentEvents(safeArray<Event>(hostEventsRes?.data?.events).slice(0, 3));
+    } catch (fetchError) {
+      console.error('Failed to load host dashboard', fetchError);
       setError('Failed to load dashboard analytics');
     } finally {
       setIsLoading(false);
@@ -139,7 +152,7 @@ export const DashboardScreen = () => {
       ) : (
         recentEvents.map((event) => (
           <EventCard
-            key={event.id}
+            key={safeString(event.id, event.title)}
             event={event}
             variant="list"
             onPress={() => navigation.navigate('EventsStack', {

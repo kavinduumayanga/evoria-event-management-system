@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Calendar, MapPin, Clock } from 'lucide-react-native';
 import { Event } from '../types';
 import { safeString } from '../utils/safeText';
+import { resolveImageUrl } from '../utils/imageUrl';
 
 interface EventCardProps {
   event: Event;
@@ -11,7 +12,8 @@ interface EventCardProps {
 }
 
 export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
-  const imageUrl = safeString(event.coverImage);
+  const [hasImageError, setHasImageError] = useState(false);
+  const imageUrl = useMemo(() => resolveImageUrl(safeString(event.coverImage)), [event.coverImage]);
   const title = safeString(event.title, 'Untitled Event');
   const description = safeString(event.description, 'No description available.');
   const eventDate = safeString(event.date, 'TBA');
@@ -21,11 +23,19 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
     ? safeString(rawLocation, 'Online / TBA')
     : safeString(rawLocation?.name || event.city, 'Online / TBA');
 
+  useEffect(() => {
+    setHasImageError(false);
+  }, [imageUrl]);
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.imageContainer}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.image} />
+        {imageUrl && !hasImageError ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.image}
+            onError={() => setHasImageError(true)}
+          />
         ) : (
           <View style={[styles.image, styles.placeholderImage]}>
             <Text style={styles.placeholderText}>E</Text>

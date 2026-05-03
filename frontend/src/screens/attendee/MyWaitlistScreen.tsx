@@ -8,7 +8,8 @@ import { Booking } from '../../types';
 import { ListOrdered, Calendar, Clock, ArrowLeft } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AttendeeHomeStackParamList } from '../../types/navigation';
-import { formatSafeDate, formatSafeTime, safeTitle } from '../../utils/safeText';
+import { safeArray } from '../../utils/safeData';
+import { formatSafeDate, formatSafeTime, safeString, safeTitle } from '../../utils/safeText';
 
 interface WaitlistItem extends Booking {
   status: 'waiting' | 'promoted';
@@ -26,7 +27,7 @@ export const MyWaitlistScreen = () => {
     try {
       setError(null);
       const res = await WaitlistService.getMyWaitlist();
-      setItems(res.data.waitlist || []);
+      setItems(safeArray<WaitlistItem>(res?.data?.waitlist));
     } catch { setError('Failed to load waitlist status'); }
     finally { setIsLoading(false); setIsRefreshing(false); }
   };
@@ -41,7 +42,7 @@ export const MyWaitlistScreen = () => {
     <ScreenContainer>
       <FlatList
         data={items}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `waitlist-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

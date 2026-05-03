@@ -25,7 +25,8 @@ import {
 } from '../../../components';
 import { EventService } from '../../../api/services';
 import { EventReminder } from '../../../types';
-import { safeUpper } from '../../../utils/safeText';
+import { safeArray } from '../../../utils/safeData';
+import { safeString, safeUpper } from '../../../utils/safeText';
 
 interface Props {
   navigation: NativeStackNavigationProp<HostAdminEventStackParamList, 'EventReminders'>;
@@ -51,7 +52,7 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
     try {
       setError(null);
       const response = await EventService.getReminders(eventId, { limit: 150 });
-      setReminders(response.data.reminders || []);
+      setReminders(safeArray<EventReminder>(response?.data?.reminders));
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load reminders');
     } finally {
@@ -151,7 +152,7 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
     <ScreenContainer>
       <FlatList
         data={reminders}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `reminder-${index}`)}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
@@ -237,7 +238,7 @@ export const EventRemindersScreen: React.FC<Props> = ({ navigation, route }) => 
                 <View style={{ flex: 1 }}>
                   <Text style={styles.reminderTitle}>{item.title}</Text>
                   <Text style={styles.reminderMeta}>{new Date(item.scheduledAt).toLocaleString()}</Text>
-                  <Text style={styles.reminderMeta}>Channels: {item.channels.join(', ')}</Text>
+                  <Text style={styles.reminderMeta}>Channels: {safeArray(item.channels).join(', ') || 'email'}</Text>
                 </View>
                 <TouchableOpacity onPress={() => handleDeleteReminder(item.id)}>
                   <Trash2 size={18} color={theme.colors.error} />

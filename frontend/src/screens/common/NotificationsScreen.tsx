@@ -9,6 +9,7 @@ import { Notification } from '../../types';
 import { NotificationService } from '../../api/services';
 import { theme } from '../../constants/theme';
 import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, StatusBadge } from '../../components';
+import { safeArray } from '../../utils/safeData';
 import { formatSafeDate, logDevMissing, safeStatus, safeString } from '../../utils/safeText';
 
 const TYPE_STATUS: Record<string, any> = {
@@ -29,7 +30,7 @@ export const NotificationsScreen = () => {
     try {
       setError(null);
       const res = await NotificationService.getMyNotifications();
-      setNotifications(res.data.notifications || []);
+      setNotifications(safeArray<Notification>(res?.data?.notifications));
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load notifications');
     } finally {

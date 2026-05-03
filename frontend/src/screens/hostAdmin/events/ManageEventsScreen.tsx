@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  RefreshControl, Alert,
+  RefreshControl, Alert, TouchableOpacity,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,8 +14,10 @@ import {
   ScreenContainer, EventCard, LoadingState, ErrorState, EmptyState, Button, Card,
 } from '../../../components';
 import { theme } from '../../../constants/theme';
-import { EventService } from '../../../api/services';
+import { EventService, UserService } from '../../../api/services';
 import { Event } from '../../../types';
+import { safeArray } from '../../../utils/safeData';
+import { safeString } from '../../../utils/safeText';
 
 type ManageEventsNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'ManageEvents'>;
 
@@ -30,10 +32,26 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
   const fetchEvents = async () => {
     try {
       setError(null);
-      const res = await EventService.getEvents();
-      setEvents(res.data.events || []);
-    } catch { setError('Failed to load events'); }
-    finally { setIsLoading(false); setIsRefreshing(false); }
+      const meRes = await UserService.getMe();
+      const userId = safeString(meRes?.data?.user?.id, '');
+      if (!userId) {
+        setEvents([]);
+        return;
+      }
+
+      const res = await EventService.getHostEvents(userId);
+      setEvents(safeArray<Event>(res?.data?.events));
+    } catch (fetchError: any) {
+      console.error('Failed to load managed events', {
+        status: fetchError?.response?.status,
+        message: fetchError?.message,
+        response: fetchError?.response?.data,
+      });
+      setError('Failed to load events');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
   useFocusEffect(useCallback(() => { fetchEvents(); }, []));
@@ -104,7 +122,7 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
     <ScreenContainer>
       <FlatList
         data={events}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `event-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -173,21 +191,21 @@ export const ManageEventsScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const ActionPill: React.FC<{ icon: React.ReactNode; label: string; onPress: () => void; danger?: boolean }> = ({ icon, label, onPress, danger }) => (
-  <View
+  <TouchableOpacity
     style={[pillStyles.pill, danger && pillStyles.dangerPill]}
-    // @ts-ignore - not a button but looks like one
+    onPress={onPress}
+    activeOpacity={0.8}
   >
-    <Text
-      onPress={onPress}
-      style={[pillStyles.label, danger && pillStyles.dangerLabel]}
-    >
-      {React.cloneElement(icon as React.ReactElement, {})}{'  '}{label}
-    </Text>
-  </View>
+    <View style={pillStyles.pillContent}>
+      {React.cloneElement(icon as React.ReactElement, {})}
+      <Text style={[pillStyles.label, danger && pillStyles.dangerLabel]}>{label}</Text>
+    </View>
+  </TouchableOpacity>
 );
 
 const pillStyles = StyleSheet.create({
   pill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.borderRadius.s, backgroundColor: theme.colors.surfaceOverlay, alignItems: 'center' },
+  pillContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dangerPill: { backgroundColor: theme.colors.errorSubtle },
   label: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '600' },
   dangerLabel: { color: theme.colors.error },

@@ -12,6 +12,7 @@ import { EventService, UploadService, SessionService } from '../../../api/servic
 import { Event, EventStatus, EventVisibility, EventType, EventCustomQuestion, CustomQuestionType, EventPricingMode } from '../../../types';
 import { resolveImageUrl } from '../../../utils/imageUrl';
 import { useAuthStore } from '../../../store/auth.store';
+import { safeArray } from '../../../utils/safeData';
 import { safeUpper } from '../../../utils/safeText';
 
 type EventFormNavigationProp = NativeStackNavigationProp<HostAdminEventStackParamList, 'EventForm'>;
@@ -182,8 +183,10 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setBrandingAccentColor(event.branding?.accentColor || themeColors[3]);
         setStatus(event.status || 'draft');
         setRequiresApproval(Boolean(event.requiresApproval));
-        setCustomQuestions(event.customQuestions || event.registrationFields?.customQuestions || []);
-        const sessions = sessionsResponse.data?.sessions || [];
+        const eventQuestions = safeArray<EventCustomQuestion>(event.customQuestions);
+        const registrationQuestions = safeArray<EventCustomQuestion>(event.registrationFields?.customQuestions);
+        setCustomQuestions(eventQuestions.length > 0 ? eventQuestions : registrationQuestions);
+        const sessions = safeArray<any>(sessionsResponse?.data?.sessions);
         setAgendaItems(
           sessions.map((session: any) => ({
             id: session.id,
@@ -299,7 +302,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     }));
 
     const existingRes = await SessionService.getEventSessions(targetEventId);
-    const existingSessions = existingRes.data?.sessions || [];
+    const existingSessions = safeArray<any>(existingRes?.data?.sessions);
     const existingById = new Map<string, any>(existingSessions.map((session: any) => [session.id, session]));
     const desiredSessionIds = new Set<string>();
 

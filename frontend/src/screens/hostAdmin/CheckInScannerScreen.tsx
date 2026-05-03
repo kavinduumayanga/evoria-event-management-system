@@ -16,7 +16,8 @@ import { ScreenContainer, LoadingState, ErrorState, EmptyState, Card, Button, In
 import { CheckInService, EventService, UserService } from '../../api/services';
 import { Event } from '../../types';
 import { HostAdminEventStackParamList } from '../../types/navigation';
-import { formatSafeDate, safeUpper } from '../../utils/safeText';
+import { safeArray } from '../../utils/safeData';
+import { formatSafeDate, safeString, safeUpper } from '../../utils/safeText';
 
 interface AttendanceRecord {
   id: string;
@@ -38,8 +39,8 @@ interface RecentScanRecord {
   message: string;
 }
 
-const normalizeAttendance = (rawItems: any[]): AttendanceRecord[] => {
-  return rawItems.map((item) => ({
+const normalizeAttendance = (rawItems: unknown): AttendanceRecord[] => {
+  return safeArray<any>(rawItems).map((item) => ({
     id: String(item.registrationId || item.bookingId || item.id),
     attendeeName: item.attendeeName || item.name || 'Unknown attendee',
     attendeeEmail: item.attendeeEmail || item.email || 'Unknown email',
@@ -83,8 +84,11 @@ export const CheckInScannerScreen = () => {
     try {
       setError(null);
       const userRes = await UserService.getMe();
-      const managedEventsRes = await EventService.getHostEvents(userRes.data.user.id);
-      const managedEvents = managedEventsRes?.data?.events || [];
+      const userId = safeString(userRes?.data?.user?.id, '');
+      const managedEventsRes = userId
+        ? await EventService.getHostEvents(userId)
+        : { data: { events: [] } };
+      const managedEvents = safeArray<Event>(managedEventsRes?.data?.events);
       setEvents(managedEvents);
 
       const hasSelectedEvent = managedEvents.some((event: Event) => event.id === selectedEventId);
@@ -227,7 +231,7 @@ export const CheckInScannerScreen = () => {
         <FlatList
           data={events}
           horizontal
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => safeString(item.id, `event-${index}`)}
           showsHorizontalScrollIndicator={false}
           renderItem={({ item }) => {
             const isSelected = item.id === selectedEventId;
@@ -295,7 +299,7 @@ export const CheckInScannerScreen = () => {
       <Text style={styles.sectionTitle}>Guest Check-in Queue</Text>
       <FlatList
         data={attendance}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => safeString(item.id, `attendance-${index}`)}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}

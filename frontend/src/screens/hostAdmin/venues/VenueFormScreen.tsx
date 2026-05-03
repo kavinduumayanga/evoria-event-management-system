@@ -8,7 +8,7 @@ import { theme } from '../../../constants/theme';
 import { ArrowLeft } from 'lucide-react-native';
 import { VenueService } from '../../../api/services';
 import { Venue, VenueType } from '../../../types';
-import { safeUpper } from '../../../utils/safeText';
+import { safeString, safeUpper } from '../../../utils/safeText';
 
 type VenueFormNavigationProp = NativeStackNavigationProp<HostAdminVenueStackParamList, 'VenueForm'>;
 type VenueFormRouteProp = RouteProp<HostAdminVenueStackParamList, 'VenueForm'>;
@@ -41,13 +41,17 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchVenue = async () => {
     try {
       const res = await VenueService.getVenue(venueId!);
-      const venue: Venue = res.data.venue;
-      setName(venue.name);
-      setAddress(venue.address);
-      setCity(venue.city);
-      setCapacity(venue.capacity.toString());
-      setType(venue.type);
-      setContactInfo(venue.contactInfo || '');
+      const venue = (res?.data?.venue as Venue | undefined) || null;
+      if (!venue?.id) {
+        throw new Error('Invalid venue payload');
+      }
+
+      setName(safeString(venue.name, ''));
+      setAddress(safeString(venue.address, ''));
+      setCity(safeString(venue.city, ''));
+      setCapacity(String(Number.isFinite(Number(venue.capacity)) ? Number(venue.capacity) : ''));
+      setType(venue.type || 'physical');
+      setContactInfo(safeString(venue.contactInfo, ''));
     } catch (error) {
       Alert.alert('Error', 'Failed to load venue details');
       navigation.goBack();
@@ -57,7 +61,8 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleSave = async () => {
-    if (!name || !address || !city || !capacity) {
+    const parsedCapacity = Number.parseInt(capacity, 10);
+    if (!name.trim() || !address.trim() || !city.trim() || !Number.isFinite(parsedCapacity) || parsedCapacity <= 0) {
       Alert.alert('Error', 'Please fill all required fields');
       return;
     }
@@ -65,12 +70,12 @@ export const VenueFormScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setIsSaving(true);
       const venueData = {
-        name,
-        address,
-        city,
-        capacity: parseInt(capacity, 10),
+        name: name.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        capacity: parsedCapacity,
         type,
-        contactInfo
+        contactInfo: contactInfo.trim(),
       };
 
       if (isEditing) {
