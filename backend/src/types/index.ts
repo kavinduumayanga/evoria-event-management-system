@@ -65,6 +65,12 @@ export interface Event {
   pricingMode: EventPricingMode;
   category: string;
   city: string;
+  location?: {
+    name?: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+  } | null;
   tags: string[];
   viewsCount: number;
   bookingCount: number;

@@ -20,6 +20,7 @@ import adminRoutes from './admin.routes';
 import publicRoutes from './public.routes';
 import pushRoutes from './push.routes';
 import reminderRoutes from './reminder.routes';
+import locationRoutes from './location.routes';
 
 const router = Router();
 
@@ -44,5 +45,6 @@ router.use('/admin', adminRoutes);
 router.use('/public', publicRoutes);
 router.use('/push', pushRoutes);
 router.use('/reminders', reminderRoutes);
+router.use('/locations', locationRoutes);
 
 export default router;

@@ -195,7 +195,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
               <View style={styles.metaRow}>
                 <Text style={styles.metaText}>Mobile: {item.mobile}</Text>
                 <Text style={styles.metaDot}>·</Text>
-                <Text style={styles.metaText}>NIC: {item.nic}</Text>
+                <Text style={styles.metaText}>Ticket: {(item as any).ticketType || 'General Admission'}</Text>
               </View>
               {item.checkedInAt && (
                 <Text style={styles.checkedInText}>
