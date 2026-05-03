@@ -1,0 +1,74 @@
+[
+  {
+    "_id": "046b5b3e-572a-4782-89c3-54c7b7249031",
+    "eventId": "e433661a-8b81-42c2-9fe7-41897a6c3944",
+    "registrationId": null,
+    "bookingId": "97766953-4e5c-42ed-bf6a-c1c64309375c",
+    "qrCodeValue": "qr_b6ab83320f4fd4f71e682fb8625303bc",
+    "scannedBy": "0bc1df5e-e650-42ae-809a-0628bdc42f0a",
+    "result": "invalid",
+    "reason": "Booking approval is pending or rejected",
+    "scannedAt": "2026-05-03T19:31:48.041Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a1d7ab0-44f6-44ff-bf72-a89369981205",
+    "eventId": "e433661a-8b81-42c2-9fe7-41897a6c3944",
+    "registrationId": null,
+    "bookingId": "97766953-4e5c-42ed-bf6a-c1c64309375c",
+    "qrCodeValue": "qr_b6ab83320f4fd4f71e682fb8625303bc",
+    "scannedBy": "0bc1df5e-e650-42ae-809a-0628bdc42f0a",
+    "result": "invalid",
+    "reason": "Booking approval is pending or rejected",
+    "scannedAt": "2026-05-03T19:31:51.848Z",
+    "__v": 0
+  },
+  {
+    "_id": "a4a8575c-50c6-47b6-a2f7-84cffd2d0db8",
+    "eventId": "e433661a-8b81-42c2-9fe7-41897a6c3944",
+    "registrationId": null,
+    "bookingId": "97766953-4e5c-42ed-bf6a-c1c64309375c",
+    "qrCodeValue": "qr_b6ab83320f4fd4f71e682fb8625303bc",
+    "scannedBy": "0bc1df5e-e650-42ae-809a-0628bdc42f0a",
+    "result": "invalid",
+    "reason": "Booking approval is pending or rejected",
+    "scannedAt": "2026-05-03T19:31:55.391Z",
+    "__v": 0
+  },
+  {
+    "_id": "9f194bc5-b4b8-4df5-8601-3fd22e161f27",
+    "eventId": "e433661a-8b81-42c2-9fe7-41897a6c3944",
+    "registrationId": null,
+    "bookingId": "97766953-4e5c-42ed-bf6a-c1c64309375c",
+    "qrCodeValue": "qr_b6ab83320f4fd4f71e682fb8625303bc",
+    "scannedBy": "0bc1df5e-e650-42ae-809a-0628bdc42f0a",
+    "result": "invalid",
+    "reason": "Booking approval is pending or rejected",
+    "scannedAt": "2026-05-03T19:31:59.141Z",
+    "__v": 0
+  },
+  {
+    "_id": "8750583d-5a6d-4692-b2c8-7aca5dfd7f91",
+    "eventId": "e433661a-8b81-42c2-9fe7-41897a6c3944",
+    "registrationId": null,
+    "bookingId": "97766953-4e5c-42ed-bf6a-c1c64309375c",
+    "qrCodeValue": "qr_b6ab83320f4fd4f71e682fb8625303bc",
+    "scannedBy": "0bc1df5e-e650-42ae-809a-0628bdc42f0a",
+    "result": "invalid",
+    "reason": "Booking approval is pending or rejected",
+    "scannedAt": "2026-05-03T19:32:55.138Z",
+    "__v": 0
+  },
+  {
+    "_id": "aa1649cc-32a2-4fcb-991c-2c8f82c06482",
+    "eventId": "e433661a-8b81-42c2-9fe7-41897a6c3944",
+    "registrationId": null,
+    "bookingId": "97766953-4e5c-42ed-bf6a-c1c64309375c",
+    "qrCodeValue": "qr_b6ab83320f4fd4f71e682fb8625303bc",
+    "scannedBy": "0bc1df5e-e650-42ae-809a-0628bdc42f0a",
+    "result": "invalid",
+    "reason": "Booking approval is pending or rejected",
+    "scannedAt": "2026-05-03T19:33:12.341Z",
+    "__v": 0
+  }
+]

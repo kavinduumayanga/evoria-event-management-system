@@ -1,0 +1,19 @@
+{
+  "createdAt": "2026-05-03T21:44:20.130Z",
+  "collections": [
+    "venues",
+    "reminders",
+    "users",
+    "pushtokens",
+    "bookings",
+    "sessions",
+    "reports",
+    "tickettypes",
+    "events",
+    "notifications",
+    "emaillogs",
+    "reviews",
+    "checkinhistories",
+    "registrations"
+  ]
+}

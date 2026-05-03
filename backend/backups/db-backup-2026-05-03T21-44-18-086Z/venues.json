@@ -1,0 +1,58 @@
+[
+  {
+    "_id": "b807eb79-8981-40c1-a2c9-643c2f7ac6a1",
+    "name": "Cyber Arena",
+    "address": "123 Neon Street",
+    "city": "Night City",
+    "capacity": 5000,
+    "type": "physical",
+    "contactInfo": "contact@cyberarena.com",
+    "createdAt": "2026-04-25T19:40:23.010Z",
+    "updatedAt": "2026-04-25T19:40:23.010Z",
+    "__v": 0
+  },
+  {
+    "_id": "2085f07c-cf4c-4ed5-b28e-9118a48f7df1",
+    "city": "Colombo",
+    "name": "Evoria Demo Convention Hall",
+    "__v": 0,
+    "address": "45 Marine Drive, Colombo 03",
+    "capacity": 250,
+    "contactInfo": "demo-venue@evoria.com",
+    "createdAt": "2026-05-01T21:08:21.968Z",
+    "type": "hybrid",
+    "updatedAt": "2026-05-01T21:12:28.427Z"
+  },
+  {
+    "_id": "a12418f7-d9f5-419a-a17c-cf666655b403",
+    "ownerId": "3b9c2672-0f4b-4b48-9f55-784d0bdaaac3",
+    "name": "Main Hall",
+    "description": "",
+    "address": "SLIIT, Kaduwela Road (New Kandy Road), Malabe, Colombo District, Western Province, 10113, Sri Lanka",
+    "city": "Malabe",
+    "capacity": 100,
+    "lat": 6.9143498,
+    "lng": 79.972684,
+    "type": "physical",
+    "contactInfo": "Kavinumayanga@gmail.com",
+    "createdAt": "2026-05-03T18:06:04.355Z",
+    "updatedAt": "2026-05-03T18:06:04.355Z",
+    "__v": 0
+  },
+  {
+    "_id": "789b52ee-5d2d-4a2e-a7b2-0a022206601c",
+    "ownerId": "0bc1df5e-e650-42ae-809a-0628bdc42f0a",
+    "name": "Main Hall",
+    "description": "",
+    "address": "SLIIT, Kaduwela Road (New Kandy Road), Malabe, Colombo District, Western Province, 10113, Sri Lanka",
+    "city": "Malabe",
+    "capacity": 100,
+    "lat": 6.9143498,
+    "lng": 79.972684,
+    "type": "physical",
+    "contactInfo": "",
+    "createdAt": "2026-05-03T19:03:14.405Z",
+    "updatedAt": "2026-05-03T19:03:14.405Z",
+    "__v": 0
+  }
+]

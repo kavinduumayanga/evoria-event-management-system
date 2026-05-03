@@ -1,0 +1,104 @@
+[
+  {
+    "_id": "7d8464ba-24bb-4a16-af99-9f0531b07de7",
+    "eventId": "a5decacc-3612-4e19-8100-379f799def6c",
+    "userId": "16a059ce-4d1f-44b6-ad37-addfdfa756c8",
+    "name": "Evoria Demo Attendee 1",
+    "email": "demo.attendee1@evoria.com",
+    "emailLower": "demo.attendee1@evoria.com",
+    "mobile": "+94 77 100 0002",
+    "nic": "200112345678",
+    "customAnswers": [
+      {
+        "questionId": "diet_pref",
+        "answer": "Vegetarian",
+        "_id": "69f5173de0f4155d88d19774"
+      }
+    ],
+    "status": "pending",
+    "qrCodeValue": null,
+    "checkedInAt": null,
+    "checkedInBy": null,
+    "checkInMethod": null,
+    "attendanceNote": null,
+    "registeredAt": "2026-05-01T21:12:29.033Z",
+    "__v": 0,
+    "createdAt": "2026-05-01T21:12:29.039Z",
+    "updatedAt": "2026-05-01T21:12:29.039Z"
+  },
+  {
+    "_id": "437e3ae6-f36d-4706-a51c-ca2555fbed68",
+    "eventId": "a5decacc-3612-4e19-8100-379f799def6c",
+    "userId": "98a41f32-6f99-4eaa-8651-063ab9b0c544",
+    "name": "Evoria Demo Attendee 2",
+    "email": "demo.attendee2@evoria.com",
+    "emailLower": "demo.attendee2@evoria.com",
+    "mobile": "+94 77 100 0003",
+    "nic": "200212345679",
+    "customAnswers": [
+      {
+        "questionId": "diet_pref",
+        "answer": "No preference",
+        "_id": "69f5173de0f4155d88d19775"
+      }
+    ],
+    "status": "going",
+    "qrCodeValue": "qr_demo_registration_attendee2_2026",
+    "checkedInAt": null,
+    "checkedInBy": null,
+    "checkInMethod": null,
+    "attendanceNote": null,
+    "registeredAt": "2026-05-01T21:12:29.033Z",
+    "__v": 0,
+    "createdAt": "2026-05-01T21:12:29.039Z",
+    "updatedAt": "2026-05-01T21:12:29.039Z"
+  },
+  {
+    "_id": "052df2be-7875-45f1-92b3-57b2f71970b0",
+    "eventId": "a5decacc-3612-4e19-8100-379f799def6c",
+    "userId": null,
+    "name": "Walk-in Guest",
+    "email": "walkin.demo@evoria.com",
+    "emailLower": "walkin.demo@evoria.com",
+    "mobile": "+94 77 100 0099",
+    "nic": "199912345670",
+    "customAnswers": [
+      {
+        "questionId": "diet_pref",
+        "answer": "Vegan",
+        "_id": "69f5173de0f4155d88d19776"
+      }
+    ],
+    "status": "checked_in",
+    "qrCodeValue": "qr_demo_walkin_checkedin_2026",
+    "checkedInAt": "2026-05-01T21:02:29.033Z",
+    "checkedInBy": "da16fbe3-b15e-4064-9078-fc7fa2f44b6f",
+    "checkInMethod": "manual",
+    "attendanceNote": null,
+    "registeredAt": "2026-05-01T21:02:29.033Z",
+    "__v": 0,
+    "createdAt": "2026-05-01T21:12:29.039Z",
+    "updatedAt": "2026-05-01T21:12:29.039Z"
+  },
+  {
+    "_id": "e2ade4db-6058-424f-a134-61a715b8b88e",
+    "eventId": "a5decacc-3612-4e19-8100-379f799def6c",
+    "userId": "27c897a7-718b-46b5-8214-9532a2f12dd5",
+    "name": "Host Admin",
+    "email": "hostadmin@evoria.com",
+    "emailLower": "hostadmin@evoria.com",
+    "mobile": "+94 704535857",
+    "nic": "200125010504",
+    "customAnswers": [],
+    "status": "pending",
+    "qrCodeValue": null,
+    "checkedInAt": null,
+    "checkedInBy": null,
+    "checkInMethod": null,
+    "attendanceNote": null,
+    "registeredAt": "2026-05-01T23:23:54.685Z",
+    "createdAt": "2026-05-01T23:23:54.706Z",
+    "updatedAt": "2026-05-01T23:23:54.706Z",
+    "__v": 0
+  }
+]
