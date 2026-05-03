@@ -20,6 +20,7 @@ import { theme } from '../../constants/theme';
 import { ArrowLeft, Tag, Receipt, CreditCard, Calendar, Ticket as TicketIcon } from 'lucide-react-native';
 import { BookingService, EventService, PaymentService } from '../../api/services';
 import { formatSafeDate, formatSafeTime, logDevMissing, safeString, safeTitle, safeUpper } from '../../utils/safeText';
+import { safeArray } from '../../utils/safeData';
 
 type PaymentSummaryNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'PaymentSummary'>;
 type PaymentSummaryRouteProp = RouteProp<AttendeeHomeStackParamList, 'PaymentSummary'>;
@@ -65,6 +66,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
   const ticketName = params?.ticketName;
   const currency = params?.currency;
   const unitPrice = params?.unitPrice;
+  const registrationDetails = params?.registrationDetails;
   const customAnswers = params?.customAnswers;
 
   const cardNumberRef = useRef<TextInput>(null);
@@ -75,6 +77,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
   const [isConfirming, setIsConfirming] = useState(false);
   const [summary, setSummary] = useState<CheckoutSummary | null>(null);
   const [eventSnapshot, setEventSnapshot] = useState<EventSnapshot | null>(null);
+  const [requiredQuestionIds, setRequiredQuestionIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cardholderName, setCardholderName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -169,7 +172,15 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
         EventService.getEvent(eventId),
       ]);
       const eventData = eventResponse?.data?.event;
+      const eventQuestions = safeArray<any>(eventData?.registrationFields?.customQuestions).length > 0
+        ? safeArray<any>(eventData?.registrationFields?.customQuestions)
+        : safeArray<any>(eventData?.customQuestions);
+      const requiredIds = eventQuestions
+        .filter((question) => Boolean(question?.required))
+        .map((question) => safeString(question?.id, '').trim())
+        .filter(Boolean);
       setSummary(checkoutResponse.data);
+      setRequiredQuestionIds(requiredIds);
       setEventSnapshot({
         title: safeTitle(eventData?.title, 'Event'),
         date: safeString(eventData?.date, ''),
@@ -183,9 +194,41 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
     }
   };
 
+  const validateRegistrationContext = () => {
+    const normalizedName = safeString(registrationDetails?.name, '').trim();
+    const normalizedEmail = safeString(registrationDetails?.email, '').trim().toLowerCase();
+    const normalizedPhone = safeString(registrationDetails?.phone, '').trim();
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+    if (!normalizedName || !normalizedEmail || !normalizedPhone) {
+      return 'Registration details are missing. Please complete the registration form first.';
+    }
+    if (!emailPattern.test(normalizedEmail)) {
+      return 'Please enter a valid email';
+    }
+
+    const answersByQuestionId = new Map(
+      safeArray(customAnswers).map((answer: any) => [
+        safeString(answer?.questionId, ''),
+        safeString(answer?.answer, '').trim(),
+      ]),
+    );
+    const hasMissingRequiredQuestions = requiredQuestionIds.some((questionId) => !safeString(answersByQuestionId.get(questionId), '').trim());
+    if (hasMissingRequiredQuestions) {
+      return 'Please answer all required questions';
+    }
+    return '';
+  };
+
   const confirmPayment = async () => {
     Keyboard.dismiss();
     if (!eventId || !ticketTypeId || !quantity) return;
+
+    const registrationValidationError = validateRegistrationContext();
+    if (registrationValidationError) {
+      Alert.alert('Validation Error', registrationValidationError);
+      return;
+    }
 
     const totalDue = Number(summary?.discountedAmount ?? (Number(unitPrice || 0) * quantity));
     const requiresPaymentDetails = totalDue > 0;
@@ -275,6 +318,19 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
       setIsConfirming(false);
     }
   };
+
+  const hasMissingRegistrationDetails = !safeString(registrationDetails?.name, '').trim()
+    || !safeString(registrationDetails?.email, '').trim()
+    || !safeString(registrationDetails?.phone, '').trim();
+
+  if (hasMissingRegistrationDetails) {
+    logDevMissing('payment-summary-registration-missing', 'PaymentSummaryScreen missing registration details route params.');
+    return (
+      <ScreenContainer>
+        <ErrorState message="Registration details are missing. Please complete the registration form first." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+      </ScreenContainer>
+    );
+  }
 
   if (!eventId || !ticketTypeId || !quantity || !ticketName || !currency || typeof unitPrice !== 'number') {
     logDevMissing('payment-summary-missing-params', 'PaymentSummaryScreen missing required route params.');

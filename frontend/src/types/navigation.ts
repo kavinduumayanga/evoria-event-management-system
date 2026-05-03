@@ -40,6 +40,11 @@ export type AttendeeHomeStackParamList = {
     ticketName: string;
     currency: string;
     unitPrice: number;
+    registrationDetails: {
+      name: string;
+      email: string;
+      phone: string;
+    };
     customAnswers?: Array<{
       questionId: string;
       answer: string;

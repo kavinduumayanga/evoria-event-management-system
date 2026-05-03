@@ -9,6 +9,7 @@ import { Event, EventCustomQuestion, TicketType } from '../../types';
 import { BookingService } from '../../api/services';
 import { safeString } from '../../utils/safeText';
 import { safeArray } from '../../utils/safeData';
+import { useAuthStore } from '../../store/auth.store';
 
 type TicketSelectionNavigationProp = NativeStackNavigationProp<AttendeeHomeStackParamList, 'TicketSelection'>;
 type TicketSelectionRouteProp = RouteProp<AttendeeHomeStackParamList, 'TicketSelection'>;
@@ -16,6 +17,7 @@ type TicketSelectionRouteProp = RouteProp<AttendeeHomeStackParamList, 'TicketSel
 interface Props { navigation: TicketSelectionNavigationProp; route: TicketSelectionRouteProp; }
 
 const CHOICE_TYPES = new Set(['choice', 'dropdown', 'radio', 'checkbox', 'multiple_choice']);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 const normalizeQuestionOptions = (raw: unknown): string[] => {
   if (!Array.isArray(raw)) return [];
@@ -36,6 +38,7 @@ const normalizeQuestionOptions = (raw: unknown): string[] => {
 
 export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
   const eventId = route.params?.eventId;
+  const currentUser = useAuthStore((state) => state.user);
 
   const [tickets, setTickets] = useState<TicketType[]>([]);
   const [event, setEvent] = useState<Event | null>(null);
@@ -46,8 +49,20 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
   const [error, setError] = useState<string | null>(null);
   const [customAnswerMap, setCustomAnswerMap] = useState<Record<string, string>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [attendeeName, setAttendeeName] = useState('');
+  const [attendeeEmail, setAttendeeEmail] = useState('');
+  const [attendeePhone, setAttendeePhone] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   useEffect(() => { fetchTickets(); }, [eventId]);
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!attendeeName.trim()) setAttendeeName(safeString(currentUser.name, ''));
+    if (!attendeeEmail.trim()) setAttendeeEmail(safeString(currentUser.email, ''));
+    if (!attendeePhone.trim()) setAttendeePhone(safeString(currentUser.phone, ''));
+  }, [currentUser, attendeeName, attendeeEmail, attendeePhone]);
 
   const fetchTickets = async () => {
     try {
@@ -94,11 +109,41 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
   const selectablePaidTickets = availableTicketOptions.filter((ticket) => (ticket.quantity - ticket.soldCount) > 0);
 
   const validateAnswers = () => {
+    const normalizedName = attendeeName.trim();
+    const normalizedEmail = attendeeEmail.trim().toLowerCase();
+    const normalizedPhone = attendeePhone.trim();
     const errors: Record<string, string> = {};
+    let validationMessage = '';
+
+    if (!normalizedName) {
+      setNameError('Please enter your name');
+      validationMessage = validationMessage || 'Please enter your name';
+    } else {
+      setNameError('');
+    }
+
+    if (!normalizedEmail) {
+      setEmailError('Please enter your email');
+      validationMessage = validationMessage || 'Please enter your email';
+    } else if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setEmailError('Please enter a valid email');
+      validationMessage = validationMessage || 'Please enter a valid email';
+    } else {
+      setEmailError('');
+    }
+
+    if (!normalizedPhone) {
+      setPhoneError('Please enter your phone number');
+      validationMessage = validationMessage || 'Please enter your phone number';
+    } else {
+      setPhoneError('');
+    }
+
     for (const question of registrationQuestions) {
       const answer = (customAnswerMap[question.id] || '').trim();
       if (requiredQuestionIds.has(question.id) && !answer) {
         errors[`q_${question.id}`] = 'This field is required';
+        validationMessage = validationMessage || 'Please answer all required questions';
         continue;
       }
 
@@ -120,15 +165,18 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
     }
 
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    return {
+      isValid: !validationMessage && Object.keys(errors).length === 0,
+      message: validationMessage || (Object.keys(errors).length > 0 ? 'Please answer all required questions' : ''),
+    };
   };
 
   const validateAnswersOrNotify = () => {
-    const isValid = validateAnswers();
-    if (!isValid) {
-      Alert.alert('Registration Form Incomplete', 'Please complete the registration form.');
+    const validation = validateAnswers();
+    if (!validation.isValid) {
+      Alert.alert('Validation Error', validation.message || 'Please answer all required questions');
     }
-    return isValid;
+    return validation.isValid;
   };
 
   const getCustomAnswersPayload = () => (
@@ -188,6 +236,11 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
       currency: selectedTicket.currency,
       unitPrice: selectedTicket.price,
       customAnswers: getCustomAnswersPayload(),
+      registrationDetails: {
+        name: attendeeName.trim(),
+        email: attendeeEmail.trim().toLowerCase(),
+        phone: attendeePhone.trim(),
+      },
     });
   };
 
@@ -240,78 +293,113 @@ export const TicketSelectionScreen: React.FC<Props> = ({ navigation, route }) =>
           <SectionBlock title="Registration">
             <GlassCard variant="dark" style={styles.formCard}>
               <Text style={styles.freeInfoText}>
-                {registrationQuestions.length > 0
-                  ? 'Complete the registration form below.'
-                  : 'This is a free event. Confirm to complete your registration.'}
+                Complete the registration form below.
               </Text>
             </GlassCard>
           </SectionBlock>
         )}
 
-        {registrationQuestions.length > 0 && (
-          <SectionBlock title="Additional Information">
-            <GlassCard variant="dark" style={styles.formCard}>
-              {registrationQuestions.map((question, index) => {
-                const questionType = safeString(question.type, 'text').toLowerCase();
-                const value = customAnswerMap[question.id] || '';
-                const options = normalizeQuestionOptions(question.options);
+        <SectionBlock title="Registration Form">
+          <GlassCard variant="dark" style={styles.formCard}>
+            <InputField
+              label="Full Name *"
+              value={attendeeName}
+              onChangeText={(value) => {
+                setAttendeeName(value);
+                if (nameError) setNameError('');
+              }}
+              placeholder="Enter your full name"
+              error={nameError}
+            />
+            <InputField
+              label="Email *"
+              value={attendeeEmail}
+              onChangeText={(value) => {
+                setAttendeeEmail(value);
+                if (emailError) setEmailError('');
+              }}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="you@example.com"
+              error={emailError}
+            />
+            <InputField
+              label="Phone Number *"
+              value={attendeePhone}
+              onChangeText={(value) => {
+                setAttendeePhone(value);
+                if (phoneError) setPhoneError('');
+              }}
+              keyboardType="phone-pad"
+              placeholder="+1 555 123 4567"
+              error={phoneError}
+            />
+            {registrationQuestions.length > 0 ? (
+              <Text style={styles.choiceQuestionLabel}>Additional Questions</Text>
+            ) : null}
+            {registrationQuestions.map((question, index) => {
+              const questionType = safeString(question.type, 'text').toLowerCase();
+              const value = customAnswerMap[question.id] || '';
+              const options = normalizeQuestionOptions(question.options);
 
-                if (CHOICE_TYPES.has(questionType) && options.length > 0) {
-                  const isMultiSelect = questionType === 'checkbox' || questionType === 'multiple_choice';
-                  const selectedValues = value.split(',').map((item) => item.trim()).filter(Boolean);
-
-                  return (
-                    <View key={safeString(question.id, `question-${index}`)} style={styles.choiceQuestionWrap}>
-                      <Text style={styles.choiceQuestionLabel}>{question.question}{question.required ? ' *' : ''}</Text>
-                      <View style={styles.choiceOptionsRow}>
-                        {options.map((option, optionIndex) => {
-                          const isSelected = isMultiSelect
-                            ? selectedValues.some((selected) => selected.toLowerCase() === option.toLowerCase())
-                            : value.trim().toLowerCase() === option.toLowerCase();
-                          return (
-                            <TouchableOpacity
-                              key={`${question.id}-${optionIndex}`}
-                              style={[styles.choiceChip, isSelected && styles.choiceChipSelected]}
-                              onPress={() => {
-                                if (isMultiSelect) {
-                                  const nextValues = isSelected
-                                    ? selectedValues.filter((selected) => selected.toLowerCase() !== option.toLowerCase())
-                                    : [...selectedValues, option];
-                                  setCustomAnswerMap((previous) => ({ ...previous, [question.id]: nextValues.join(', ') }));
-                                } else {
-                                  setCustomAnswerMap((previous) => ({ ...previous, [question.id]: option }));
-                                }
-                                setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
-                              }}
-                            >
-                              <Text style={[styles.choiceChipText, isSelected && styles.choiceChipTextSelected]}>{option}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      {formErrors[`q_${question.id}`] ? <Text style={styles.choiceErrorText}>{formErrors[`q_${question.id}`]}</Text> : null}
-                    </View>
-                  );
-                }
+              if (CHOICE_TYPES.has(questionType) && options.length > 0) {
+                const isMultiSelect = questionType === 'checkbox' || questionType === 'multiple_choice';
+                const selectedValues = value.split(',').map((item) => item.trim()).filter(Boolean);
 
                 return (
-                  <InputField
-                    key={safeString(question.id, `question-${index}`)}
-                    label={`${question.question}${question.required ? ' *' : ''}`}
-                    value={value}
-                    onChangeText={(inputValue) => {
-                      setCustomAnswerMap((previous) => ({ ...previous, [question.id]: inputValue }));
-                      setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
-                    }}
-                    placeholder={question.type === 'number' ? 'Enter a number' : 'Your answer'}
-                    keyboardType={question.type === 'number' ? 'numeric' : 'default'}
-                    error={formErrors[`q_${question.id}`]}
-                  />
+                  <View key={safeString(question.id, `question-${index}`)} style={styles.choiceQuestionWrap}>
+                    <Text style={styles.choiceQuestionLabel}>{question.question}{question.required ? ' *' : ''}</Text>
+                    <View style={styles.choiceOptionsRow}>
+                      {options.map((option, optionIndex) => {
+                        const isSelected = isMultiSelect
+                          ? selectedValues.some((selected) => selected.toLowerCase() === option.toLowerCase())
+                          : value.trim().toLowerCase() === option.toLowerCase();
+                        return (
+                          <TouchableOpacity
+                            key={`${question.id}-${optionIndex}`}
+                            style={[styles.choiceChip, isSelected && styles.choiceChipSelected]}
+                            onPress={() => {
+                              if (isMultiSelect) {
+                                const nextValues = isSelected
+                                  ? selectedValues.filter((selected) => selected.toLowerCase() !== option.toLowerCase())
+                                  : [...selectedValues, option];
+                                setCustomAnswerMap((previous) => ({ ...previous, [question.id]: nextValues.join(', ') }));
+                              } else {
+                                setCustomAnswerMap((previous) => ({ ...previous, [question.id]: option }));
+                              }
+                              setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
+                            }}
+                          >
+                            <Text style={[styles.choiceChipText, isSelected && styles.choiceChipTextSelected]}>{option}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    {formErrors[`q_${question.id}`] ? <Text style={styles.choiceErrorText}>{formErrors[`q_${question.id}`]}</Text> : null}
+                  </View>
                 );
-              })}
-            </GlassCard>
-          </SectionBlock>
-        )}
+              }
+
+              return (
+                <InputField
+                  key={safeString(question.id, `question-${index}`)}
+                  label={`${question.question}${question.required ? ' *' : ''}`}
+                  value={value}
+                  onChangeText={(inputValue) => {
+                    setCustomAnswerMap((previous) => ({ ...previous, [question.id]: inputValue }));
+                    setFormErrors((previous) => ({ ...previous, [`q_${question.id}`]: '' }));
+                  }}
+                  placeholder={question.type === 'number' ? 'Enter a number' : 'Your answer'}
+                  keyboardType={question.type === 'number' ? 'numeric' : 'default'}
+                  error={formErrors[`q_${question.id}`]}
+                />
+              );
+            })}
+            {registrationQuestions.length === 0 ? (
+              <Text style={styles.freeInfoText}>No additional questions for this event.</Text>
+            ) : null}
+          </GlassCard>
+        </SectionBlock>
       </ScrollView>
 
       <View style={styles.footer}>
