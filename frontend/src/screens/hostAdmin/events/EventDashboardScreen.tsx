@@ -359,14 +359,16 @@ export const EventDashboardScreen: React.FC<Props> = ({ navigation, route }) => 
                       onPress={() => handlePendingApprovalAction(entry, 'approve')}
                       variant="secondary"
                       size="sm"
+                      fullWidth={false}
                       isLoading={isUpdatingApprovalId === entry.id}
                       style={styles.pendingActionButton}
                     />
                     <Button
-                      title="Reject"
+                      title="Decline"
                       onPress={() => handlePendingApprovalAction(entry, 'reject')}
                       variant="danger"
                       size="sm"
+                      fullWidth={false}
                       isLoading={isUpdatingApprovalId === entry.id}
                       style={styles.pendingActionButton}
                     />
@@ -677,7 +679,8 @@ const styles = StyleSheet.create({
   },
   pendingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.m,
@@ -687,6 +690,7 @@ const styles = StyleSheet.create({
   },
   pendingMeta: {
     flex: 1,
+    minWidth: 140,
   },
   pendingName: {
     ...theme.typography.bodyMedium,
@@ -699,10 +703,18 @@ const styles = StyleSheet.create({
   },
   pendingActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     gap: theme.spacing.xs,
+    flex: 1,
+    minWidth: 160,
   },
   pendingActionButton: {
-    minWidth: 86,
+    flexGrow: 1,
+    flexBasis: 72,
+    minWidth: 72,
+    maxWidth: 120,
+    borderRadius: theme.borderRadius.s,
   },
   quickActionsGrid: {
     flexDirection: 'row',

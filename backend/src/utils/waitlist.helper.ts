@@ -111,7 +111,7 @@ const promoteWaitlistedBookingInternal = async (bookingId: string, promotedBy?: 
       isWaitlisted: false,
       waitlistPosition: null,
       bookingStatus: 'confirmed',
-      approvalStatus: event.requiresApproval ? 'pending' : 'approved',
+      approvalStatus: event.pricingMode === 'free' ? 'pending' : 'approved',
       wasWaitlisted: true,
     },
     { new: true },

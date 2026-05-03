@@ -139,12 +139,12 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
   };
 
   const handleCvvChange = (text: string) => {
-    const digits = text.replace(/\D/g, '').slice(0, 4);
+    const digits = text.replace(/\D/g, '').slice(0, 3);
     setCvv(digits);
-    if (digits.length >= 3 || digits.length === 0) {
+    if (digits.length === 3 || digits.length === 0) {
       setCvvError('');
     } else {
-      setCvvError('CVV must be 3 or 4 digits');
+      setCvvError('CVV must be exactly 3 digits');
     }
   };
 
@@ -187,24 +187,33 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
     Keyboard.dismiss();
     if (!eventId || !ticketTypeId || !quantity) return;
 
+    const totalDue = Number(summary?.discountedAmount ?? (Number(unitPrice || 0) * quantity));
+    const requiresPaymentDetails = totalDue > 0;
     const normalizedCardNumber = cardNumber.replace(/\s+/g, '');
     let isValid = true;
 
-    if (!cardholderName.trim() || cardholderName.trim().length < 2) {
-      setNameError('Cardholder name is required');
-      isValid = false;
-    }
-    if (!/^\d{16}$/.test(normalizedCardNumber)) {
-      setCardError('Card number must be 16 digits');
-      isValid = false;
-    }
-    if (!/^\d{2}\/\d{2}$/.test(expiry.trim()) || expiryError) {
-      setExpiryError(expiryError || 'Expiry must be in MM/YY format');
-      isValid = false;
-    }
-    if (!/^\d{3,4}$/.test(cvv.trim())) {
-      setCvvError('CVV must be 3 or 4 digits');
-      isValid = false;
+    if (requiresPaymentDetails) {
+      const hasMissingPaymentDetails = !cardholderName.trim() || !normalizedCardNumber || !expiry.trim() || !cvv.trim();
+      if (hasMissingPaymentDetails) {
+        Alert.alert('Payment Failed', 'Payment method details are missing.');
+      }
+
+      if (!cardholderName.trim() || cardholderName.trim().length < 2) {
+        setNameError('Cardholder name is required');
+        isValid = false;
+      }
+      if (!/^\d{16}$/.test(normalizedCardNumber)) {
+        setCardError('Card number must be 16 digits');
+        isValid = false;
+      }
+      if (!/^\d{2}\/\d{2}$/.test(expiry.trim()) || expiryError) {
+        setExpiryError(expiryError || 'Expiry must be in MM/YY format');
+        isValid = false;
+      }
+      if (!/^\d{3}$/.test(cvv.trim())) {
+        setCvvError('CVV must be exactly 3 digits');
+        isValid = false;
+      }
     }
 
     if (!isValid) return;
@@ -221,10 +230,47 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
         customAnswers,
         allowWaitlist: false,
       });
-      Alert.alert('Payment Successful', 'Mock Visa payment confirmed.');
+      Alert.alert(
+        requiresPaymentDetails ? 'Payment Successful' : 'Registration Confirmed',
+        requiresPaymentDetails ? 'Payment completed successfully.' : 'No payment was required for this ticket.',
+      );
       navigation.replace('BookingConfirmation', { bookingId: bookingRes.data.booking.id });
     } catch (err: any) {
-      Alert.alert(err?.response?.status === 409 ? 'Sold Out' : 'Payment Failed', err.response?.data?.message || 'Unable to complete payment');
+      const status = Number(err?.response?.status || 0);
+      const rawMessage = safeString(err?.response?.data?.message, '').toLowerCase();
+      let title = 'Payment Failed';
+      let message = 'Payment could not be completed. Please try again';
+
+      if (
+        rawMessage.includes('required question is missing an answer')
+        || rawMessage.includes('invalid custom question answer')
+        || rawMessage.includes('invalid answer for question')
+      ) {
+        message = 'Please complete the registration form';
+      } else if (
+        rawMessage.includes('tickettypeid is required')
+        || rawMessage.includes('ticket not found')
+        || rawMessage.includes('ticket does not belong to this event')
+      ) {
+        message = 'Please select a ticket';
+      } else if (
+        rawMessage.includes('requested quantity exceeds ticket capacity')
+        || rawMessage.includes('ticket is not active')
+      ) {
+        title = 'Sold Out';
+        message = 'Selected ticket is sold out';
+      } else if (
+        rawMessage.includes('sold out')
+        || rawMessage.includes('capacity full')
+        || status === 409
+      ) {
+        title = 'Sold Out';
+        message = 'This event is full';
+      } else if (rawMessage.includes('payment method details are missing')) {
+        message = 'Payment method details are missing';
+      }
+
+      Alert.alert(title, message);
     } finally {
       setIsConfirming(false);
     }
@@ -234,7 +280,7 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
     logDevMissing('payment-summary-missing-params', 'PaymentSummaryScreen missing required route params.');
     return (
       <ScreenContainer>
-        <ErrorState message="Missing payment details." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
+        <ErrorState message="Payment method details are missing." onRetry={() => navigation.goBack()} actionLabel="Go Back" />
       </ScreenContainer>
     );
   }
@@ -321,68 +367,80 @@ export const PaymentSummaryScreen: React.FC<Props> = ({ navigation, route }) => 
                   </View>
                 </Card>
 
-                <Card variant="raised" style={styles.sectionCard} noPadding>
-                  <View style={styles.sectionInner}>
-                    <View style={styles.sectionTitleRow}>
-                      <CreditCard size={16} color={theme.colors.primary} />
-                      <Text style={styles.sectionTitle}>Payment Method</Text>
-                    </View>
-                    <Text style={styles.disclaimerText}>This is a simulated payment form. No real card charge is made.</Text>
-                    <Input
-                      label="Cardholder name"
-                      value={cardholderName}
-                      onChangeText={handleNameChange}
-                      placeholder="John Doe"
-                      returnKeyType="next"
-                      error={nameError}
-                      onSubmitEditing={() => cardNumberRef.current?.focus()}
-                    />
-                    <Input
-                      ref={cardNumberRef}
-                      label="Card number"
-                      value={cardNumber}
-                      onChangeText={handleCardNumberChange}
-                      keyboardType="number-pad"
-                      placeholder="4111 1111 1111 1111"
-                      returnKeyType="next"
-                      error={cardError}
-                      maxLength={19}
-                      onSubmitEditing={() => expiryRef.current?.focus()}
-                    />
-                    <View style={styles.formRow}>
+                {(summary?.discountedAmount ?? Number(unitPrice || 0) * quantity) > 0 ? (
+                  <Card variant="raised" style={styles.sectionCard} noPadding>
+                    <View style={styles.sectionInner}>
+                      <View style={styles.sectionTitleRow}>
+                        <CreditCard size={16} color={theme.colors.primary} />
+                        <Text style={styles.sectionTitle}>Payment Method</Text>
+                      </View>
+                      <Text style={styles.disclaimerText}>This is a simulated payment form. No real card charge is made.</Text>
                       <Input
-                        ref={expiryRef}
-                        label="Expiry (MM/YY)"
-                        value={expiry}
-                        onChangeText={handleExpiryChange}
-                        keyboardType="number-pad"
-                        placeholder="12/30"
-                        containerStyle={styles.flexInput}
+                        label="Cardholder name"
+                        value={cardholderName}
+                        onChangeText={handleNameChange}
+                        placeholder="John Doe"
                         returnKeyType="next"
-                        error={expiryError}
-                        maxLength={5}
-                        onSubmitEditing={() => cvvRef.current?.focus()}
+                        error={nameError}
+                        onSubmitEditing={() => cardNumberRef.current?.focus()}
                       />
                       <Input
-                        ref={cvvRef}
-                        label="CVV"
-                        value={cvv}
-                        onChangeText={handleCvvChange}
+                        ref={cardNumberRef}
+                        label="Card number"
+                        value={cardNumber}
+                        onChangeText={handleCardNumberChange}
                         keyboardType="number-pad"
-                        placeholder="123"
-                        containerStyle={styles.flexInput}
-                        returnKeyType="done"
-                        error={cvvError}
-                        maxLength={4}
-                        blurOnSubmit
+                        placeholder="4111 1111 1111 1111"
+                        returnKeyType="next"
+                        error={cardError}
+                        maxLength={19}
+                        onSubmitEditing={() => expiryRef.current?.focus()}
                       />
+                      <View style={styles.formRow}>
+                        <Input
+                          ref={expiryRef}
+                          label="Expiry (MM/YY)"
+                          value={expiry}
+                          onChangeText={handleExpiryChange}
+                          keyboardType="number-pad"
+                          placeholder="12/30"
+                          containerStyle={styles.flexInput}
+                          returnKeyType="next"
+                          error={expiryError}
+                          maxLength={5}
+                          onSubmitEditing={() => cvvRef.current?.focus()}
+                        />
+                        <Input
+                          ref={cvvRef}
+                          label="CVV"
+                          value={cvv}
+                          onChangeText={handleCvvChange}
+                          keyboardType="number-pad"
+                          placeholder="123"
+                          containerStyle={styles.flexInput}
+                          returnKeyType="done"
+                          error={cvvError}
+                          maxLength={3}
+                          blurOnSubmit
+                        />
+                      </View>
                     </View>
-                  </View>
-                </Card>
+                  </Card>
+                ) : (
+                  <Card variant="raised" style={styles.sectionCard} noPadding>
+                    <View style={styles.sectionInner}>
+                      <View style={styles.sectionTitleRow}>
+                        <CreditCard size={16} color={theme.colors.primary} />
+                        <Text style={styles.sectionTitle}>Payment Method</Text>
+                      </View>
+                      <Text style={styles.disclaimerText}>No payment method is required for this ticket.</Text>
+                    </View>
+                  </Card>
+                )}
 
                 <View style={styles.payActionWrap}>
                   <Button
-                    title="Confirm & Pay"
+                    title={(summary?.discountedAmount ?? Number(unitPrice || 0) * quantity) > 0 ? 'Confirm & Pay' : 'Confirm Registration'}
                     onPress={confirmPayment}
                     isLoading={isConfirming}
                     variant="primary"

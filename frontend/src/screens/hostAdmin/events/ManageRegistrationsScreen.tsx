@@ -334,14 +334,16 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
                       onPress={() => runApprovalAction(item, 'approve')}
                       variant="primary"
                       size="sm"
+                      fullWidth={false}
                       style={styles.actionBtn}
                       isLoading={updatingId === item.id}
                     />
                     <Button
-                      title="Reject"
+                      title="Decline"
                       onPress={() => runApprovalAction(item, 'reject')}
                       variant="danger"
                       size="sm"
+                      fullWidth={false}
                       style={styles.actionBtn}
                       isLoading={updatingId === item.id}
                     />
@@ -369,6 +371,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
                       onPress={() => runManualCheckIn(item)}
                       variant="secondary"
                       size="sm"
+                      fullWidth={false}
                       icon={<UserCheck size={13} color={theme.colors.success} />}
                       style={styles.actionBtn}
                     />
@@ -388,6 +391,7 @@ export const ManageRegistrationsScreen: React.FC<Props> = ({ navigation, route }
                     }}
                     variant="secondary"
                     size="sm"
+                    fullWidth={false}
                     style={styles.actionBtn}
                   />
                 </View>
@@ -419,9 +423,15 @@ const styles = StyleSheet.create({
   guestTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.xs },
   guestName: { ...theme.typography.bodyMedium, color: theme.colors.text, flex: 1, marginRight: theme.spacing.s },
   metaText: { ...theme.typography.caption, color: theme.colors.textMuted },
-  actionsRowPrimary: { flexDirection: 'row', gap: theme.spacing.xs, marginTop: theme.spacing.sm },
+  actionsRowPrimary: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginTop: theme.spacing.sm },
   actionsRowSecondary: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginTop: theme.spacing.xs },
-  actionBtn: { flexGrow: 1, minWidth: 96 },
+  actionBtn: {
+    flexGrow: 1,
+    flexBasis: 96,
+    minWidth: 96,
+    maxWidth: 150,
+    borderRadius: theme.borderRadius.s,
+  },
   approvedRow: {
     marginTop: theme.spacing.sm,
     backgroundColor: theme.colors.successSubtle,
