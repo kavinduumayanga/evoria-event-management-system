@@ -276,6 +276,10 @@ export interface PublicEventDetails {
     description: string;
     location: {
       label: string;
+      name: string;
+      address: string;
+      lat: number | null;
+      lng: number | null;
       city: string;
       venue: {
         id: string;

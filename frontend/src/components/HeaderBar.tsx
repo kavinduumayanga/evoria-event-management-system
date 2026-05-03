@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ViewStyle, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Share, Map, Search } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -12,6 +12,8 @@ interface HeaderBarProps {
   onBack?: () => void;
   rightAction?: React.ReactNode;
   transparent?: boolean;
+  onSearchChange?: (text: string) => void;
+  onShare?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -22,9 +24,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onBack,
   rightAction,
   transparent = false,
+  onSearchChange,
+  onShare,
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   const handleBack = () => {
     if (onBack) onBack();
@@ -41,18 +46,23 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       {variant === 'discover' ? (
         <>
           <View style={styles.leftSection}>
-            {profileImageUrl ? (
-              <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.placeholderAvatar]} />
+            <Image source={require('../../assets/icon.png')} style={styles.avatar} />
+            {!isSearchActive && <Text style={styles.titleDiscover}>Discovery</Text>}
+            {isSearchActive && onSearchChange && (
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search events..."
+                placeholderTextColor="#A3A3A3"
+                autoFocus
+                onChangeText={onSearchChange}
+              />
             )}
-            <Text style={styles.titleDiscover}>{title || 'Discover'}</Text>
           </View>
           <View style={styles.rightSection}>
             <TouchableOpacity style={styles.iconButton}>
               <Map color="#FFFFFF" size={20} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchActive(!isSearchActive)}>
               <Search color="#FFFFFF" size={20} />
             </TouchableOpacity>
           </View>
@@ -63,7 +73,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             <ChevronLeft color="#FFFFFF" size={24} />
           </TouchableOpacity>
           <View style={styles.flex1} />
-          <TouchableOpacity style={styles.circleButton}>
+          <TouchableOpacity style={styles.circleButton} onPress={onShare}>
             <Share color="#FFFFFF" size={20} />
           </TouchableOpacity>
         </>
@@ -113,6 +123,15 @@ const styles = StyleSheet.create({
   },
   placeholderAvatar: {
     backgroundColor: '#333',
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: 'rgba(30,30,30,0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    color: '#FFFFFF',
+    fontSize: 16,
   },
   titleDiscover: {
     color: '#FFFFFF',
