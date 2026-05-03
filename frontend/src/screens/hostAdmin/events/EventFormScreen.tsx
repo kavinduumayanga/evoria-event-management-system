@@ -7,7 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Plus, X, Upload, HelpCircle, Edit2 } from 'lucide-react-native';
 import { HostAdminEventStackParamList } from '../../../types/navigation';
-import { ScreenContainer, Input, Button, LoadingState, Card, IconButton, LocationSearchInput } from '../../../components';
+import { ScreenContainer, Input, Button, LoadingState, Card, IconButton } from '../../../components';
 import { theme } from '../../../constants/theme';
 import { EventService, UploadService, SessionService, TicketService, VenueService } from '../../../api/services';
 import {
@@ -114,6 +114,16 @@ interface TicketDraft {
   currency: string;
 }
 
+interface VenueDraft {
+  name: string;
+  address: string;
+  city: string;
+  capacity: string;
+  type: EventType;
+  contactInfo: string;
+  description: string;
+}
+
 type PickerType =
   | 'date'
   | 'startTime'
@@ -139,8 +149,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [endTime, setEndTime] = useState('');
   const [capacity, setCapacity] = useState('');
   const [category, setCategory] = useState('');
-  const [location, setLocation] = useState<{name: string, address: string, lat?: number, lng?: number} | null>(null);
-  const [locationInputResetKey, setLocationInputResetKey] = useState(0);
   const [tagsInput, setTagsInput] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
   const [venueId, setVenueId] = useState('');
@@ -172,6 +180,17 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const [editingAgendaIndex, setEditingAgendaIndex] = useState<number | null>(null);
 
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [isVenueModalVisible, setIsVenueModalVisible] = useState(false);
+  const [isSavingVenue, setIsSavingVenue] = useState(false);
+  const [venueDraft, setVenueDraft] = useState<VenueDraft>({
+    name: '',
+    address: '',
+    city: '',
+    capacity: '',
+    type: 'physical',
+    contactInfo: '',
+    description: '',
+  });
   const [ticketDrafts, setTicketDrafts] = useState<TicketDraft[]>([]);
   const [isTicketModalVisible, setIsTicketModalVisible] = useState(false);
   const [editingTicketIndex, setEditingTicketIndex] = useState<number | null>(null);
@@ -192,7 +211,7 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     fetchData();
   }, [eventId]);
 
-  const requiresLocation = type === 'physical' || type === 'hybrid';
+  const requiresVenue = type === 'physical' || type === 'hybrid';
 
   const fetchData = async () => {
     try {
@@ -219,36 +238,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         setEndTime(event.endTime || '');
         setCapacity(String(event.capacity || ''));
         setCategory(event.category || '');
-        const rawLocation = (event as any).location;
-        if (rawLocation && typeof rawLocation === 'object') {
-          const locationName = String(rawLocation.name || rawLocation.label || '').trim();
-          const locationAddress = String(rawLocation.address || '').trim();
-          const locationLat = typeof rawLocation.lat === 'number' && Number.isFinite(rawLocation.lat)
-            ? rawLocation.lat
-            : undefined;
-          const locationLng = typeof rawLocation.lng === 'number' && Number.isFinite(rawLocation.lng)
-            ? rawLocation.lng
-            : undefined;
-
-          if (locationName || locationAddress || (locationLat !== undefined && locationLng !== undefined)) {
-            setLocation({
-              name: locationName || locationAddress || String(event.city || '').trim(),
-              address: locationAddress,
-              ...(locationLat !== undefined ? { lat: locationLat } : {}),
-              ...(locationLng !== undefined ? { lng: locationLng } : {}),
-            });
-          } else if (event.city) {
-            setLocation({ name: event.city, address: '' });
-          } else {
-            setLocation(null);
-          }
-        } else if (typeof rawLocation === 'string' && rawLocation.trim()) {
-          setLocation({ name: rawLocation.trim(), address: '' });
-        } else if (event.city) {
-          setLocation({ name: event.city, address: '' });
-        } else {
-          setLocation(null);
-        }
         setTagsInput((event.tags || []).join(', '));
         setMeetingLink(event.meetingLink || '');
         setVenueId(event.venueId || '');
@@ -513,6 +502,62 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
     await Promise.all([...createRequests, ...updateRequests, ...deleteRequests]);
   };
 
+  const handleCreateVenue = async () => {
+    Keyboard.dismiss();
+    const parsedCapacity = Number.parseInt(venueDraft.capacity, 10);
+    if (!venueDraft.name.trim()) {
+      Alert.alert('Validation Error', 'Venue name is required.');
+      return;
+    }
+    if (!venueDraft.address.trim()) {
+      Alert.alert('Validation Error', 'Venue address is required.');
+      return;
+    }
+    if (!venueDraft.city.trim()) {
+      Alert.alert('Validation Error', 'Venue city is required.');
+      return;
+    }
+    if (!Number.isFinite(parsedCapacity) || parsedCapacity <= 0) {
+      Alert.alert('Validation Error', 'Venue capacity must be greater than 0.');
+      return;
+    }
+
+    try {
+      setIsSavingVenue(true);
+      const response = await VenueService.createVenue({
+        name: venueDraft.name.trim(),
+        description: venueDraft.description.trim(),
+        address: venueDraft.address.trim(),
+        city: venueDraft.city.trim(),
+        capacity: parsedCapacity,
+        type: venueDraft.type,
+        contactInfo: venueDraft.contactInfo.trim(),
+      });
+      const createdVenue = response?.data?.venue as Venue | undefined;
+      if (!createdVenue?.id) {
+        throw new Error('Invalid venue response');
+      }
+
+      setVenues((previous) => [createdVenue, ...previous.filter((item) => item.id !== createdVenue.id)]);
+      setVenueId(createdVenue.id);
+      setCapacity((previous) => (previous.trim() ? previous : String(createdVenue.capacity || '')));
+      setVenueDraft({
+        name: '',
+        address: '',
+        city: '',
+        capacity: '',
+        type: 'physical',
+        contactInfo: '',
+        description: '',
+      });
+      setIsVenueModalVisible(false);
+    } catch (error: any) {
+      Alert.alert('Error', error?.response?.data?.message || 'Failed to create venue.');
+    } finally {
+      setIsSavingVenue(false);
+    }
+  };
+
   const handleSave = async () => {
     Keyboard.dismiss();
     const parsedCapacity = Number.parseInt(capacity, 10);
@@ -550,8 +595,8 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
-    if (requiresLocation && !location?.name?.trim()) {
-      Alert.alert('Validation Error', 'Please select a location for physical/hybrid events.');
+    if (requiresVenue && !selectedVenue) {
+      Alert.alert('Validation Error', 'Please select or create a venue for physical/hybrid events.');
       return;
     }
 
@@ -650,12 +695,10 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         endTime: trimmedEnd,
         capacity: parsedCapacity,
         category: category.trim(),
-        city: selectedVenue?.city || location?.name || '',
-        location: (location && location.name) ? {
-          name: location.name,
-          address: location.address || '',
-          ...(typeof location.lat === 'number' && Number.isFinite(location.lat) ? { lat: location.lat } : {}),
-          ...(typeof location.lng === 'number' && Number.isFinite(location.lng) ? { lng: location.lng } : {}),
+        city: selectedVenue?.city || '',
+        location: selectedVenue ? {
+          name: selectedVenue.name,
+          address: selectedVenue.address || '',
         } : undefined,
         tags: tagsInput
           .split(',')
@@ -703,7 +746,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) return <LoadingState />;
 
   const saveDisabled = isSaving || (isEditing && status === 'cancelled');
-  const hasSelectedLocation = Boolean(location?.name?.trim());
   const selectedVenue = venues.find((venue) => venue.id === venueId) || null;
 
   return (
@@ -781,39 +823,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         <Input label="Category" value={category} onChangeText={setCategory} placeholder="Technology" />
-        <LocationSearchInput
-          key={`location-search-${locationInputResetKey}`}
-          label="Location"
-          placeholder="Search location (e.g. SLIIT Malabe)..."
-          initialValue={location?.name || ''}
-          onSelect={(loc) => {
-            setLocation(loc);
-          }}
-        />
-        {location && hasSelectedLocation && (
-          <View style={styles.locationPreview}>
-            <View style={styles.locationPreviewTop}>
-              <View style={styles.locationPreviewTextWrap}>
-                <Text style={styles.locationPreviewName} numberOfLines={2}>{location.name}</Text>
-                {location.address ? <Text style={styles.locationPreviewAddr} numberOfLines={2}>{location.address}</Text> : null}
-              </View>
-            </View>
-            <View style={styles.locationPreviewActionsRow}>
-              <TouchableOpacity style={styles.locationActionButton} onPress={() => setLocation(null)}>
-                <Text style={styles.locationActionText}>Change</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.locationActionButton, styles.locationRemoveButton]}
-                onPress={() => {
-                  setLocation(null);
-                  setLocationInputResetKey((previous) => previous + 1);
-                }}
-              >
-                <Text style={[styles.locationActionText, styles.locationRemoveText]}>Remove</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         <Text style={styles.label}>Event Type *</Text>
         <View style={styles.segmentRow}>
@@ -834,26 +843,15 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
         {(type === 'physical' || type === 'hybrid') ? (
           <Card variant="raised" style={styles.questionCard}>
             <Text style={styles.sectionTitle}>Venue</Text>
-            <Text style={styles.photoHint}>Select one of your saved venues or keep a custom location.</Text>
+            <Text style={styles.photoHint}>Select one of your saved venues, or create a new venue.</Text>
 
             <View style={styles.venueRow}>
-              <TouchableOpacity
-                style={[styles.chip, !venueId && styles.chipSelected]}
-                onPress={() => setVenueId('')}
-              >
-                <Text style={[styles.chipText, !venueId && styles.chipTextSelected]}>Custom Location</Text>
-              </TouchableOpacity>
-
               {venues.map((venue) => (
                 <TouchableOpacity
                   key={venue.id}
                   style={[styles.chip, venueId === venue.id && styles.chipSelected]}
                   onPress={() => {
                     setVenueId(venue.id);
-                    setLocation({
-                      name: venue.name,
-                      address: `${venue.address}, ${venue.city}`,
-                    });
                     if (!capacity.trim()) {
                       setCapacity(String(venue.capacity || ''));
                     }
@@ -865,7 +863,25 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                 </TouchableOpacity>
               ))}
             </View>
-            {venues.length === 0 ? <Text style={styles.noVenueText}>No saved venues yet. You can continue with custom location.</Text> : null}
+            {venues.length === 0 ? <Text style={styles.noVenueText}>No saved venues yet. Create one to continue.</Text> : null}
+            <Button
+              variant="secondary"
+              title="Create Venue"
+              onPress={() => {
+                setVenueDraft({
+                  name: '',
+                  address: '',
+                  city: '',
+                  capacity: '',
+                  type: type === 'hybrid' ? 'hybrid' : 'physical',
+                  contactInfo: '',
+                  description: '',
+                });
+                setIsVenueModalVisible(true);
+              }}
+              icon={<Plus size={16} color={theme.colors.text} />}
+              style={{ marginTop: theme.spacing.s }}
+            />
             {selectedVenue ? (
               <Text style={styles.questionMeta}>
                 Selected venue: {selectedVenue.address}, {selectedVenue.city} • Capacity {selectedVenue.capacity}
@@ -886,6 +902,65 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           ))}
         </View>
+
+        {pricingMode === 'ticketed' ? (
+          <Card variant="raised" style={styles.questionCard}>
+            <Text style={styles.sectionTitle}>Ticket Configuration</Text>
+            {ticketDrafts.length > 0 ? (
+              ticketDrafts.map((ticket, index) => (
+                <View key={`${ticket.id || 'new-ticket'}-${index}`} style={styles.questionRow}>
+                  <View style={styles.questionInfo}>
+                    <Text style={styles.questionText}>
+                      {ticket.name || 'Unnamed Ticket'} • {(Number.parseFloat(ticket.price) || 0) <= 0 ? 'FREE' : `${(ticket.currency || 'LKR').toUpperCase()} ${ticket.price}`}
+                    </Text>
+                    <Text style={styles.questionMeta}>
+                      Qty {ticket.quantity} • Max/User {ticket.maxPerUser} • {ticket.isActive ? 'ACTIVE' : 'INACTIVE'}
+                    </Text>
+                    {ticket.description ? <Text style={styles.questionMeta}>{ticket.description}</Text> : null}
+                  </View>
+                  <View style={styles.agendaRowActions}>
+                    <IconButton
+                      icon={<Edit2 size={14} color={theme.colors.primary} />}
+                      onPress={() => {
+                        setEditingTicketIndex(index);
+                        setTicketDraft(ticket);
+                        setIsTicketModalVisible(true);
+                      }}
+                      variant="ghost"
+                      size={30}
+                    />
+                    <IconButton
+                      icon={<X size={14} color={theme.colors.error} />}
+                      onPress={() => setTicketDrafts((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
+                      variant="ghost"
+                      size={30}
+                    />
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noQuestionText}>No tickets configured yet.</Text>
+            )}
+            <Button
+              variant="secondary"
+              title="Add Ticket"
+              onPress={() => {
+                setEditingTicketIndex(null);
+                setTicketDraft({
+                  name: '',
+                  description: '',
+                  price: '0',
+                  quantity: '100',
+                  maxPerUser: '1',
+                  isActive: true,
+                  currency: 'LKR',
+                });
+                setIsTicketModalVisible(true);
+              }}
+              icon={<Plus size={16} color={theme.colors.text} />}
+            />
+          </Card>
+        ) : null}
 
         <Text style={styles.label}>Visibility *</Text>
         <View style={styles.segmentRow}>
@@ -1097,65 +1172,6 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
             icon={<Plus size={16} color={theme.colors.text} />}
           />
         </Card>
-
-        {pricingMode === 'ticketed' ? (
-          <Card variant="raised" style={styles.questionCard}>
-            <Text style={styles.sectionTitle}>Ticket Configuration</Text>
-            {ticketDrafts.length > 0 ? (
-              ticketDrafts.map((ticket, index) => (
-                <View key={`${ticket.id || 'new-ticket'}-${index}`} style={styles.questionRow}>
-                  <View style={styles.questionInfo}>
-                    <Text style={styles.questionText}>
-                      {ticket.name || 'Unnamed Ticket'} • {(Number.parseFloat(ticket.price) || 0) <= 0 ? 'FREE' : `${(ticket.currency || 'LKR').toUpperCase()} ${ticket.price}`}
-                    </Text>
-                    <Text style={styles.questionMeta}>
-                      Qty {ticket.quantity} • Max/User {ticket.maxPerUser} • {ticket.isActive ? 'ACTIVE' : 'INACTIVE'}
-                    </Text>
-                    {ticket.description ? <Text style={styles.questionMeta}>{ticket.description}</Text> : null}
-                  </View>
-                  <View style={styles.agendaRowActions}>
-                    <IconButton
-                      icon={<Edit2 size={14} color={theme.colors.primary} />}
-                      onPress={() => {
-                        setEditingTicketIndex(index);
-                        setTicketDraft(ticket);
-                        setIsTicketModalVisible(true);
-                      }}
-                      variant="ghost"
-                      size={30}
-                    />
-                    <IconButton
-                      icon={<X size={14} color={theme.colors.error} />}
-                      onPress={() => setTicketDrafts((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
-                      variant="ghost"
-                      size={30}
-                    />
-                  </View>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noQuestionText}>No tickets configured yet.</Text>
-            )}
-            <Button
-              variant="secondary"
-              title="Add Ticket"
-              onPress={() => {
-                setEditingTicketIndex(null);
-                setTicketDraft({
-                  name: '',
-                  description: '',
-                  price: '0',
-                  quantity: '100',
-                  maxPerUser: '1',
-                  isActive: true,
-                  currency: 'LKR',
-                });
-                setIsTicketModalVisible(true);
-              }}
-              icon={<Plus size={16} color={theme.colors.text} />}
-            />
-          </Card>
-        ) : null}
 
         <Card variant="raised" style={styles.questionCard}>
           <Text style={styles.sectionTitle}>Agenda</Text>
@@ -1415,6 +1431,91 @@ export const EventFormScreen: React.FC<Props> = ({ navigation, route }) => {
                     setEditingTicketIndex(null);
                     setIsTicketModalVisible(false);
                   }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={isVenueModalVisible} transparent animationType="slide" onRequestClose={() => setIsVenueModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.agendaModal}>
+            <Text style={styles.sectionTitle}>Create Venue</Text>
+            <Input
+              label="Venue Name *"
+              value={venueDraft.name}
+              onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, name: value }))}
+              placeholder="Main Hall"
+            />
+            <Input
+              label="Address *"
+              value={venueDraft.address}
+              onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, address: value }))}
+              placeholder="123 Event Street"
+            />
+            <View style={styles.row}>
+              <View style={styles.flexHalf}>
+                <Input
+                  label="City *"
+                  value={venueDraft.city}
+                  onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, city: value }))}
+                  placeholder="Colombo"
+                />
+              </View>
+              <View style={styles.flexHalf}>
+                <Input
+                  label="Capacity *"
+                  value={venueDraft.capacity}
+                  onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, capacity: value }))}
+                  keyboardType="numeric"
+                  placeholder="500"
+                />
+              </View>
+            </View>
+            <Input
+              label="Contact Info"
+              value={venueDraft.contactInfo}
+              onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, contactInfo: value }))}
+              placeholder="contact@venue.com"
+            />
+            <Input
+              label="Description"
+              value={venueDraft.description}
+              onChangeText={(value) => setVenueDraft((previous) => ({ ...previous, description: value }))}
+              placeholder="Venue details"
+              multiline
+            />
+
+            <Text style={styles.label}>Venue Type</Text>
+            <View style={styles.segmentRow}>
+              {(['physical', 'hybrid'] as EventType[]).map((venueType) => (
+                <TouchableOpacity
+                  key={`venue-type-${venueType}`}
+                  style={[styles.segment, venueDraft.type === venueType && styles.segmentSelected]}
+                  onPress={() => setVenueDraft((previous) => ({ ...previous, type: venueType }))}
+                >
+                  <Text style={[styles.segmentText, venueDraft.type === venueType && styles.segmentTextSelected]}>
+                    {safeUpper(venueType)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.flexHalf}>
+                <Button
+                  variant="secondary"
+                  title="Cancel"
+                  onPress={() => setIsVenueModalVisible(false)}
+                />
+              </View>
+              <View style={styles.flexHalf}>
+                <Button
+                  variant="primary"
+                  title="Save Venue"
+                  onPress={handleCreateVenue}
+                  isLoading={isSavingVenue}
                 />
               </View>
             </View>

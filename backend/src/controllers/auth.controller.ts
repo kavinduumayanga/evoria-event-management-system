@@ -57,11 +57,13 @@ const forgotPasswordSchema = z.object({
 });
 
 const resetPasswordSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
   token: z.string().trim().min(1, 'Reset token is required'),
   newPassword: z.string().min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`),
 });
 
 const verifyResetOtpSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
   token: z.string().trim().min(1, 'Reset token is required'),
 });
 
@@ -245,10 +247,12 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = resetPasswordSchema.parse(req.body);
+    const normalizedEmail = normalizeEmail(validatedData.email);
 
     const hashedToken = crypto.createHash('sha256').update(validatedData.token).digest('hex');
 
     const userDoc = await UserModel.findOne({
+      email: normalizedEmail,
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: new Date() },
     }).select('+password +resetPasswordToken +resetPasswordExpires +isActive +isSuspended');
@@ -265,11 +269,22 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       return next(new AppError('This account is suspended.', 403));
     }
 
+    const isSamePassword = await bcrypt.compare(validatedData.newPassword, userDoc.password);
+    if (isSamePassword) {
+      return next(new AppError('New password must be different from current password', 400));
+    }
+
+    const previousHash = userDoc.password;
     userDoc.password = await bcrypt.hash(validatedData.newPassword, 12);
     userDoc.resetPasswordToken = undefined;
     userDoc.resetPasswordExpires = undefined;
 
     await userDoc.save();
+
+    if (!userDoc.password || userDoc.password === previousHash) {
+      console.error('[auth.resetPassword] Password hash did not change for user', userDoc.id);
+      return next(new AppError('Password reset failed. Please try again.', 500));
+    }
 
     const safeUser = toSafeUser(userDoc);
     const token = signToken(safeUser.id, safeUser.role);
@@ -290,9 +305,11 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 export const verifyResetOtp = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validatedData = verifyResetOtpSchema.parse(req.body);
+    const normalizedEmail = normalizeEmail(validatedData.email);
     const hashedToken = crypto.createHash('sha256').update(validatedData.token).digest('hex');
 
     const userDoc = await UserModel.findOne({
+      email: normalizedEmail,
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: new Date() },
     }).select('+isActive +isSuspended');

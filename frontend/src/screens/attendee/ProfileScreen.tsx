@@ -53,22 +53,68 @@ export const ProfileScreen = () => {
   };
 
   const handleDeactivateAccount = () => {
-    Alert.alert('Deactivate Account', 'This will deactivate your account and sign you out. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Deactivate',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await UserService.deactivateAccount();
-            Alert.alert('Account Deactivated', 'Your account was deactivated successfully.');
-            await logout();
-          } catch (err: any) {
-            Alert.alert('Failed', getApiErrorMessage(err, 'Unable to deactivate account.'));
-          }
+    const runDelete = async () => {
+      try {
+        await UserService.deleteAccount();
+        Alert.alert('Account Deleted', 'Your account and related data were deleted permanently.');
+        await logout();
+      } catch (err: any) {
+        Alert.alert('Failed', getApiErrorMessage(err, 'Unable to delete account.'));
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const typed = window.prompt('Type DELETE to permanently delete your account and all related data.');
+      if (typed === 'DELETE') {
+        void runDelete();
+      }
+      return;
+    }
+
+    if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
+      Alert.prompt(
+        'Delete Account',
+        'This will permanently delete your account and all related data. Type DELETE to confirm.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: (value?: string) => {
+              if ((value || '').trim().toUpperCase() !== 'DELETE') {
+                Alert.alert('Confirmation Required', 'Account deletion cancelled because DELETE was not entered.');
+                return;
+              }
+              void runDelete();
+            },
+          },
+        ],
+        'plain-text',
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all related data. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Final Confirmation',
+              'This action cannot be undone. Do you want to permanently delete your account?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete Permanently', style: 'destructive', onPress: () => { void runDelete(); } },
+              ],
+            );
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   if (isLoading) return <LoadingState />;
@@ -130,7 +176,7 @@ export const ProfileScreen = () => {
           style={styles.logoutBtn}
         />
         <TouchableOpacity onPress={handleDeactivateAccount} style={styles.deactivateBtn}>
-          <Text style={styles.deactivateText}>Deactivate Account</Text>
+          <Text style={styles.deactivateText}>Delete Account</Text>
         </TouchableOpacity>
       </View>
     </ScreenContainer>

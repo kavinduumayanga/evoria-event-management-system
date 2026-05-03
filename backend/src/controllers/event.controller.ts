@@ -647,18 +647,7 @@ const resolveEventOwnerId = (event: any): string => {
 };
 
 const validatePricingModeTransition = async (event: any, nextPricingMode: EventPricingMode) => {
-  if (nextPricingMode !== 'free') return;
-
-  const hasPaidTickets = await TicketTypeModel.exists({
-    eventId: event.id,
-    isActive: true,
-    isFree: false,
-    price: { $gt: 0 },
-  });
-
-  if (hasPaidTickets) {
-    throw new AppError('Cannot switch to free while active paid ticket types exist', 400);
-  }
+  if (!event || !nextPricingMode) return;
 };
 
 const parseTagsParam = (rawTags: string | string[] | undefined): string[] => {
@@ -1376,6 +1365,8 @@ export const updateEvent = async (req: Request, res: Response, next: NextFunctio
     }
 
     const mergedEventInput = toMergedEventInputForUpdate(event, updates);
+    const previousPricingMode = normalizePricingMode(event.pricingMode);
+    const nextPricingMode = mergedEventInput.pricingMode;
     await validatePricingModeTransition(event, mergedEventInput.pricingMode);
     await validateEventData(mergedEventInput, resolveEventOwnerId(event));
 
@@ -1384,6 +1375,13 @@ export const updateEvent = async (req: Request, res: Response, next: NextFunctio
       toEventUpdatePayload(updates),
       { new: true },
     );
+
+    if (previousPricingMode !== 'free' && nextPricingMode === 'free') {
+      await TicketTypeModel.updateMany(
+        { eventId: event.id, isActive: true },
+        { $set: { isActive: false } },
+      );
+    }
 
     res.status(200).json({ status: 'success', data: { event: updatedEvent!.toJSON() } });
   } catch (error: any) {
