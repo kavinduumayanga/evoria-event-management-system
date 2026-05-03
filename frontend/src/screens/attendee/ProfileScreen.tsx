@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Platform } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { User, Mail, Phone, Shield, LogOut, ChevronRight, KeyRound } from 'lucide-react-native';
 import { ScreenContainer, Card, LoadingState, ErrorState, Button } from '../../components';
@@ -38,6 +38,14 @@ export const ProfileScreen = () => {
   useFocusEffect(useCallback(() => { setIsLoading(true); fetchProfile(); }, [fetchProfile]));
 
   const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to log out?');
+      if (confirmed) {
+        void logout();
+      }
+      return;
+    }
+
     Alert.alert('Log out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log Out', style: 'destructive', onPress: async () => await logout() },
