@@ -11,6 +11,20 @@ import { AppError } from '../utils/appError';
 import { createNotificationRecord } from '../utils/notification.helper';
 import { canManageEvent } from '../utils/eventPermissions';
 
+const EVENT_CHECKIN_QR_TYPE = 'EVENT_CHECKIN_QR';
+
+type EventCheckInQrPayload = {
+  type: typeof EVENT_CHECKIN_QR_TYPE;
+  eventId: string;
+  registrationId: string;
+  bookingId?: string;
+  entityType?: 'registration' | 'booking';
+  userId?: string;
+  ticketId?: string;
+  qrToken?: string;
+  generatedAt?: string;
+};
+
 const scanSchema = z.object({
   qrCodeValue: z.string().trim().min(1, 'qrCodeValue is required'),
   eventId: z.string().trim().optional(),
@@ -30,6 +44,88 @@ const ensureCanManageEvent = async (eventId: string, userId: string) => {
   if (!event) throw new AppError('Event not found', 404);
   if (!canManageEvent(userId, event)) throw new AppError('Not authorized for this event', 403);
   return event;
+};
+
+const extractQrToken = (value: string | null | undefined): string => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return `qr_${crypto.randomBytes(16).toString('hex')}`;
+
+  try {
+    const parsed = JSON.parse(trimmed) as Partial<EventCheckInQrPayload>;
+    if (parsed && parsed.type === EVENT_CHECKIN_QR_TYPE) {
+      const existingToken = String(parsed.qrToken || '').trim();
+      if (existingToken) return existingToken;
+    }
+  } catch (_error) {
+    // Fallback to using legacy raw token value.
+  }
+
+  return trimmed;
+};
+
+const buildRegistrationQrPayload = (registration: any, qrToken: string): EventCheckInQrPayload => ({
+  type: EVENT_CHECKIN_QR_TYPE,
+  entityType: 'registration',
+  eventId: registration.eventId,
+  registrationId: registration.id,
+  userId: registration.userId || undefined,
+  qrToken,
+  generatedAt: new Date().toISOString(),
+});
+
+const buildBookingQrPayload = (booking: any, qrToken: string): EventCheckInQrPayload => ({
+  type: EVENT_CHECKIN_QR_TYPE,
+  entityType: 'booking',
+  eventId: booking.eventId,
+  registrationId: booking.id,
+  bookingId: booking.id,
+  userId: booking.userId || undefined,
+  ticketId: booking.ticketTypeId || undefined,
+  qrToken,
+  generatedAt: new Date().toISOString(),
+});
+
+const parseCheckInQrPayload = (qrCodeValue: string): {
+  payload: EventCheckInQrPayload | null;
+  jsonDetected: boolean;
+} => {
+  const value = String(qrCodeValue || '').trim();
+  if (!value.startsWith('{')) {
+    return { payload: null, jsonDetected: false };
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<EventCheckInQrPayload>;
+    const registrationId = String(parsed.registrationId || '').trim();
+    const eventId = String(parsed.eventId || '').trim();
+    const type = String(parsed.type || '').trim();
+    if (
+      type !== EVENT_CHECKIN_QR_TYPE
+      || !eventId
+      || !registrationId
+    ) {
+      return { payload: null, jsonDetected: true };
+    }
+
+    return {
+      payload: {
+        type: EVENT_CHECKIN_QR_TYPE,
+        eventId,
+        registrationId,
+        bookingId: String(parsed.bookingId || '').trim() || undefined,
+        entityType: parsed.entityType === 'booking' || parsed.entityType === 'registration'
+          ? parsed.entityType
+          : undefined,
+        userId: String(parsed.userId || '').trim() || undefined,
+        ticketId: String(parsed.ticketId || '').trim() || undefined,
+        qrToken: String(parsed.qrToken || '').trim() || undefined,
+        generatedAt: String(parsed.generatedAt || '').trim() || undefined,
+      },
+      jsonDetected: true,
+    };
+  } catch (_error) {
+    return { payload: null, jsonDetected: true };
+  }
 };
 
 const recordCheckInHistory = async (input: {
@@ -116,9 +212,17 @@ const ensureQrTokenForBooking = async (booking: any) => {
     throw new AppError('Your registration was not approved. QR code is unavailable.', 403);
   }
 
-  if (booking.qrCodeValue) return booking;
-  booking.qrCodeValue = await generateBookingQrCodeValue();
-  await booking.save();
+  if (!booking.qrCodeValue) {
+    booking.qrCodeValue = await generateBookingQrCodeValue();
+  }
+
+  const qrToken = extractQrToken(booking.qrCodeValue);
+  const nextQrValue = JSON.stringify(buildBookingQrPayload(booking, qrToken));
+  if (booking.qrCodeValue !== nextQrValue) {
+    booking.qrCodeValue = nextQrValue;
+    await booking.save();
+  }
+
   return booking;
 };
 
@@ -130,9 +234,17 @@ const ensureQrTokenForRegistration = async (registrationId: string) => {
     throw new AppError('QR is available only for going/checked-in guests', 400);
   }
 
-  if (registration.qrCodeValue) return registration;
-  registration.qrCodeValue = await generateRegistrationQrCodeValue();
-  await registration.save();
+  if (!registration.qrCodeValue) {
+    registration.qrCodeValue = await generateRegistrationQrCodeValue();
+  }
+
+  const qrToken = extractQrToken(registration.qrCodeValue);
+  const nextQrValue = JSON.stringify(buildRegistrationQrPayload(registration, qrToken));
+  if (registration.qrCodeValue !== nextQrValue) {
+    registration.qrCodeValue = nextQrValue;
+    await registration.save();
+  }
+
   return registration;
 };
 
@@ -189,18 +301,90 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
   try {
     const { qrCodeValue, eventId: requestedEventId } = scanSchema.parse(req.body);
 
-    const fallbackEventId = requestedEventId ? String(requestedEventId).trim() : '';
-    if (fallbackEventId) {
-      await ensureCanManageEvent(fallbackEventId, req.user!.id);
+    const selectedEventId = requestedEventId ? String(requestedEventId).trim() : '';
+    if (!selectedEventId) {
+      return res.status(400).json({
+        status: 'invalid',
+        message: 'Please select an event before scanning',
+      });
     }
 
-    const registration = await RegistrationModel.findOne({ qrCodeValue });
-    if (registration) {
-      await ensureCanManageEvent(registration.eventId, req.user!.id);
+    await ensureCanManageEvent(selectedEventId, req.user!.id);
 
+    const parsedQr = parseCheckInQrPayload(qrCodeValue);
+    if (parsedQr.jsonDetected && !parsedQr.payload) {
+      await recordCheckInHistory({
+        eventId: selectedEventId,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'invalid',
+        reason: 'Invalid QR code',
+      });
+
+      return res.status(400).json({
+        status: 'invalid',
+        message: 'Invalid QR code',
+      });
+    }
+
+    if (parsedQr.payload && parsedQr.payload.eventId !== selectedEventId) {
+      await recordCheckInHistory({
+        eventId: selectedEventId,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'invalid',
+        reason: 'This QR code belongs to a different event. Please select the correct event.',
+      });
+
+      return res.status(409).json({
+        status: 'invalid',
+        message: 'This QR code belongs to a different event. Please select the correct event.',
+      });
+    }
+
+    let registration: any = null;
+    let booking: any = null;
+
+    if (parsedQr.payload) {
+      const shouldLookupBooking = parsedQr.payload.entityType === 'booking'
+        || Boolean(parsedQr.payload.bookingId);
+      if (shouldLookupBooking) {
+        const bookingId = String(parsedQr.payload.bookingId || parsedQr.payload.registrationId || '').trim();
+        booking = bookingId
+          ? await BookingModel.findOne({ _id: bookingId, eventId: selectedEventId })
+          : null;
+      } else {
+        const registrationId = String(parsedQr.payload.registrationId || '').trim();
+        registration = registrationId
+          ? await RegistrationModel.findOne({ _id: registrationId, eventId: selectedEventId })
+          : null;
+      }
+
+      if (!registration && !booking) {
+        await recordCheckInHistory({
+          eventId: selectedEventId,
+          qrCodeValue,
+          scannedBy: req.user!.id,
+          result: 'invalid',
+          reason: 'Registration not found for this event',
+        });
+
+        return res.status(404).json({
+          status: 'invalid',
+          message: 'Registration not found for this event',
+        });
+      }
+    } else {
+      registration = await RegistrationModel.findOne({ qrCodeValue, eventId: selectedEventId });
+      if (!registration) {
+        booking = await BookingModel.findOne({ qrCodeValue, eventId: selectedEventId });
+      }
+    }
+
+    if (registration) {
       if (registration.status === 'declined' || registration.status === 'not_going') {
         await recordCheckInHistory({
-          eventId: registration.eventId,
+          eventId: selectedEventId,
           registrationId: registration.id,
           qrCodeValue,
           scannedBy: req.user!.id,
@@ -220,17 +404,17 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
 
       if (registration.status === 'pending') {
         await recordCheckInHistory({
-          eventId: registration.eventId,
+          eventId: selectedEventId,
           registrationId: registration.id,
           qrCodeValue,
           scannedBy: req.user!.id,
           result: 'invalid',
-          reason: 'Guest must be marked going before check-in',
+          reason: 'This registration is still pending approval',
         });
 
         return res.status(400).json({
           status: 'invalid',
-          message: 'Guest must be marked going before check-in',
+          message: 'This registration is still pending approval',
           data: {
             registrationId: registration.id,
             guestStatus: registration.status,
@@ -240,17 +424,17 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
 
       if (registration.status === 'checked_in') {
         await recordCheckInHistory({
-          eventId: registration.eventId,
+          eventId: selectedEventId,
           registrationId: registration.id,
           qrCodeValue,
           scannedBy: req.user!.id,
           result: 'duplicate',
-          reason: 'Guest already checked in',
+          reason: 'Already checked in for this event',
         });
 
         return res.status(409).json({
           status: 'duplicate',
-          message: 'Guest already checked in',
+          message: 'Already checked in for this event',
           data: {
             registrationId: registration.id,
             checkedInAt: registration.checkedInAt,
@@ -265,7 +449,7 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       await registration.save();
 
       await recordCheckInHistory({
-        eventId: registration.eventId,
+        eventId: selectedEventId,
         registrationId: registration.id,
         qrCodeValue,
         scannedBy: req.user!.id,
@@ -300,10 +484,9 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    const booking = await BookingModel.findOne({ qrCodeValue });
     if (!booking) {
       await recordCheckInHistory({
-        eventId: fallbackEventId || null,
+        eventId: selectedEventId || null,
         qrCodeValue,
         scannedBy: req.user!.id,
         result: 'invalid',
@@ -316,11 +499,9 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    await ensureCanManageEvent(booking.eventId, req.user!.id);
-
     if (booking.bookingStatus === 'cancelled') {
       await recordCheckInHistory({
-        eventId: booking.eventId,
+        eventId: selectedEventId,
         bookingId: booking.id,
         qrCodeValue,
         scannedBy: req.user!.id,
@@ -340,17 +521,21 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
 
     if (booking.bookingStatus !== 'confirmed') {
       await recordCheckInHistory({
-        eventId: booking.eventId,
+        eventId: selectedEventId,
         bookingId: booking.id,
         qrCodeValue,
         scannedBy: req.user!.id,
         result: 'invalid',
-        reason: 'Only confirmed bookings can be checked in',
+        reason: booking.approvalStatus === 'pending'
+          ? 'This registration is still pending approval'
+          : 'Only confirmed bookings can be checked in',
       });
 
       return res.status(400).json({
         status: 'invalid',
-        message: 'Only confirmed bookings can be checked in',
+        message: booking.approvalStatus === 'pending'
+          ? 'This registration is still pending approval'
+          : 'Only confirmed bookings can be checked in',
         data: {
           bookingId: booking.id,
           bookingStatus: booking.bookingStatus,
@@ -360,17 +545,21 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
 
     if (booking.approvalStatus && booking.approvalStatus !== 'approved') {
       await recordCheckInHistory({
-        eventId: booking.eventId,
+        eventId: selectedEventId,
         bookingId: booking.id,
         qrCodeValue,
         scannedBy: req.user!.id,
         result: 'invalid',
-        reason: 'Booking approval is pending or rejected',
+        reason: booking.approvalStatus === 'pending'
+          ? 'This registration is still pending approval'
+          : 'Booking approval is pending or rejected',
       });
 
       return res.status(400).json({
         status: 'invalid',
-        message: 'Booking approval is pending or rejected',
+        message: booking.approvalStatus === 'pending'
+          ? 'This registration is still pending approval'
+          : 'Booking approval is pending or rejected',
         data: {
           bookingId: booking.id,
           approvalStatus: booking.approvalStatus,
@@ -378,19 +567,39 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
+    if (booking.rsvpStatus === 'not_going') {
+      await recordCheckInHistory({
+        eventId: selectedEventId,
+        bookingId: booking.id,
+        qrCodeValue,
+        scannedBy: req.user!.id,
+        result: 'rejected',
+        reason: 'Declined/Not-going guests cannot be checked in',
+      });
+
+      return res.status(409).json({
+        status: 'declined',
+        message: 'Declined/Not-going guests cannot be checked in',
+        data: {
+          bookingId: booking.id,
+          rsvpStatus: booking.rsvpStatus,
+        },
+      });
+    }
+
     if (booking.checkInStatus === 'checked_in') {
       await recordCheckInHistory({
-        eventId: booking.eventId,
+        eventId: selectedEventId,
         bookingId: booking.id,
         qrCodeValue,
         scannedBy: req.user!.id,
         result: 'duplicate',
-        reason: 'Attendee already checked in',
+        reason: 'Already checked in for this event',
       });
 
       return res.status(409).json({
         status: 'duplicate',
-        message: 'Attendee already checked in',
+        message: 'Already checked in for this event',
         data: {
           bookingId: booking.id,
           checkedInAt: booking.checkedInAt,
@@ -405,7 +614,7 @@ export const scanCheckIn = async (req: Request, res: Response, next: NextFunctio
     await booking.save();
 
     await recordCheckInHistory({
-      eventId: booking.eventId,
+      eventId: selectedEventId,
       bookingId: booking.id,
       qrCodeValue,
       scannedBy: req.user!.id,
