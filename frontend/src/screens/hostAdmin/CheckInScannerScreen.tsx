@@ -165,7 +165,7 @@ export const CheckInScannerScreen = () => {
 
   const openScanner = async () => {
     if (!selectedEventId) {
-      Alert.alert('Select Event', 'Please select an event first.');
+      Alert.alert('Select Event', 'Please select an event before scanning');
       return;
     }
 
@@ -191,6 +191,10 @@ export const CheckInScannerScreen = () => {
 
   const handleScan = async (result: BarcodeScanningResult) => {
     if (isProcessingScan) return;
+    if (!selectedEventId) {
+      Alert.alert('Select Event', 'Please select an event before scanning');
+      return;
+    }
     const qrCodeValue = String(result.data || '').trim();
     if (!qrCodeValue) return;
 
@@ -209,13 +213,15 @@ export const CheckInScannerScreen = () => {
       Alert.alert('Success', response.message || 'Check-in successful');
       await fetchAttendance(selectedEventId);
     } catch (scanError: any) {
-      const statusCode = scanError?.response?.status;
       const message = scanError?.response?.data?.message || 'Invalid QR code';
       const responseStatus = String(scanError?.response?.data?.status || '').toLowerCase();
 
-      if (statusCode === 409 || responseStatus === 'duplicate') {
+      if (responseStatus === 'duplicate' || /already checked in/i.test(message)) {
         pushRecentScan('duplicate', message);
         Alert.alert('Duplicate', message);
+      } else if (/different event/i.test(message)) {
+        pushRecentScan('invalid', message);
+        Alert.alert('Invalid QR', message);
       } else if (responseStatus === 'declined' || /declined|not-going/i.test(message)) {
         pushRecentScan('declined', message);
         Alert.alert('Declined', message);
