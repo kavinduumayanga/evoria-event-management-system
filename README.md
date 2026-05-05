@@ -1,142 +1,241 @@
-# Evoria - Event Management App
+# Evoria Event Management App
 
-Evoria is a mobile-based event booking and management system prototype.
+Evoria is a full-stack event platform with:
 
-## Project Structure
-This repository contains two main directories:
-- `backend/`: Node.js Express API using MongoDB for storage
-- `frontend/`: React Native Expo mobile application
+- A TypeScript/Express/MongoDB API (`backend/`)
+- A React Native + Expo mobile app (`frontend/`)
 
-## Tech Stack
-- **Backend:** Node.js, Express, TypeScript, MongoDB, Mongoose, bcryptjs, jsonwebtoken, zod
-- **Frontend:** React Native, Expo, TypeScript, Zustand, React Navigation
-- **Design:** Dark neon UI with custom glassmorphism components
+It supports end-to-end event lifecycle flows: discovery, public event pages, registration/booking, waitlists, QR check-in, reminders, notifications, reviews, reporting, and event moderation.
 
-## Note
-This project has been migrated to use MongoDB via Mongoose. The JSON file storage has been fully deprecated.
+## Features
 
-## Setup Instructions
+### Attendee flows
+- Email OTP verification during signup and password reset
+- Browse/discover/search/trending/recommended events
+- Public event page by slug (`/api/public/events/:slug`)
+- Book tickets with promo code + unlock code support
+- Waitlist participation and promotion handling
+- View bookings, registrations, and QR ticket/check-in data
+- Add events to calendar via generated ICS links
+- Report events/users and receive in-app notifications
 
-### 1. MongoDB Setup
-You must have a MongoDB instance running.
-- **Local Install (macOS):**
-  ```bash
-  brew tap mongodb/brew
-  brew install mongodb-community
-  brew services start mongodb-community
-  ```
-- Alternatively, you can use MongoDB Atlas and set your `MONGO_URI` in the `.env` file.
+### Event manager flows (owner/admin/co-host)
+- Create, update, publish, cancel, and delete events
+- Assign event admins and co-hosts by email
+- Manage custom registration fields/questions
+- Manage ticket types, sessions, guest lists, waitlists
+- QR scanner + manual check-in + check-in history logs
+- Event dashboard analytics and aggregate analytics endpoints
+- Event communication: invite guests, blast messages, reminders
+- Export guest list CSV
 
-### 2. Backend Setup
-1. Open a terminal and navigate to the backend folder:
-   ```bash
-   cd backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Set up environment variables:
-   Copy `.env.example` to `.env`. Ensure your `MONGO_URI` and `JWT_SECRET` are correctly configured.
-4. Seed the Database:
-   Populate your local MongoDB with test data (Users, Events, Venues, Tickets, Sessions):
-   ```bash
-   npm run seed
-   ```
-5. Start the backend server:
-   ```bash
-   npm run dev
-   ```
-   *The server will run on http://localhost:5000*
-   *You can verify it's working by visiting http://localhost:5000/api/health*
+### Platform/admin flows
+- Event moderation (approve/reject)
+- User moderation (suspend/activate)
+- Platform analytics
 
-### 3. Frontend Setup
-1. Open a new terminal and navigate to the frontend folder:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Update API Base URL:
-   Since you will be testing on a physical iPhone 11 Pro Max via Expo Go, you **must** update the `API_URL` in `frontend/src/constants/api.ts` to point to your computer's local network IP address (e.g., `http://192.168.1.100:5000/api`). 
-   - On macOS, you can find your IP by running `ipconfig getifaddr en0` in the terminal.
-4. Start the Expo development server:
-   ```bash
-   npx expo start
-   ```
+## Tech stack
 
-### 4. Running on iPhone 11 Pro Max
-1. Download the **Expo Go** app from the App Store on your iPhone.
-2. Make sure your iPhone and computer are on the **same Wi-Fi network**.
-3. Scan the QR code displayed in the Expo terminal using your iPhone's camera.
-4. Tap the prompt to open the project in Expo Go.
+- Backend: Node.js, Express 5, TypeScript, MongoDB, Mongoose, Zod, JWT, Nodemailer, Azure Blob SDK
+- Frontend: React Native, Expo SDK 54, TypeScript, Axios, Zustand, React Navigation
+- Notifications: Expo push notifications + in-app notifications
 
-## Test Credentials
+## Repository structure
 
-After running `npm run seed`, you can use the following accounts:
+```text
+evoria-event-management-app/
+├── backend/    # Express + MongoDB API
+└── frontend/   # Expo React Native app
+```
 
-- **Host Admin:**
-  - Email: `hostadmin@evoria.com`
-  - Password: `Admin123!`
+## Quick start
 
-- **Attendee:**
-  - Email: `attendee@evoria.com`
-  - Password: `Attendee123!`
+### 1. Prerequisites
 
-## API Smoke Testing / Postman Examples
+- Node.js 18+ (Node 20 LTS recommended)
+- npm
+- MongoDB local instance or MongoDB Atlas
+- Expo Go app (for physical mobile testing)
 
-You can test the API using standard curl commands or Postman. For example, to login and get a token:
+### 2. Backend setup
+
+```bash
+cd backend
+npm install
+cp .env.example .env
+```
+
+Set at minimum:
+
+- `MONGO_URI`
+- `JWT_SECRET`
+
+Run migrations/seed and start API:
+
+```bash
+npm run seed
+npm run dev
+```
+
+Health check:
+
+- `http://localhost:5000/api/health` (or your configured `PORT`)
+
+### 3. Frontend setup
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+```
+
+Set:
+
+- `EXPO_PUBLIC_API_BASE_URL=http://<YOUR_LOCAL_IP>:5000/api` for local device testing
+- Or your deployed backend URL for production testing
+
+Run:
+
+```bash
+npm run start
+```
+
+## Environment variables
+
+### Backend (`backend/.env`)
+
+Required:
+
+- `MONGO_URI`
+- `JWT_SECRET`
+
+Core:
+
+- `NODE_ENV` (development/production)
+- `PORT` (defaults to `5000` in code)
+- `JWT_EXPIRES_IN` (default `7d`)
+- `FRONTEND_URL` (CORS allowlist fallback, optional)
+- `PUBLIC_API_BASE_URL` (used for public links in communication flows)
+
+Email / OTP:
+
+- `EMAIL_PROVIDER` (`gmail` or `mock`)
+- `GMAIL_USER`
+- `GMAIL_APP_PASSWORD`
+- `EMAIL_FROM`
+- `OTP_EXPIRY_MINUTES`
+
+Push notifications:
+
+- `EXPO_ACCESS_TOKEN` (optional bearer token for Expo push send API)
+
+Azure image storage (optional):
+
+- `AZURE_STORAGE_CONNECTION_STRING`
+- `AZURE_STORAGE_CONTAINER_EVENTS`
+- `AZURE_STORAGE_CONTAINER_PROFILES`
+- `AZURE_STORAGE_CONTAINER_SESSIONS`
+
+If Azure storage is not configured, uploads use local fallback under `backend/uploads/`.
+
+### Frontend (`frontend/.env`)
+
+- `EXPO_PUBLIC_API_BASE_URL`
+
+If omitted, frontend falls back to the hardcoded production API URL in `frontend/src/constants/api.ts`.
+
+## Demo seed data
+
+After `npm run seed` in `backend/`, demo users are upserted:
+
+- `demo.host@evoria.com` / `Demo123!`
+- `demo.attendee1@evoria.com` / `Demo123!`
+- `demo.attendee2@evoria.com` / `Demo123!`
+
+Seed also creates:
+
+- Demo event slug: `evoria-tech-meetup-2026`
+- Venue, sessions, registrations, bookings, and a sample notification
+
+## Useful scripts
+
+### Backend scripts
+
+- `npm run dev` — run API with nodemon
+- `npm run build` — compile TypeScript to `dist/`
+- `npm run start` — run compiled server
+- `npm run test` — run backend tests
+- `npm run seed` — seed deterministic demo data
+- `npm run db:counts` — print document counts by collection
+- `npm run db:clear -- --confirm-clear-db` — clear database (with safety checks)
+- `npm run reset:users -- --confirm-delete-all-users --type DELETE_ALL_USERS` — destructive user/data reset
+
+### Frontend scripts
+
+- `npm run start` — start Expo dev server
+- `npm run android` — run Android native build
+- `npm run ios` — run iOS native build
+- `npm run web` — run web mode
+- `npm run web:build` — export static web build
+
+## API overview
+
+Base URL:
+
+- `http://localhost:<PORT>/api`
+
+Main route groups:
+
+- `auth` — register/login/verify/reset/get current user
+- `events` — discovery, event CRUD, visibility/status, co-host/admin, reminders, reviews, calendar
+- `public` — public event by slug + public registration
+- `tickets` / `bookings` / `registrations` / `waitlist`
+- `checkins` / `guests`
+- `notifications` / `push`
+- `venues` / `sessions`
+- `analytics` / `admin`
+- `reports` / `moderation`
+- `uploads` / `locations`
+
+Quick login smoke test:
 
 ```bash
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "hostadmin@evoria.com", "password": "Admin123!"}'
+  -d '{"email":"demo.host@evoria.com","password":"Demo123!"}'
 ```
 
-To fetch all events:
-```bash
-curl -X GET http://localhost:5000/api/events
-```
-
-To fetch venues:
-```bash
-curl -X GET http://localhost:5000/api/venues
-```
-
-## Roles
-There are two roles in the system:
-- **Host Admin:** Can create and manage events, venues, sessions, tickets, and view bookings.
-- **Attendee:** Can browse public events, view details, and book tickets.
-
-## Azure Deployment Instructions
+## Deployment notes
 
 ### Backend (Azure App Service)
-The backend is fully compatible with Azure App Service (Linux Node.js runtime).
 
-1. **Create an Azure Web App** with the Node.js runtime.
-2. **Environment Variables**: Add the following Application Settings:
-   - `NODE_ENV=production`
-   - `MONGO_URI=<Your MongoDB Atlas connection string>`
-   - `JWT_SECRET=<Your strong secret>`
-   - `JWT_EXPIRES_IN=7d`
-   - `FRONTEND_URL=<Your Azure Static Web App URL>` (Optional, limits CORS)
-3. **Startup Command**: Azure will automatically detect the `package.json` and run:
-   - `npm install`
-   - `npm run build`
-   - `npm start`
-4. **Health Check**: Once deployed, verify functionality at `https://YOUR_BACKEND.azurewebsites.net/api/health`.
+Use Node.js runtime and set env vars above. Typical startup:
+
+- `npm install`
+- `npm run build`
+- `npm run start`
 
 ### Frontend (Azure Static Web Apps)
-The Expo React Native app can be exported statically for the web and hosted on Azure Static Web Apps.
 
-1. **Create an Azure Static Web App**.
-2. **Configure Build Settings**:
-   - App location: `frontend`
-   - Api location: Leave blank
-   - Output location: `dist`
-   - Build command: `npm run web:build`
-3. **Environment Variables**: Add the following in the Azure Static Web Apps configuration:
-   - `EXPO_PUBLIC_API_BASE_URL=https://YOUR_BACKEND.azurewebsites.net/api`
-4. **Deployment**: Pushing to your GitHub branch will trigger the GitHub Actions workflow, compiling the Expo web build directly to Azure.
+Expo web export is supported via:
+
+- Build command: `npm run web:build`
+- Output folder: `frontend/dist`
+- Environment: `EXPO_PUBLIC_API_BASE_URL=<backend_api_url>/api`
+
+## Current limitations
+
+- Payment flow is mock-only (`/api/payments/mock-checkout`)
+- Google auth endpoint is a planned placeholder (`/api/auth/google` returns `501`)
+- No OpenAPI/Swagger spec included yet
+
+## Security and safety notes
+
+- Do not commit `.env` files or real credentials
+- Rotate `JWT_SECRET` and email credentials in production
+- Use `NODE_ENV=production` and restrictive `FRONTEND_URL` in production
+- Destructive DB scripts intentionally require explicit confirmation flags
+
+## License
+
+No license file is currently included in this repository. Add a license before public distribution if you intend to permit reuse.
