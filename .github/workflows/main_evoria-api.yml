@@ -38,6 +38,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    # Keeping this environment makes GitHub's OIDC subject use:
+    # repo:<owner>/<repo>:environment:Production
+    # which should match an environment-scoped federated credential in Entra ID.
+    environment: Production
     permissions:
       id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
