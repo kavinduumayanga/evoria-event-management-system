@@ -49,6 +49,19 @@ jobs:
         with:
           name: node-app
 
+      - name: Resolve deployment package path
+        run: |
+          if [ -f backend/package.json ]; then
+            echo "DEPLOY_PACKAGE=backend" >> "$GITHUB_ENV"
+          elif [ -f package.json ]; then
+            echo "DEPLOY_PACKAGE=." >> "$GITHUB_ENV"
+          else
+            echo "Could not find package.json in backend/ or repository root after artifact download."
+            echo "Artifact contents:"
+            ls -la
+            exit 1
+          fi
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -62,4 +75,4 @@ jobs:
         with:
           app-name: 'evoria-api'
           slot-name: 'Production'
-          package: backend
+          package: ${{ env.DEPLOY_PACKAGE }}
